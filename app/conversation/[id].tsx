@@ -1,8 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import {
-  View, Text, FlatList, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator,
-} from 'react-native'
+import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator, StyleSheet } from 'react-native'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -11,29 +8,21 @@ import { formatDistanceToNow } from 'date-fns'
 import { Screen, Spinner, Avatar } from '../../components/ui'
 import { dmApi, feedApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
-
-const REACTIONS = ['❤️', '😂', '😮', '😢', '👍', '👎']
+import { C } from '../../constants/colors'
+import { useC } from '../../constants/ColorContext'
 
 export default function ConversationScreen() {
+  const c = useC()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { user } = useAuthStore()
   const qc = useQueryClient()
   const [text, setText] = useState('')
   const [imageUrl, setImageUrl] = useState('')
   const [uploading, setUploading] = useState(false)
-  const [reacting, setReacting] = useState<string | null>(null)
   const flatListRef = useRef<FlatList>(null)
 
-  const { data: convData } = useQuery({
-    queryKey: ['conversation', id],
-    queryFn: () => dmApi.getConversation(id!).then(r => r.data),
-  })
-
-  const { data: msgData, refetch } = useQuery({
-    queryKey: ['messages', id],
-    queryFn: () => dmApi.getMessages(id!).then(r => r.data),
-    refetchInterval: 5_000,
-  })
+  const { data: convData } = useQuery({ queryKey: ['conversation', id], queryFn: () => dmApi.getConversation(id!).then(r => r.data) })
+  const { data: msgData, refetch } = useQuery({ queryKey: ['messages', id], queryFn: () => dmApi.getMessages(id!).then(r => r.data), refetchInterval: 5_000 })
 
   const messages = msgData?.messages || []
   const conv = convData
@@ -47,16 +36,8 @@ export default function ConversationScreen() {
     mutationFn: () => dmApi.sendMessage(id!, text, imageUrl || undefined),
     onSuccess: () => { setText(''); setImageUrl(''); refetch(); qc.invalidateQueries({ queryKey: ['conversations'] }) },
   })
-
-  const del = useMutation({
-    mutationFn: (msgId: string) => dmApi.deleteMessage(msgId),
-    onSuccess: refetch,
-  })
-
-  const accept = useMutation({
-    mutationFn: () => dmApi.acceptRequest(id!),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['conversation', id] }),
-  })
+  const del    = useMutation({ mutationFn: (msgId: string) => dmApi.deleteMessage(msgId), onSuccess: refetch })
+  const accept = useMutation({ mutationFn: () => dmApi.acceptRequest(id!), onSuccess: () => qc.invalidateQueries({ queryKey: ['conversation', id] }) })
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 })
@@ -70,145 +51,78 @@ export default function ConversationScreen() {
     finally { setUploading(false) }
   }
 
-  const MessageBubble = ({ msg }: { msg: any }) => {
-    const isOwn = msg.author_id === user?.id
-    if (msg.deleted_at) {
-      return (
-        <View className={`flex-row my-0.5 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-          <Text className="text-xs text-gray-400 italic px-3 py-1.5">Message deleted</Text>
-        </View>
-      )
-    }
-
-    return (
-      <View className={`flex-row items-end gap-1.5 my-0.5 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
-        {!isOwn && <Avatar url={msg.author_avatar_url} name={msg.author_display_name} size={28} />}
-
-        <TouchableOpacity
-          onLongPress={() => {
-            if (isOwn) {
-              Alert.alert('Message options', undefined, [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => del.mutate(msg.id) },
-              ])
-            } else {
-              setReacting(msg.id)
-            }
-          }}
-          className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 ${isOwn ? 'bg-indigo-600 rounded-br-sm' : 'bg-gray-100 dark:bg-gray-800 rounded-bl-sm'}`}
-        >
-          {msg.content ? (
-            <Text className={`text-sm ${isOwn ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>
-              {msg.content}
-            </Text>
-          ) : null}
-          {msg.image_url ? (
-            <Image source={{ uri: msg.image_url }} style={{ width: 180, height: 140, borderRadius: 8, marginTop: msg.content ? 4 : 0 }} resizeMode="cover" />
-          ) : null}
-          <Text className={`text-[10px] mt-1 ${isOwn ? 'text-indigo-200' : 'text-gray-400'}`}>
-            {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
-            {msg.edited_at ? ' · edited' : ''}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Reaction picker (long press) */}
-        {reacting === msg.id && (
-          <View className="absolute bottom-8 left-0 right-0 items-center z-10">
-            <View className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-2 flex-row gap-2 shadow-lg">
-              {REACTIONS.map(r => (
-                <TouchableOpacity key={r} onPress={() => setReacting(null)}>
-                  <Text style={{ fontSize: 24 }}>{r}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-      </View>
-    )
-  }
-
   return (
     <Screen>
       <Stack.Screen options={{
-        headerShown: true,
-        headerTitle: other?.display_name || other?.username || 'Message',
-        headerBackTitle: 'Messages',
-        headerStyle: { backgroundColor: '#ffffff' },
-        headerTintColor: '#6366f1',
+        headerShown: true, headerTitle: other?.display_name || other?.username || 'Message',
+        headerBackTitle: 'Messages', headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
         headerRight: () => other ? (
           <TouchableOpacity onPress={() => router.push(`/profile/${other.username}`)}>
             <Avatar url={other.avatar_url} name={other.display_name || other.username} size={32} />
           </TouchableOpacity>
         ) : null,
       }} />
-
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={90}
-      >
-        {/* Message request banner */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={90}>
         {conv && !conv.is_accepted && (
-          <View className="mx-4 mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl">
-            <Text className="text-sm font-medium text-amber-800 dark:text-amber-300">Message request</Text>
-            <Text className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 mb-2">Accept to reply</Text>
-            <TouchableOpacity onPress={() => accept.mutate()} className="bg-indigo-600 rounded-lg py-1.5 items-center">
-              <Text className="text-white font-semibold text-sm">Accept</Text>
+          <View style={s.requestBanner}>
+            <Text style={s.requestTitle}>Message request</Text>
+            <Text style={s.requestSub}>Accept to reply</Text>
+            <TouchableOpacity onPress={() => accept.mutate()} style={s.acceptBtn}>
+              <Text style={s.acceptBtnText}>Accept</Text>
             </TouchableOpacity>
           </View>
         )}
-
         <FlatList
           ref={flatListRef}
           data={messages}
           keyExtractor={m => m.id}
-          renderItem={({ item }) => <MessageBubble msg={item} />}
           contentContainerStyle={{ padding: 12 }}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-          ListEmptyComponent={
-            <View className="items-center py-16">
-              <Text className="text-gray-400 text-sm">No messages yet. Say hello!</Text>
-            </View>
-          }
+          ListEmptyComponent={<View style={{ alignItems: 'center', paddingVertical: 48 }}><Text style={{ color: c.textLight }}>No messages yet. Say hello!</Text></View>}
+          renderItem={({ item: msg }) => {
+            const isOwn = msg.author_id === user?.id
+            if (msg.deleted_at) return (
+              <View style={[s.bubbleRow, isOwn && { justifyContent: 'flex-end' }]}>
+                <Text style={s.deleted}>Message deleted</Text>
+              </View>
+            )
+            return (
+              <View style={[s.bubbleRow, isOwn && { justifyContent: 'flex-end' }]}>
+                {!isOwn && <Avatar url={msg.author_avatar_url} name={msg.author_display_name} size={28} />}
+                <TouchableOpacity
+                  onLongPress={() => isOwn && Alert.alert('Delete message?', undefined, [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: () => del.mutate(msg.id) },
+                  ])}
+                  style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}
+                >
+                  {msg.content ? <Text style={[s.bubbleText, isOwn && { color: 'white' }]}>{msg.content}</Text> : null}
+                  {msg.image_url ? <Image source={{ uri: msg.image_url }} style={s.bubbleImage} resizeMode="cover" /> : null}
+                  <Text style={[s.bubbleTime, isOwn && { color: 'rgba(255,255,255,0.7)' }]}>
+                    {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )
+          }}
         />
-
-        {/* Image preview */}
         {imageUrl ? (
-          <View className="px-4 pt-2 relative w-fit">
+          <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
             <Image source={{ uri: imageUrl }} style={{ height: 80, width: 100, borderRadius: 8 }} resizeMode="cover" />
-            <TouchableOpacity
-              onPress={() => setImageUrl('')}
-              className="absolute top-1 right-0 bg-black/60 rounded-full w-5 h-5 items-center justify-center"
-            >
+            <TouchableOpacity onPress={() => setImageUrl('')} style={s.removeImg}>
               <Ionicons name="close" size={10} color="white" />
             </TouchableOpacity>
           </View>
         ) : null}
-
-        {/* Composer */}
         {(conv?.is_accepted !== false) && (
-          <View className="flex-row items-end gap-2 px-3 py-3 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-            <TouchableOpacity onPress={pickImage} disabled={uploading} className="pb-1">
-              {uploading
-                ? <ActivityIndicator size="small" color="#6366f1" />
-                : <Ionicons name="image-outline" size={22} color="#6366f1" />}
+          <View style={s.composer}>
+            <TouchableOpacity onPress={pickImage} disabled={uploading}>
+              {uploading ? <ActivityIndicator size="small" color={c.primary} /> : <Ionicons name="image-outline" size={22} color={c.primary} />}
             </TouchableOpacity>
-            <TextInput
-              className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-2 text-sm text-gray-900 dark:text-white max-h-24"
-              placeholder="Message…"
-              placeholderTextColor="#9ca3af"
-              value={text}
-              onChangeText={setText}
-              multiline
-              returnKeyType="send"
-              onSubmitEditing={() => (text.trim() || imageUrl) && send.mutate()}
-            />
-            <TouchableOpacity
-              onPress={() => (text.trim() || imageUrl) && send.mutate()}
-              disabled={(!text.trim() && !imageUrl) || send.isPending}
-              className="pb-1"
-            >
-              <Ionicons name="send" size={20} color={(text.trim() || imageUrl) ? '#6366f1' : '#9ca3af'} />
+            <TextInput style={s.input} placeholder="Message…" placeholderTextColor={c.textLight}
+              value={text} onChangeText={setText} multiline maxLength={2000} />
+            <TouchableOpacity onPress={() => (text.trim() || imageUrl) && send.mutate()} disabled={(!text.trim() && !imageUrl) || send.isPending}>
+              <Ionicons name="send" size={20} color={(text.trim() || imageUrl) ? c.primary : c.textLight} />
             </TouchableOpacity>
           </View>
         )}
@@ -216,3 +130,22 @@ export default function ConversationScreen() {
     </Screen>
   )
 }
+
+const s = StyleSheet.create({
+  requestBanner: { margin: 12, padding: 12, backgroundColor: '#fefce8', borderWidth: 1, borderColor: '#fde68a', borderRadius: 12 },
+  requestTitle: { fontSize: 14, fontWeight: '600', color: '#92400e' },
+  requestSub: { fontSize: 12, color: '#b45309', marginBottom: 8 },
+  acceptBtn: { backgroundColor: C.primary, borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
+  acceptBtnText: { color: 'white', fontWeight: '600', fontSize: 14 },
+  bubbleRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginVertical: 2 },
+  bubble: { maxWidth: '75%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
+  bubbleOwn: { backgroundColor: C.primary, borderBottomRightRadius: 4 },
+  bubbleOther: { backgroundColor: C.bg, borderBottomLeftRadius: 4 },
+  bubbleText: { fontSize: 14, color: C.text },
+  bubbleTime: { fontSize: 10, color: C.textLight, marginTop: 3 },
+  bubbleImage: { width: 180, height: 140, borderRadius: 8, marginTop: 4 },
+  deleted: { fontSize: 12, color: C.textLight, fontStyle: 'italic', paddingHorizontal: 12, paddingVertical: 6 },
+  removeImg: { position: 'absolute', top: 6, right: -2, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.card },
+  input: { flex: 1, backgroundColor: C.bg, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, color: C.text, maxHeight: 100 },
+})

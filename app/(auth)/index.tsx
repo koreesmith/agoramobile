@@ -1,13 +1,12 @@
 import { useState } from 'react'
-import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
-} from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, StyleSheet } from 'react-native'
 import { router } from 'expo-router'
 import { useAuthStore } from '../../store/auth'
 import { authApi } from '../../api'
+import { useC } from '../../constants/ColorContext'
 
 export default function LoginScreen() {
+  const c = useC()
   const { setAuth } = useAuthStore()
   const [instanceUrl, setInstanceUrl] = useState('')
   const [username, setUsername] = useState('')
@@ -27,9 +26,7 @@ export default function LoginScreen() {
       setStep('credentials')
     } catch {
       Alert.alert('Cannot connect', 'Could not reach that instance. Check the URL and try again.')
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   const login = async () => {
@@ -43,104 +40,42 @@ export default function LoginScreen() {
     } catch (err: any) {
       const msg = err?.response?.data?.error || 'Login failed. Check your credentials.'
       Alert.alert('Login failed', msg)
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-white dark:bg-gray-950"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View className="flex-1 justify-center px-6 py-12">
-          {/* Logo / title */}
-          <View className="items-center mb-10">
-            <View className="w-16 h-16 rounded-2xl bg-indigo-600 items-center justify-center mb-4">
-              <Text className="text-white text-3xl font-bold">A</Text>
-            </View>
-            <Text className="text-2xl font-bold text-gray-900 dark:text-white">
-              {step === 'credentials' && instanceName ? instanceName : 'Agora'}
-            </Text>
-            <Text className="text-gray-500 mt-1 text-center">
-              {step === 'instance' ? 'Enter your instance URL to get started' : `Sign in to ${instanceName}`}
-            </Text>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#f9fafb' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+        <View style={s.container}>
+          <View style={s.logoWrap}>
+            <View style={s.logo}><Text style={s.logoText}>A</Text></View>
+            <Text style={s.title}>{step === 'credentials' && instanceName ? instanceName : 'Agora'}</Text>
+            <Text style={s.subtitle}>{step === 'instance' ? 'Enter your instance URL to get started' : `Sign in to ${instanceName}`}</Text>
           </View>
 
           {step === 'instance' ? (
-            <View className="space-y-4">
-              <View>
-                <Text className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Instance URL</Text>
-                <TextInput
-                  className="border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-900"
-                  placeholder="https://your-instance.social"
-                  placeholderTextColor="#9ca3af"
-                  value={instanceUrl}
-                  onChangeText={setInstanceUrl}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
-                  returnKeyType="go"
-                  onSubmitEditing={checkInstance}
-                />
-              </View>
-              <TouchableOpacity
-                className={`rounded-xl py-3.5 items-center ${loading ? 'bg-indigo-400' : 'bg-indigo-600'}`}
-                onPress={checkInstance}
-                disabled={loading || !instanceUrl.trim()}
-              >
-                {loading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text className="text-white font-semibold text-base">Continue</Text>
-                )}
+            <View style={s.form}>
+              <Text style={s.label}>Instance URL</Text>
+              <TextInput style={s.input} placeholder="https://your-instance.social" placeholderTextColor="#9ca3af"
+                value={instanceUrl} onChangeText={setInstanceUrl} autoCapitalize="none" autoCorrect={false}
+                keyboardType="url" returnKeyType="go" onSubmitEditing={checkInstance} />
+              <TouchableOpacity style={[s.btn, loading && s.btnDisabled]} onPress={checkInstance} disabled={loading || !instanceUrl.trim()}>
+                {loading ? <ActivityIndicator color="white" /> : <Text style={s.btnText}>Continue</Text>}
               </TouchableOpacity>
             </View>
           ) : (
-            <View className="space-y-4">
-              <View>
-                <Text className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Username</Text>
-                <TextInput
-                  className="border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-900"
-                  placeholder="your_username"
-                  placeholderTextColor="#9ca3af"
-                  value={username}
-                  onChangeText={setUsername}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="next"
-                />
-              </View>
-              <View>
-                <Text className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Password</Text>
-                <TextInput
-                  className="border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-900"
-                  placeholder="••••••••"
-                  placeholderTextColor="#9ca3af"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  returnKeyType="go"
-                  onSubmitEditing={login}
-                />
-              </View>
-              <TouchableOpacity
-                className={`rounded-xl py-3.5 items-center ${loading ? 'bg-indigo-400' : 'bg-indigo-600'}`}
-                onPress={login}
-                disabled={loading || !username.trim() || !password.trim()}
-              >
-                {loading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text className="text-white font-semibold text-base">Sign in</Text>
-                )}
+            <View style={s.form}>
+              <Text style={s.label}>Username</Text>
+              <TextInput style={s.input} placeholder="your_username" placeholderTextColor="#9ca3af"
+                value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} returnKeyType="next" />
+              <Text style={[s.label, { marginTop: 12 }]}>Password</Text>
+              <TextInput style={s.input} placeholder="••••••••" placeholderTextColor="#9ca3af"
+                value={password} onChangeText={setPassword} secureTextEntry returnKeyType="go" onSubmitEditing={login} />
+              <TouchableOpacity style={[s.btn, loading && s.btnDisabled]} onPress={login} disabled={loading || !username.trim() || !password.trim()}>
+                {loading ? <ActivityIndicator color="white" /> : <Text style={s.btnText}>Sign in</Text>}
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setStep('instance')} className="items-center py-2">
-                <Text className="text-indigo-600 text-sm">← Change instance</Text>
+              <TouchableOpacity onPress={() => setStep('instance')} style={s.backBtn}>
+                <Text style={{ color: c.primary, fontSize: 14 }}>← Change instance</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -149,3 +84,20 @@ export default function LoginScreen() {
     </KeyboardAvoidingView>
   )
 }
+
+const s = StyleSheet.create({
+  container: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 48 },
+  logoWrap: { alignItems: 'center', marginBottom: 40 },
+  logo: { width: 64, height: 64, borderRadius: 16, backgroundColor: '#486581', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  logoText: { color: 'white', fontSize: 28, fontWeight: 'bold' },
+  title: { fontSize: 24, fontWeight: 'bold', color: '#111827' },
+  subtitle: { color: '#6b7280', marginTop: 4, textAlign: 'center', fontSize: 14 },
+  form: { gap: 4 },
+  label: { fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 6 },
+  input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, color: '#111827', backgroundColor: 'white', marginBottom: 4 },
+  btn: { backgroundColor: '#486581', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
+  btnDisabled: { backgroundColor: '#9fb3c8' },
+  btnText: { color: 'white', fontWeight: '600', fontSize: 16 },
+  backBtn: { alignItems: 'center', paddingVertical: 8, marginTop: 4 },
+})
+

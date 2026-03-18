@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react'
-import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,
-  KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image,
-} from 'react-native'
+import { useState } from 'react'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image, StyleSheet } from 'react-native'
 import { router, Stack } from 'expo-router'
 import { useMutation } from '@tanstack/react-query'
 import * as ImagePicker from 'expo-image-picker'
-import { Screen, Avatar } from '../../components/ui'
-import { usersApi, feedApi } from '../../api'
-import { useAuthStore } from '../../store/auth'
+import { Screen, Avatar } from '../components/ui'
+import { usersApi, feedApi } from '../api'
+import { useAuthStore } from '../store/auth'
+import { C } from '../constants/colors'
+import { useC } from '../constants/ColorContext'
 
 export default function EditProfileScreen() {
+  const c = useC()
   const { user, updateUser } = useAuthStore()
   const [displayName, setDisplayName] = useState(user?.display_name || '')
   const [pronouns, setPronouns] = useState(user?.pronouns || '')
@@ -43,71 +43,59 @@ export default function EditProfileScreen() {
   }
 
   const Field = ({ label, value, onChangeText, placeholder, multiline = false }: any) => (
-    <View className="mb-4">
-      <Text className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{label}</Text>
+    <View style={{ marginBottom: 16 }}>
+      <Text style={s.label}>{label}</Text>
       <TextInput
-        className={`border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-900 ${multiline ? 'min-h-[80px]' : ''}`}
-        placeholder={placeholder}
-        placeholderTextColor="#9ca3af"
-        value={value}
-        onChangeText={onChangeText}
-        multiline={multiline}
-        textAlignVertical={multiline ? 'top' : 'auto'}
-        autoCapitalize="none"
-        autoCorrect={false}
+        style={[s.input, multiline && { minHeight: 80, textAlignVertical: 'top' }]}
+        placeholder={placeholder} placeholderTextColor={c.textLight}
+        value={value} onChangeText={onChangeText}
+        multiline={multiline} autoCapitalize="none" autoCorrect={false}
       />
     </View>
   )
 
   return (
     <Screen>
-      <Stack.Screen options={{
-        headerShown: true,
-        headerTitle: 'Edit Profile',
-        headerBackTitle: 'Profile',
-        headerStyle: { backgroundColor: '#ffffff' },
-        headerTintColor: '#6366f1',
+      <Stack.Screen options={{ headerShown: true, headerTitle: 'Edit Profile', headerBackTitle: 'Profile', headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
         headerRight: () => (
           <TouchableOpacity onPress={() => save.mutate()} disabled={save.isPending}>
-            {save.isPending
-              ? <ActivityIndicator size="small" color="#6366f1" />
-              : <Text className="text-indigo-600 font-semibold text-base">Save</Text>}
+            {save.isPending ? <ActivityIndicator size="small" color={c.primary} /> : <Text style={{ color: c.primary, fontWeight: '600', fontSize: 16 }}>Save</Text>}
           </TouchableOpacity>
         ),
       }} />
-
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView className="flex-1 px-4 py-6" keyboardShouldPersistTaps="handled">
-          {/* Avatar */}
-          <View className="items-center mb-6">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView style={{ flex: 1, padding: 16 }} keyboardShouldPersistTaps="handled">
+          <View style={s.avatarSection}>
             <TouchableOpacity onPress={pickAvatar} disabled={uploadingAvatar}>
-              <View className="relative">
+              <View style={{ position: 'relative' }}>
                 <Avatar url={avatarUrl} name={user?.display_name || user?.username} size={80} />
-                <View className="absolute bottom-0 right-0 w-7 h-7 bg-indigo-600 rounded-full items-center justify-center border-2 border-white">
-                  {uploadingAvatar
-                    ? <ActivityIndicator size="small" color="white" />
-                    : <Text className="text-white text-xs">✏️</Text>}
+                <View style={s.editBadge}>
+                  {uploadingAvatar ? <ActivityIndicator size="small" color="white" /> : <Text style={{ color: 'white', fontSize: 14 }}>✏️</Text>}
                 </View>
               </View>
             </TouchableOpacity>
-            <Text className="text-indigo-600 text-sm mt-2">Change photo</Text>
+            <Text style={{ color: c.primary, fontSize: 14, marginTop: 8 }}>Change photo</Text>
           </View>
-
           <Field label="Display name" value={displayName} onChangeText={setDisplayName} placeholder="Your name" />
           <Field label="Pronouns" value={pronouns} onChangeText={setPronouns} placeholder="e.g. they/them" />
           <Field label="Bio" value={bio} onChangeText={setBio} placeholder="Tell people about yourself" multiline />
           <Field label="Location" value={location} onChangeText={setLocation} placeholder="Where are you?" />
           <Field label="Website" value={website} onChangeText={setWebsite} placeholder="https://yoursite.com" />
-
-          <TouchableOpacity
-            onPress={() => save.mutate()}
-            disabled={save.isPending}
-            className={`rounded-xl py-3.5 items-center mt-2 mb-8 ${save.isPending ? 'bg-indigo-300' : 'bg-indigo-600'}`}
-          >
-            <Text className="text-white font-semibold text-base">{save.isPending ? 'Saving…' : 'Save changes'}</Text>
+          <TouchableOpacity onPress={() => save.mutate()} disabled={save.isPending}
+            style={[s.saveBtn, save.isPending && { backgroundColor: c.primaryLt }]}>
+            <Text style={s.saveBtnText}>{save.isPending ? 'Saving…' : 'Save changes'}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
   )
 }
+
+const s = StyleSheet.create({
+  avatarSection: { alignItems: 'center', marginBottom: 24 },
+  editBadge: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, backgroundColor: C.primary, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'white' },
+  label: { fontSize: 14, fontWeight: '500', color: C.textMd, marginBottom: 6 },
+  input: { borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, color: C.text, backgroundColor: C.card },
+  saveBtn: { backgroundColor: C.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 8, marginBottom: 40 },
+  saveBtnText: { color: 'white', fontWeight: '600', fontSize: 16 },
+})

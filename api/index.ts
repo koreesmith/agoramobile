@@ -23,10 +23,20 @@ api.interceptors.response.use(
 
 export default api
 
+// ── Image URL helper ──────────────────────────────────────────────────────────
+// Converts relative /uploads/... paths to full https:// URLs
+export function imgUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  const { instanceUrl } = useAuthStore.getState()
+  if (!instanceUrl) return url
+  return `${instanceUrl}${url}`
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const authApi = {
   login:      (instanceUrl: string, username: string, password: string) =>
-    axios.post(`${instanceUrl}/api/auth/login`, { username, password }),
+    axios.post(`${instanceUrl}/api/auth/login`, { username_or_email: username, password }),
   register:   (data: any)        => api.post('/auth/register', data),
   me:         ()                 => api.get('/auth/me'),
   meWithUrl:  (instanceUrl: string, token: string) =>
@@ -37,7 +47,7 @@ export const authApi = {
 
 // ── Feed ──────────────────────────────────────────────────────────────────────
 export const feedApi = {
-  getFeed:      (page = 0)           => api.get('/feed', { params: { page } }),
+  getFeed:      (offset = 0)          => api.get('/feed', { params: { offset } }),
   getPost:      (id: string)         => api.get(`/posts/${id}`),
   createPost:   (data: any)          => api.post('/posts', data),
   deletePost:   (id: string)         => api.delete(`/posts/${id}`),
@@ -57,7 +67,7 @@ export const feedApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
-  previewUrl:   (url: string)        => api.post('/preview', { url }),
+  previewUrl:   (url: string)        => api.get('/preview', { params: { url } }),
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
@@ -94,8 +104,9 @@ export const notificationsApi = {
 // ── Groups ────────────────────────────────────────────────────────────────────
 export const groupsApi = {
   list:        ()               => api.get('/groups'),
+  listFilter:  (filter: string) => api.get('/groups', { params: { filter } }),
   get:         (slug: string)   => api.get(`/groups/${slug}`),
-  getFeed:     (slug: string, page = 0) => api.get(`/groups/${slug}/posts`, { params: { page } }),
+  getFeed:     (slug: string, page = 0) => api.get(`/groups/${slug}/feed`, { params: { page } }),
   join:        (slug: string)   => api.post(`/groups/${slug}/join`),
   leave:       (slug: string)   => api.delete(`/groups/${slug}/leave`),
   createPost:  (slug: string, data: any) => api.post(`/groups/${slug}/posts`, data),

@@ -1,21 +1,30 @@
 import { useState } from 'react'
-import {
-  View, Text, Image, TouchableOpacity, Alert, Share,
-} from 'react-native'
+import { View, Text, TouchableOpacity, Alert, Share, StyleSheet, Modal, Dimensions, Linking } from 'react-native'
+import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { formatDistanceToNow } from 'date-fns'
-import { feedApi } from '../api'
+import { feedApi, imgUrl } from '../api'
 import { useAuthStore } from '../store/auth'
 import { Avatar } from './ui'
+import { C } from '../constants/colors'
+import { useC } from '../constants/ColorContext'
 
-const REACTIONS = ['❤️','😂','😮','😢','🤗','🏳️‍🌈','🙏','🤮']
+const REACTIONS = [
+  { type: 'like', emoji: '❤️' }, { type: 'love', emoji: '😍' },
+  { type: 'laugh', emoji: '😂' }, { type: 'wow', emoji: '😮' },
+  { type: 'angry', emoji: '😡' }, { type: 'care', emoji: '🤗' },
+  { type: 'pride', emoji: '🏳️‍🌈' }, { type: 'thankful', emoji: '🙏' },
+  { type: 'vomit', emoji: '🤮' },
+]
 
 export default function PostCard({ post, queryKey }: { post: any; queryKey: any[] }) {
   const { user } = useAuthStore()
   const qc = useQueryClient()
   const [showReactions, setShowReactions] = useState(false)
+  const [twExpanded, setTwExpanded] = useState(false)
+  const c = useC()
 
   const invalidate = () => qc.invalidateQueries({ queryKey })
 
@@ -25,179 +34,187 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
     onSuccess: invalidate,
   })
 
-  const repost = useMutation({
-    mutationFn: () => feedApi.repostPost(post.id),
-    onSuccess: invalidate,
-  })
+  const repost = useMutation({ mutationFn: () => feedApi.repostPost(post.id), onSuccess: invalidate })
+  const del    = useMutation({ mutationFn: () => feedApi.deletePost(post.id), onSuccess: invalidate })
 
-  const del = useMutation({
-    mutationFn: () => feedApi.deletePost(post.id),
-    onSuccess: invalidate,
-  })
+  const isOwn    = user?.id === post.author_id
+  const author   = post.repost_of_id ? post.repost_author_display_name : (post.author_display_name || post.display_name)
+  const username = post.repost_of_id ? post.repost_author_username    : (post.author_username || post.username)
+  const avatar   = imgUrl(post.repost_of_id ? post.repost_author_avatar_url  : (post.author_avatar_url || post.avatar_url))
+  const content  = post.repost_of_id ? post.repost_content            : post.content
+  const imageUrl = imgUrl(post.repost_of_id ? post.repost_image_url   : post.image_url)
+  const linkImage = imgUrl(post.link_image)
 
-  const isOwn = user?.id === post.author_id
-  const author = post.repost_of_id ? post.repost_author_display_name : post.author_display_name
-  const username = post.repost_of_id ? post.repost_author_username : post.author_username
-  const avatar = post.repost_of_id ? post.repost_author_avatar_url : post.author_avatar_url
-  const content = post.repost_of_id ? post.repost_content : post.content
-  const imageUrl = post.repost_of_id ? post.repost_image_url : post.image_url
-
-  const totalReactions = Object.values(post.reaction_counts || {}).reduce((a: any, b: any) => a + b, 0) as number
+  const [showLightbox, setShowLightbox] = useState(false)
+  const screenWidth = Dimensions.get('window').width
+  const screenHeight = Dimensions.get('window').height
+  const reactionCounts: Record<string, number> = post.reaction_counts || {}
+  const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + b, 0)
+  const myReactionEmoji = REACTIONS.find(r => r.type === post.my_reaction)?.emoji
 
   return (
-    <View className="bg-white dark:bg-gray-900 rounded-2xl mx-3 my-1.5 overflow-hidden shadow-sm">
-      {/* Repost banner */}
+    <View style={[s.card, { backgroundColor: c.card }]}>
       {post.repost_of_id && (
-        <View className="flex-row items-center gap-1.5 px-4 pt-3 pb-1">
-          <Ionicons name="repeat" size={13} color="#6366f1" />
-          <Text className="text-xs text-indigo-500">
-            {post.author_display_name} reposted
-          </Text>
+        <View style={s.banner}>
+          <Ionicons name="repeat" size={13} color={c.primary} />
+          <Text style={[s.bannerText, { color: c.primary }]}>{post.author_display_name} reposted</Text>
         </View>
       )}
-
-      {/* Wall banner */}
       {post.wall_user_id && (
-        <View className="flex-row items-center gap-1.5 px-4 pt-3 pb-1">
-          <Ionicons name="arrow-forward" size={13} color="#6366f1" />
-          <Text className="text-xs text-indigo-500">
-            {post.author_display_name} → {post.wall_display_name}'s wall
-          </Text>
+        <View style={s.banner}>
+          <Ionicons name="arrow-forward" size={13} color={c.primary} />
+          <Text style={[s.bannerText, { color: c.primary }]}>{post.author_display_name} to {post.wall_display_name}'s wall</Text>
         </View>
       )}
 
-      <View className="p-4">
-        {/* Author row */}
-        <TouchableOpacity
-          className="flex-row items-center gap-3 mb-3"
-          onPress={() => router.push(`/profile/${username}`)}
-        >
+      <View style={s.body}>
+        <TouchableOpacity style={s.authorRow} onPress={() => router.push(`/profile/${username}`)}>
           <Avatar url={avatar} name={author} size={40} />
-          <View className="flex-1">
-            <Text className="font-semibold text-gray-900 dark:text-white text-sm">{author}</Text>
-            <Text className="text-gray-400 text-xs">
-              @{username} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-            </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.authorName, { color: c.text }]}>{author}</Text>
+            <Text style={[s.authorMeta, { color: c.textMuted }]}>@{username} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</Text>
           </View>
           {isOwn && (
-            <TouchableOpacity
-              onPress={() => Alert.alert('Delete post?', undefined, [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => del.mutate() },
-              ])}
-              className="p-1"
-            >
-              <Ionicons name="trash-outline" size={16} color="#ef4444" />
+            <TouchableOpacity onPress={() => Alert.alert('Delete post?', undefined, [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: () => del.mutate() },
+            ])} style={{ padding: 4 }}>
+              <Ionicons name="trash-outline" size={16} color={c.red} />
             </TouchableOpacity>
           )}
         </TouchableOpacity>
 
-        {/* Content warning */}
-        {post.content_warning && (
-          <View className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-xl px-3 py-2 mb-2">
-            <Text className="text-yellow-700 dark:text-yellow-400 text-xs font-medium">⚠️ {post.content_warning}</Text>
+        {post.content_warning && !twExpanded && (
+          <View style={[s.cw, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.cwText, { fontWeight: '700' }]}>Trigger Warning</Text>
+              <Text style={s.cwText} numberOfLines={1}>{post.content_warning}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setTwExpanded(true)}
+              style={{ borderWidth: 1, borderColor: '#fde68a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+              <Text style={{ fontSize: 12, color: '#92400e', fontWeight: '500' }}>Show post</Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        {/* Content */}
-        {content ? (
+        {post.content_warning && twExpanded && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <Text style={{ fontSize: 12, color: '#b45309' }}>⚠️ {post.content_warning}</Text>
+            <TouchableOpacity onPress={() => setTwExpanded(false)} style={{ marginLeft: 'auto' }}>
+              <Text style={{ fontSize: 11, color: c.textMuted }}>Hide</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {(!post.content_warning || twExpanded) && content ? (
           <TouchableOpacity onPress={() => router.push(`/post/${post.id}`)}>
-            <Text className="text-gray-800 dark:text-gray-200 text-sm leading-relaxed">{content}</Text>
+            <Text style={[s.content, { color: c.textMd }]}>{content}</Text>
           </TouchableOpacity>
         ) : null}
 
-        {/* Image */}
-        {imageUrl ? (
-          <Image
-            source={{ uri: imageUrl }}
-            className="rounded-xl mt-2 w-full"
-            style={{ height: 200 }}
-            resizeMode="cover"
-          />
+        {(!post.content_warning || twExpanded) && imageUrl ? (
+          <View>
+            <TouchableOpacity onPress={() => setShowLightbox(true)} activeOpacity={0.9}>
+              <Image source={{ uri: imageUrl }} style={s.image} contentFit="cover" />
+            </TouchableOpacity>
+            <Modal visible={showLightbox} transparent animationType="fade" onRequestClose={() => setShowLightbox(false)}>
+              <TouchableOpacity style={s.lightboxBg} activeOpacity={1} onPress={() => setShowLightbox(false)}>
+                <Image source={{ uri: imageUrl }} style={{ width: screenWidth, height: screenHeight * 0.8 }} contentFit="contain" />
+                <Text style={s.lightboxClose}>✕ tap to close</Text>
+              </TouchableOpacity>
+            </Modal>
+          </View>
         ) : null}
 
-        {/* Link preview */}
-        {post.link_url && !imageUrl && (
-          <TouchableOpacity
-            className="mt-2 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden"
-            onPress={() => {/* open link */}}
-          >
-            {post.link_image && (
-              <Image source={{ uri: post.link_image }} style={{ height: 120 }} resizeMode="cover" />
-            )}
-            <View className="px-3 py-2">
-              <Text className="text-xs text-gray-400">{post.link_domain}</Text>
-              {post.link_title && <Text className="text-sm font-medium text-gray-800 dark:text-gray-200">{post.link_title}</Text>}
+        {(!post.content_warning || twExpanded) && post.link_url && !imageUrl ? (
+          <TouchableOpacity onPress={() => Linking.openURL(post.link_url)} activeOpacity={0.8}
+            style={[s.linkPreview, { borderColor: c.border }]}>
+            {linkImage ? <Image source={{ uri: linkImage }} style={{ height: 140, width: '100%' }} contentFit="cover" /> : null}
+            <View style={{ padding: 10 }}>
+              <Text style={[s.linkDomain, { color: c.textMuted }]}>{post.link_domain}</Text>
+              {post.link_title ? <Text style={[s.linkTitle, { color: c.text }]}>{post.link_title}</Text> : null}
+              {post.link_description ? <Text style={[s.linkDesc, { color: c.textMuted }]} numberOfLines={2}>{post.link_description}</Text> : null}
             </View>
           </TouchableOpacity>
-        )}
+        ) : null}
 
-        {/* Reaction counts */}
         {totalReactions > 0 && (
-          <View className="flex-row flex-wrap gap-1 mt-2">
-            {Object.entries(post.reaction_counts || {}).filter(([,v]) => (v as number) > 0).map(([emoji, count]) => (
-              <TouchableOpacity
-                key={emoji}
-                onPress={() => react.mutate({ type: emoji })}
-                className={`flex-row items-center gap-1 px-2 py-0.5 rounded-full border ${post.my_reaction === emoji ? 'bg-indigo-50 border-indigo-300 dark:bg-indigo-900/30 dark:border-indigo-600' : 'border-gray-200 dark:border-gray-700'}`}
-              >
-                <Text style={{ fontSize: 13 }}>{emoji}</Text>
-                <Text className="text-xs text-gray-600 dark:text-gray-400">{count as number}</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={s.reactionCounts}>
+            {Object.entries(reactionCounts).filter(([,v]) => v > 0).map(([type, count]) => {
+              const emoji = REACTIONS.find(r => r.type === type)?.emoji ?? '❤️'
+              const isActive = post.my_reaction === type
+              return (
+                <TouchableOpacity key={type} onPress={() => react.mutate({ type })}
+                  style={[s.chip, { borderColor: isActive ? c.primaryLt : c.border, backgroundColor: isActive ? c.primaryBg : c.bg }]}>
+                  <Text style={{ fontSize: 12 }}>{emoji}</Text>
+                  <Text style={[s.chipCount, { color: isActive ? c.primary : c.textMuted }]}>{count}</Text>
+                </TouchableOpacity>
+              )
+            })}
           </View>
         )}
 
-        {/* Action bar */}
-        <View className="flex-row items-center mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-          {/* React */}
-          <View className="flex-1 relative">
-            <TouchableOpacity
-              className="flex-row items-center gap-1.5"
-              onPress={() => setShowReactions(v => !v)}
-            >
-              <Text style={{ fontSize: 16 }}>{post.my_reaction || '🤍'}</Text>
-              <Text className="text-xs text-gray-500">{totalReactions > 0 ? totalReactions : ''}</Text>
+        <View style={[s.actions, { borderTopColor: c.border }]}>
+          <View>
+            <TouchableOpacity style={s.actionBtn} onPress={() => setShowReactions(v => !v)}>
+              <Text style={{ fontSize: 17 }}>{myReactionEmoji ?? '🤍'}</Text>
+              {totalReactions > 0 && <Text style={[s.actionCount, { color: c.textMuted }]}>{totalReactions}</Text>}
             </TouchableOpacity>
             {showReactions && (
-              <View className="absolute bottom-8 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-2 flex-row gap-1 shadow-lg z-10">
+              <View style={[s.picker, { backgroundColor: c.card, borderColor: c.border }]}>
                 {REACTIONS.map(r => (
-                  <TouchableOpacity key={r} onPress={() => { react.mutate({ type: r }); setShowReactions(false) }}>
-                    <Text style={{ fontSize: 22 }}>{r}</Text>
+                  <TouchableOpacity key={r.type} onPress={() => { react.mutate({ type: r.type }); setShowReactions(false) }}
+                    style={post.my_reaction === r.type ? [s.pickerItemActive, { backgroundColor: c.primaryBg }] : undefined}>
+                    <Text style={{ fontSize: 24 }}>{r.emoji}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             )}
           </View>
 
-          {/* Comment */}
-          <TouchableOpacity
-            className="flex-1 flex-row items-center gap-1.5"
-            onPress={() => router.push(`/post/${post.id}`)}
-          >
-            <Ionicons name="chatbubble-outline" size={17} color="#6b7280" />
-            <Text className="text-xs text-gray-500">{post.comment_count > 0 ? post.comment_count : ''}</Text>
+          <TouchableOpacity style={s.actionBtn} onPress={() => router.push(`/post/${post.id}`)}>
+            <Ionicons name="chatbubble-outline" size={17} color={c.textMuted} />
+            {post.comment_count > 0 && <Text style={[s.actionCount, { color: c.textMuted }]}>{post.comment_count}</Text>}
           </TouchableOpacity>
 
-          {/* Repost */}
-          <TouchableOpacity
-            className="flex-1 flex-row items-center gap-1.5"
-            onPress={() => repost.mutate()}
-          >
-            <Ionicons name="repeat" size={17} color={post.reposted ? '#6366f1' : '#6b7280'} />
-            <Text className={`text-xs ${post.reposted ? 'text-indigo-500' : 'text-gray-500'}`}>
-              {post.repost_count > 0 ? post.repost_count : ''}
-            </Text>
+          <TouchableOpacity style={s.actionBtn} onPress={() => repost.mutate()}>
+            <Ionicons name="repeat" size={17} color={post.reposted ? c.primary : c.textMuted} />
+            {post.repost_count > 0 && <Text style={[s.actionCount, { color: post.reposted ? c.primary : c.textMuted }]}>{post.repost_count}</Text>}
           </TouchableOpacity>
 
-          {/* Share */}
-          <TouchableOpacity
-            onPress={() => Share.share({ message: content || '' })}
-          >
-            <Ionicons name="share-outline" size={17} color="#6b7280" />
+          <TouchableOpacity onPress={() => Share.share({ message: content || '' })}>
+            <Ionicons name="share-outline" size={17} color={c.textMuted} />
           </TouchableOpacity>
         </View>
       </View>
     </View>
   )
 }
+
+const s = StyleSheet.create({
+  card: { borderRadius: 16, marginHorizontal: 12, marginVertical: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 },
+  bannerText: { fontSize: 12 },
+  body: { padding: 14 },
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  authorName: { fontWeight: '600', fontSize: 14 },
+  authorMeta: { fontSize: 12, marginTop: 1 },
+  cw: { backgroundColor: '#fefce8', borderWidth: 1, borderColor: '#fde68a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8 },
+  cwText: { fontSize: 12, color: '#92400e', fontWeight: '500' },
+  content: { fontSize: 14, lineHeight: 21, marginBottom: 8 },
+  image: { height: 260, marginHorizontal: -14, marginVertical: 8 },
+  linkPreview: { marginTop: 8, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
+  linkDomain: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3 },
+  linkTitle: { fontSize: 13, fontWeight: '600', marginTop: 2 },
+  linkDesc: { fontSize: 12, marginTop: 2 },
+  reactionCounts: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 8 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, borderWidth: 1 },
+  chipCount: { fontSize: 12 },
+  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  actionCount: { fontSize: 12 },
+  picker: { position: 'absolute', bottom: 36, left: 0, borderWidth: 1, borderRadius: 20, padding: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10, zIndex: 99, width: 240 },
+  pickerItemActive: { borderRadius: 8 },
+  lightboxBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' },
+  lightboxClose: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 16 },
+})

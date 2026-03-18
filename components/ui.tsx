@@ -1,110 +1,90 @@
-import { View, Text, Image, TouchableOpacity, useColorScheme } from 'react-native'
-
-// ── Avatar ────────────────────────────────────────────────────────────────────
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { Image } from 'expo-image'
+import { C } from '../constants/colors'
+import { useC } from '../constants/ColorContext'
+import { imgUrl } from '../api'
 
 export function Avatar({ url, name, size = 40 }: { url?: string; name?: string; size?: number }) {
+  const c = useC()
   const letter = (name || '?')[0].toUpperCase()
+  const resolvedUrl = imgUrl(url)
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden' }}
-      className="bg-indigo-100 items-center justify-center flex-shrink-0">
-      {url
-        ? <Image source={{ uri: url }} style={{ width: size, height: size }} />
-        : <Text style={{ fontSize: size * 0.4 }} className="font-bold text-indigo-600">{letter}</Text>}
+    <View style={[lay.avatarWrap, { width: size, height: size, borderRadius: size / 2, backgroundColor: c.primaryBg }]}>
+      {resolvedUrl
+        ? <Image source={{ uri: resolvedUrl }} style={{ width: size, height: size }} />
+        : <Text style={[lay.avatarLetter, { fontSize: size * 0.4, color: c.primary }]}>{letter}</Text>}
     </View>
   )
 }
 
-// ── Screen wrapper ────────────────────────────────────────────────────────────
-
-export function Screen({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <View className={`flex-1 bg-gray-50 dark:bg-gray-950 ${className}`}>
-      {children}
-    </View>
-  )
+export function Screen({ children }: { children: React.ReactNode }) {
+  const c = useC()
+  return <View style={[lay.screen, { backgroundColor: c.bg }]}>{children}</View>
 }
-
-// ── Header ────────────────────────────────────────────────────────────────────
 
 export function Header({ title, right }: { title: string; right?: React.ReactNode }) {
+  const c = useC()
   return (
-    <View className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 pt-14 pb-3 flex-row items-center justify-between">
-      <Text className="text-xl font-bold text-gray-900 dark:text-white">{title}</Text>
+    <View style={[lay.header, { backgroundColor: c.card, borderBottomColor: c.border }]}>
+      <Text style={[lay.headerTitle, { color: c.text }]}>{title}</Text>
       {right && <View>{right}</View>}
     </View>
   )
 }
 
-// ── Card ──────────────────────────────────────────────────────────────────────
-
-export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <View className={`bg-white dark:bg-gray-900 rounded-2xl mx-3 my-1.5 shadow-sm ${className}`}>
-      {children}
-    </View>
-  )
+export function Card({ children }: { children: React.ReactNode }) {
+  const c = useC()
+  return <View style={[lay.card, { backgroundColor: c.card }]}>{children}</View>
 }
 
-// ── Button ────────────────────────────────────────────────────────────────────
-
-export function Button({
-  title, onPress, variant = 'primary', disabled = false, small = false,
-}: {
-  title: string
-  onPress: () => void
-  variant?: 'primary' | 'secondary' | 'danger'
-  disabled?: boolean
-  small?: boolean
+export function Button({ title, onPress, variant = 'primary', disabled = false, small = false }: {
+  title: string; onPress: () => void; variant?: 'primary' | 'secondary' | 'danger'
+  disabled?: boolean; small?: boolean
 }) {
-  const bg = disabled
-    ? 'bg-gray-200 dark:bg-gray-700'
-    : variant === 'primary'
-      ? 'bg-indigo-600'
-      : variant === 'danger'
-        ? 'bg-red-500'
-        : 'bg-gray-100 dark:bg-gray-800'
-
-  const textColor = disabled
-    ? 'text-gray-400'
-    : variant === 'primary' || variant === 'danger'
-      ? 'text-white'
-      : 'text-gray-700 dark:text-gray-200'
-
+  const c = useC()
+  const bg = disabled ? c.border : variant === 'primary' ? c.primary : variant === 'danger' ? c.red : c.primaryBg
+  const color = disabled ? c.textLight : variant === 'primary' || variant === 'danger' ? c.white : c.primary
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={disabled}
-      className={`${bg} rounded-xl items-center justify-center ${small ? 'px-3 py-1.5' : 'px-4 py-2.5'}`}
-    >
-      <Text className={`${textColor} font-semibold ${small ? 'text-sm' : 'text-base'}`}>{title}</Text>
+    <TouchableOpacity onPress={onPress} disabled={disabled}
+      style={[lay.button, { backgroundColor: bg, paddingVertical: small ? 6 : 10, paddingHorizontal: small ? 12 : 16 }]}>
+      <Text style={[lay.buttonText, { color }]}>{title}</Text>
     </TouchableOpacity>
   )
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
-
 export function EmptyState({ icon, title, subtitle }: { icon: string; title: string; subtitle?: string }) {
+  const c = useC()
   return (
-    <View className="flex-1 items-center justify-center px-8 py-16">
-      <Text className="text-5xl mb-4">{icon}</Text>
-      <Text className="text-lg font-semibold text-gray-700 dark:text-gray-300 text-center">{title}</Text>
-      {subtitle && <Text className="text-gray-400 text-center mt-1 text-sm">{subtitle}</Text>}
+    <View style={lay.emptyState}>
+      <Text style={{ fontSize: 48, marginBottom: 12 }}>{icon}</Text>
+      <Text style={[lay.emptyTitle, { color: c.textMd }]}>{title}</Text>
+      {subtitle && <Text style={[lay.emptySubtitle, { color: c.textLight }]}>{subtitle}</Text>}
     </View>
   )
 }
-
-// ── Spinner ───────────────────────────────────────────────────────────────────
 
 export function Spinner() {
-  return (
-    <View className="flex-1 items-center justify-center">
-      <Text className="text-gray-400 text-sm">Loading…</Text>
-    </View>
-  )
+  const c = useC()
+  return <View style={lay.spinner}><ActivityIndicator color={c.primary} size="large" /></View>
 }
-
-// ── Divider ───────────────────────────────────────────────────────────────────
 
 export function Divider() {
-  return <View className="h-px bg-gray-100 dark:bg-gray-800 mx-4" />
+  const c = useC()
+  return <View style={[lay.divider, { backgroundColor: c.border }]} />
 }
+
+const lay = StyleSheet.create({
+  avatarWrap: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
+  avatarLetter: { fontWeight: 'bold' },
+  screen: { flex: 1 },
+  header: { borderBottomWidth: 1, paddingHorizontal: 16, paddingTop: 56, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  card: { borderRadius: 16, marginHorizontal: 12, marginVertical: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
+  button: { borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  buttonText: { fontWeight: '600', fontSize: 15 },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 64 },
+  emptyTitle: { fontSize: 17, fontWeight: '600', textAlign: 'center' },
+  emptySubtitle: { textAlign: 'center', marginTop: 4, fontSize: 14 },
+  spinner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  divider: { height: 1, marginHorizontal: 16 },
+})

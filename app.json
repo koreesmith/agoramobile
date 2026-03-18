@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#6366f1"
+      "backgroundColor": "#486581"
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
@@ -23,9 +23,10 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#6366f1"
+        "backgroundColor": "#486581"
       },
       "package": "social.agora.app",
+      "usesCleartextTraffic": true,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
