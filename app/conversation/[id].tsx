@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator, StyleSheet } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -16,6 +17,8 @@ export default function ConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { user } = useAuthStore()
   const qc = useQueryClient()
+  const insets = useSafeAreaInsets()
+  const headerHeight = insets.top + 44
   const [text, setText] = useState('')
   const [imageUrl, setImageUrl] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -62,7 +65,7 @@ export default function ConversationScreen() {
           </TouchableOpacity>
         ) : null,
       }} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={90}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={headerHeight}>
         {conv && !conv.is_accepted && (
           <View style={s.requestBanner}>
             <Text style={s.requestTitle}>Message request</Text>
@@ -115,7 +118,7 @@ export default function ConversationScreen() {
           </View>
         ) : null}
         {(conv?.is_accepted !== false) && (
-          <View style={s.composer}>
+          <View style={[s.composer, { backgroundColor: c.card, borderTopColor: c.border, paddingBottom: Math.max(insets.bottom, 10) }]}>
             <TouchableOpacity onPress={pickImage} disabled={uploading}>
               {uploading ? <ActivityIndicator size="small" color={c.primary} /> : <Ionicons name="image-outline" size={22} color={c.primary} />}
             </TouchableOpacity>

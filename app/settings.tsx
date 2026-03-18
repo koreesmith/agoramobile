@@ -30,11 +30,11 @@ export default function SettingsScreen() {
   })
 
   const Row = ({ icon, label, onPress, right, destructive = false }: any) => (
-    <TouchableOpacity onPress={onPress} style={s.row}>
+    <TouchableOpacity onPress={onPress} style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
       <View style={[s.rowIcon, { backgroundColor: destructive ? '#fee2e2' : c.primaryBg }]}>
         <Ionicons name={icon} size={18} color={destructive ? c.red : c.primary} />
       </View>
-      <Text style={[s.rowLabel, destructive && { color: c.red }]}>{label}</Text>
+      <Text style={[s.rowLabel, { color: destructive ? c.red : c.text }]}>{label}</Text>
       {right ?? <Ionicons name="chevron-forward" size={16} color={c.textLight} />}
     </TouchableOpacity>
   )
@@ -49,10 +49,10 @@ export default function SettingsScreen() {
       <Stack.Screen options={headerOpts('Change Password', 'Settings')} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView style={{ flex: 1, padding: 16 }} keyboardShouldPersistTaps="handled">
-          <Text style={s.label}>Current password</Text>
-          <TextInput style={[s.input, { marginBottom: 16 }]} secureTextEntry value={currentPassword} onChangeText={setCurrentPassword} placeholder="••••••••" placeholderTextColor={c.textLight} />
-          <Text style={s.label}>New password</Text>
-          <TextInput style={[s.input, { marginBottom: 24 }]} secureTextEntry value={newPassword} onChangeText={setNewPassword} placeholder="••••••••" placeholderTextColor={c.textLight} />
+          <Text style={[s.label, { color: c.textMd }]}>Current password</Text>
+          <TextInput style={[s.input, { marginBottom: 16, backgroundColor: c.card, borderColor: c.border, color: c.text }]} secureTextEntry value={currentPassword} onChangeText={setCurrentPassword} placeholder="••••••••" placeholderTextColor={c.textLight} />
+          <Text style={[s.label, { color: c.textMd }]}>New password</Text>
+          <TextInput style={[s.input, { marginBottom: 24, backgroundColor: c.card, borderColor: c.border, color: c.text }]} secureTextEntry value={newPassword} onChangeText={setNewPassword} placeholder="••••••••" placeholderTextColor={c.textLight} />
           <TouchableOpacity onPress={() => changePassword.mutate()} disabled={!currentPassword || !newPassword || changePassword.isPending}
             style={[s.btn, (!currentPassword || !newPassword) && { backgroundColor: c.primaryLt }]}>
             <Text style={s.btnText}>{changePassword.isPending ? 'Saving…' : 'Change password'}</Text>
@@ -66,10 +66,10 @@ export default function SettingsScreen() {
     <Screen>
       <Stack.Screen options={headerOpts('Settings', 'Profile')} />
       <ScrollView>
-        <Text style={s.section}>Account</Text>
+        <Text style={[s.section, { color: c.textMuted }]}>Account</Text>
         <Row icon="person-outline" label="Edit profile" onPress={() => router.push('/edit-profile')} />
         <Row icon="key-outline" label="Change password" onPress={() => setSection('password')} />
-        <Text style={s.section}>Appearance</Text>
+        <Text style={[s.section, { color: c.textMuted }]}>Appearance</Text>
         <View style={[s.themeRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
           <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
             <Ionicons name="color-palette-outline" size={18} color={c.primary} />
@@ -86,10 +86,10 @@ export default function SettingsScreen() {
             ))}
           </View>
         </View>
-        <Text style={s.section}>Privacy</Text>
+        <Text style={[s.section, { color: c.textMuted }]}>Privacy</Text>
         <Row icon="lock-closed-outline" label="Private profile"
           right={<Switch value={user?.profile_private ?? false} onValueChange={() => togglePrivacy.mutate()} trackColor={{ false: c.border, true: c.primary }} />} />
-        <Text style={s.section}>About</Text>
+        <Text style={[s.section, { color: c.textMuted }]}>About</Text>
         <Row icon="person-circle-outline" label={`Signed in as @${user?.username}`} onPress={() => {}} right={<View />} />
         <Row icon="server-outline" label={`Instance: ${useAuthStore.getState().instanceUrl?.replace(/^https?:\/\//, '')}`} onPress={() => {}} right={<View />} />
         <View style={{ marginTop: 8 }}>

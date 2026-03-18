@@ -53,7 +53,18 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const myReactionEmoji = REACTIONS.find(r => r.type === post.my_reaction)?.emoji
 
   return (
-    <View style={[s.card, { backgroundColor: c.card }]}>
+    <View style={[s.card, { backgroundColor: c.card }, post.group_slug && { borderLeftWidth: 3, borderLeftColor: c.primaryLt }]}>
+      {/* Group badge */}
+      {post.group_slug && (
+        <TouchableOpacity
+          onPress={() => router.push(`/group/${post.group_slug}`)}
+          style={[s.groupBadge, { backgroundColor: c.primaryBg }]}
+        >
+          <Ionicons name="people" size={11} color={c.primary} />
+          <Text style={[s.groupBadgeText, { color: c.primary }]}>{post.group_name}</Text>
+          <Text style={[s.groupBadgeArrow, { color: c.textLight }]}>· View in group →</Text>
+        </TouchableOpacity>
+      )}
       {post.repost_of_id && (
         <View style={s.banner}>
           <Ionicons name="repeat" size={13} color={c.primary} />
@@ -192,7 +203,10 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
 }
 
 const s = StyleSheet.create({
-  card: { borderRadius: 16, marginHorizontal: 12, marginVertical: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  card: { borderRadius: 16, marginHorizontal: 12, marginVertical: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2, overflow: 'hidden' },
+  groupBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
+  groupBadgeText: { fontSize: 12, fontWeight: '600' },
+  groupBadgeArrow: { fontSize: 11 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 },
   bannerText: { fontSize: 12 },
   body: { padding: 14 },

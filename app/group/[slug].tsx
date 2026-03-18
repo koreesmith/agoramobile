@@ -18,6 +18,10 @@ export default function GroupScreen() {
   const qc = useQueryClient()
   const [content, setContent] = useState('')
   const [imageUrl, setImageUrl] = useState('')
+  const [showCW, setShowCW] = useState(false)
+  const [cwLabel, setCwLabel] = useState('')
+
+  const resetCompose = () => { setContent(''); setImageUrl(''); setShowCW(false); setCwLabel(''); setShowCompose(false) }
   const [uploading, setUploading] = useState(false)
   const [showCompose, setShowCompose] = useState(false)
 
@@ -35,8 +39,12 @@ export default function GroupScreen() {
   const join = useMutation({ mutationFn: () => groupsApi.join(slug!), onSuccess: () => { qc.invalidateQueries({ queryKey: ['group', slug] }); qc.invalidateQueries({ queryKey: ['groups'] }) } })
   const leave = useMutation({ mutationFn: () => groupsApi.leave(slug!), onSuccess: () => { qc.invalidateQueries({ queryKey: ['group', slug] }); router.back() } })
   const createPost = useMutation({
-    mutationFn: () => groupsApi.createPost(slug!, { content, image_url: imageUrl }),
-    onSuccess: () => { setContent(''); setImageUrl(''); setShowCompose(false); qc.invalidateQueries({ queryKey: ['group-feed', slug] }) },
+    mutationFn: () => groupsApi.createPost(slug!, {
+      content,
+      image_url: imageUrl,
+      content_warning: showCW && cwLabel.trim() ? cwLabel.trim() : '',
+    }),
+    onSuccess: () => { resetCompose(); qc.invalidateQueries({ queryKey: ['group-feed', slug] }) },
   })
 
   const pickImage = async () => {
@@ -99,8 +107,15 @@ export default function GroupScreen() {
               <View style={s.composer}>
                 {showCompose ? (
                   <>
+                    {showCW && (
+                      <View style={{ borderWidth: 1, borderColor: '#fcd34d', backgroundColor: '#fffbeb', borderRadius: 8, padding: 8, marginBottom: 8 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>⚠️ Trigger warning</Text>
+                        <TextInput style={{ fontSize: 13, color: '#92400e', padding: 0 }} placeholder="e.g. spoilers, violence…" placeholderTextColor="#d97706"
+                          value={cwLabel} onChangeText={setCwLabel} returnKeyType="done" />
+                      </View>
+                    )}
                     <TextInput style={s.composeInput} placeholder={`Post to ${group.name}…`} placeholderTextColor={c.textLight}
-                      value={content} onChangeText={setContent} multiline autoFocus />
+                      value={content} onChangeText={setContent} multiline autoFocus={!showCW} />
                     {imageUrl ? (
                       <View>
                         <Image source={{ uri: imageUrl }} style={{ height: 120, borderRadius: 8, width: '100%' }} resizeMode="cover" />
@@ -110,11 +125,17 @@ export default function GroupScreen() {
                       </View>
                     ) : null}
                     <View style={s.composeActions}>
-                      <TouchableOpacity onPress={pickImage} disabled={uploading}>
-                        {uploading ? <ActivityIndicator size="small" color={c.primary} /> : <Ionicons name="image-outline" size={20} color={c.primary} />}
-                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                        <TouchableOpacity onPress={pickImage} disabled={uploading}>
+                          {uploading ? <ActivityIndicator size="small" color={c.primary} /> : <Ionicons name="image-outline" size={20} color={c.primary} />}
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setShowCW(v => !v)}
+                          style={{ borderWidth: 1, borderColor: showCW ? '#fcd34d' : c.border, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: showCW ? '#fef3c7' : 'transparent' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: showCW ? '#92400e' : c.textMuted }}>TW</Text>
+                        </TouchableOpacity>
+                      </View>
                       <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <TouchableOpacity onPress={() => { setShowCompose(false); setContent(''); setImageUrl('') }} style={s.cancelBtn}>
+                        <TouchableOpacity onPress={resetCompose} style={s.cancelBtn}>
                           <Text style={s.cancelBtnText}>Cancel</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => createPost.mutate()} disabled={(!content.trim() && !imageUrl) || createPost.isPending} style={[s.postBtn, (!content.trim() && !imageUrl) && { backgroundColor: c.primaryLt }]}>

@@ -42,6 +42,10 @@ export default function FeedScreen() {
   const [content, setContent] = useState('')
   const [imageUrl, setImageUrl] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [showCW, setShowCW] = useState(false)
+  const [cwLabel, setCwLabel] = useState('')
+
+  const resetCompose = () => { setContent(''); setImageUrl(''); setShowCW(false); setCwLabel(''); setShowCompose(false) }
 
   // Auto-detect GIF URLs pasted into content
   useEffect(() => {
@@ -75,8 +79,13 @@ export default function FeedScreen() {
   const posts = data?.pages.flatMap(p => p.posts) ?? []
 
   const createPost = useMutation({
-    mutationFn: () => feedApi.createPost({ content, image_url: imageUrl, visibility: 'friends' }),
-    onSuccess: () => { setContent(''); setImageUrl(''); setShowCompose(false); qc.invalidateQueries({ queryKey: ['feed'] }) },
+    mutationFn: () => feedApi.createPost({
+      content,
+      image_url: imageUrl,
+      visibility: 'friends',
+      content_warning: showCW && cwLabel.trim() ? cwLabel.trim() : '',
+    }),
+    onSuccess: () => { resetCompose(); qc.invalidateQueries({ queryKey: ['feed'] }) },
     onError: () => Alert.alert('Error', 'Could not create post'),
   })
 
@@ -120,11 +129,16 @@ export default function FeedScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <View style={[s.modalHeader, { borderBottomColor: c.border }]}>
-            <TouchableOpacity onPress={() => { setShowCompose(false); setContent(''); setImageUrl('') }}>
+            <TouchableOpacity onPress={resetCompose}>
               <Text style={[s.cancelText, { color: c.textMuted }]}>Cancel</Text>
             </TouchableOpacity>
             <Text style={[s.modalTitle, { color: c.text }]}>New post</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {/* CW toggle */}
+              <TouchableOpacity onPress={() => setShowCW(v => !v)}
+                style={[s.cwBtn, showCW && { backgroundColor: '#fef3c7', borderColor: '#fcd34d' }]}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: showCW ? '#92400e' : c.textMuted }}>TW</Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={pickImage} disabled={uploading}>
                 {uploading
                   ? <ActivityIndicator size="small" color={c.primary} />
@@ -139,7 +153,24 @@ export default function FeedScreen() {
               </TouchableOpacity>
             </View>
           </View>
+
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+            {/* CW input — shown when TW toggled */}
+            {showCW && (
+              <View style={[s.cwInputWrap, { borderColor: '#fcd34d', backgroundColor: '#fffbeb' }]}>
+                <Text style={s.cwInputLabel}>⚠️ Trigger warning label</Text>
+                <TextInput
+                  style={s.cwInput}
+                  placeholder="e.g. spoilers, violence, mental health…"
+                  placeholderTextColor="#d97706"
+                  value={cwLabel}
+                  onChangeText={setCwLabel}
+                  autoFocus
+                  returnKeyType="done"
+                />
+              </View>
+            )}
+
             <TextInput
               style={[s.composeInput, { color: c.text }]}
               placeholder="What's on your mind?"
@@ -147,7 +178,7 @@ export default function FeedScreen() {
               value={content}
               onChangeText={setContent}
               multiline
-              autoFocus
+              autoFocus={!showCW}
             />
             {imageUrl ? (
               <View style={{ marginTop: 12 }}>
@@ -177,6 +208,9 @@ const s = StyleSheet.create({
   composeInput: { fontSize: 16, color: '#111827', flex: 1 },
   imagePreview: { height: 180, width: '100%', borderRadius: 12, marginTop: 8 },
   removeImage: { position: 'absolute', top: 10, right: 2, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
-  modalFooter: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 10, borderTopWidth: 1, flexDirection: 'row', gap: 16 },
+  cwBtn: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  cwInputWrap: { borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 12 },
+  cwInputLabel: { fontSize: 11, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
+  cwInput: { fontSize: 14, color: '#92400e', padding: 0 },
 })
 
