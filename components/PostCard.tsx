@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, Alert, Share, StyleSheet, Modal, Dimensions, Linking } from 'react-native'
+import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, Dimensions, Linking, TextInput } from 'react-native'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -8,7 +8,6 @@ import { formatDistanceToNow } from 'date-fns'
 import { feedApi, imgUrl } from '../api'
 import { useAuthStore } from '../store/auth'
 import { Avatar } from './ui'
-import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
 
 const REACTIONS = [
@@ -24,6 +23,11 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const qc = useQueryClient()
   const [showReactions, setShowReactions] = useState(false)
   const [twExpanded, setTwExpanded] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
+  const [editContent, setEditContent] = useState(post.content || '')
+  const [editCW, setEditCW] = useState(post.content_warning || '')
+  const [showEditCW, setShowEditCW] = useState(!!post.content_warning)
   const c = useC()
 
   const invalidate = () => qc.invalidateQueries({ queryKey })
@@ -36,6 +40,14 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
 
   const repost = useMutation({ mutationFn: () => feedApi.repostPost(post.id), onSuccess: invalidate })
   const del    = useMutation({ mutationFn: () => feedApi.deletePost(post.id), onSuccess: invalidate })
+  const edit   = useMutation({
+    mutationFn: () => feedApi.editPost(post.id, {
+      content: editContent,
+      content_warning: showEditCW && editCW.trim() ? editCW.trim() : '',
+    }),
+    onSuccess: () => { setShowEdit(false); invalidate() },
+    onError: () => Alert.alert('Error', 'Could not save changes'),
+  })
 
   const isOwn    = user?.id === post.author_id
   const author   = post.repost_of_id ? post.repost_author_display_name : (post.author_display_name || post.display_name)
@@ -86,11 +98,8 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             <Text style={[s.authorMeta, { color: c.textMuted }]}>@{username} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</Text>
           </View>
           {isOwn && (
-            <TouchableOpacity onPress={() => Alert.alert('Delete post?', undefined, [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Delete', style: 'destructive', onPress: () => del.mutate() },
-            ])} style={{ padding: 4 }}>
-              <Ionicons name="trash-outline" size={16} color={c.red} />
+            <TouchableOpacity onPress={() => setShowMenu(true)} style={{ padding: 4 }}>
+              <Ionicons name="ellipsis-horizontal" size={18} color={c.textMuted} />
             </TouchableOpacity>
           )}
         </TouchableOpacity>
@@ -193,11 +202,81 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             {post.repost_count > 0 && <Text style={[s.actionCount, { color: post.reposted ? c.primary : c.textMuted }]}>{post.repost_count}</Text>}
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => Share.share({ message: content || '' })}>
-            <Ionicons name="share-outline" size={17} color={c.textMuted} />
-          </TouchableOpacity>
         </View>
       </View>
+
+      {/* ── Three-dots menu ───────────────────────────────────────── */}
+      <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
+        <TouchableOpacity style={s.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
+          <View style={[s.menuSheet, { backgroundColor: c.card, borderColor: c.border }]}>
+            <TouchableOpacity style={s.menuItem} onPress={() => { setShowMenu(false); setEditContent(post.content || ''); setEditCW(post.content_warning || ''); setShowEditCW(!!post.content_warning); setShowEdit(true) }}>
+              <Ionicons name="pencil-outline" size={18} color={c.text} />
+              <Text style={[s.menuItemText, { color: c.text }]}>Edit post</Text>
+            </TouchableOpacity>
+            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+            <TouchableOpacity style={s.menuItem} onPress={() => {
+              setShowMenu(false)
+              Alert.alert('Delete post?', 'This cannot be undone.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete', style: 'destructive', onPress: () => del.mutate() },
+              ])
+            }}>
+              <Ionicons name="trash-outline" size={18} color={c.red} />
+              <Text style={[s.menuItemText, { color: c.red }]}>Delete post</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Edit modal ────────────────────────────────────────────── */}
+      <Modal visible={showEdit} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowEdit(false)}>
+        <View style={[s.editModal, { backgroundColor: c.card }]}>
+          <View style={[s.editHeader, { borderBottomColor: c.border }]}>
+            <TouchableOpacity onPress={() => setShowEdit(false)}>
+              <Text style={{ fontSize: 16, color: c.textMuted }}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[s.editTitle, { color: c.text }]}>Edit post</Text>
+            <TouchableOpacity
+              onPress={() => edit.mutate()}
+              disabled={!editContent.trim() || edit.isPending}
+              style={[s.editSaveBtn, (!editContent.trim() || edit.isPending) && { backgroundColor: c.primaryLt }]}
+            >
+              <Text style={s.editSaveBtnText}>{edit.isPending ? '…' : 'Save'}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ padding: 16 }}>
+            {showEditCW && (
+              <View style={{ borderWidth: 1, borderColor: '#fcd34d', backgroundColor: '#fffbeb', borderRadius: 10, padding: 10, marginBottom: 12 }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>⚠️ Trigger warning</Text>
+                <TextInput
+                  style={{ fontSize: 14, color: '#92400e', padding: 0 }}
+                  value={editCW}
+                  onChangeText={setEditCW}
+                  placeholder="e.g. spoilers, violence…"
+                  placeholderTextColor="#d97706"
+                  returnKeyType="done"
+                />
+              </View>
+            )}
+            <TextInput
+              style={[s.editInput, { color: c.text, borderColor: c.border }]}
+              value={editContent}
+              onChangeText={setEditContent}
+              multiline
+              autoFocus
+              placeholderTextColor={c.textLight}
+              placeholder="What's on your mind?"
+            />
+            <TouchableOpacity
+              onPress={() => setShowEditCW(v => !v)}
+              style={[s.editCWBtn, { borderColor: showEditCW ? '#fcd34d' : c.border, backgroundColor: showEditCW ? '#fef3c7' : 'transparent' }]}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '600', color: showEditCW ? '#92400e' : c.textMuted }}>TW</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   )
 }
@@ -231,4 +310,16 @@ const s = StyleSheet.create({
   pickerItemActive: { borderRadius: 8 },
   lightboxBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' },
   lightboxClose: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 16 },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+  menuSheet: { borderRadius: 16, borderWidth: 1, overflow: 'hidden', minWidth: 220 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16 },
+  menuItemText: { fontSize: 16 },
+  menuDivider: { height: 1 },
+  editModal: { flex: 1 },
+  editHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12, borderBottomWidth: 1 },
+  editTitle: { fontWeight: '600', fontSize: 16 },
+  editSaveBtn: { backgroundColor: '#486581', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 6 },
+  editSaveBtnText: { color: 'white', fontWeight: '600' },
+  editInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15, minHeight: 120, textAlignVertical: 'top', marginBottom: 12 },
+  editCWBtn: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
 })

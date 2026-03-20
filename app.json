@@ -27,7 +27,6 @@
         "backgroundColor": "#486581"
       },
       "package": "social.agora.app",
-      "usesCleartextTraffic": true,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",

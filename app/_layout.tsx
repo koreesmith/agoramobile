@@ -1,5 +1,4 @@
-import '../global.css'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Stack, router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useColorScheme } from 'react-native'
@@ -10,6 +9,7 @@ import { useAuthStore } from '../store/auth'
 import { usersApi } from '../api'
 import { ColorProvider } from '../constants/ColorContext'
 import { useThemeStore } from '../store/theme'
+import SplashScreen from '../components/SplashScreen'
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -50,6 +50,26 @@ function AppContent() {
   )
 }
 
+export default function RootLayout() {
+  const [showSplash, setShowSplash] = useState(true)
+
+  if (showSplash) {
+    return (
+      <ColorProvider>
+        <SplashScreen onFinish={() => setShowSplash(false)} />
+      </ColorProvider>
+    )
+  }
+
+  return (
+    <ColorProvider>
+      <QueryClientProvider client={queryClient}>
+        <AppContent />
+      </QueryClientProvider>
+    </ColorProvider>
+  )
+}
+
 async function registerForPushNotifications() {
   if (!Device.isDevice) return
   const { status: existing } = await Notifications.getPermissionsAsync()
@@ -63,14 +83,4 @@ async function registerForPushNotifications() {
     const token = (await Notifications.getExpoPushTokenAsync()).data
     await usersApi.updateProfile({ expo_push_token: token })
   } catch {}
-}
-
-export default function RootLayout() {
-  return (
-    <ColorProvider>
-      <QueryClientProvider client={queryClient}>
-        <AppContent />
-      </QueryClientProvider>
-    </ColorProvider>
-  )
 }

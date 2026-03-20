@@ -37,7 +37,8 @@ export function imgUrl(url: string | null | undefined): string | undefined {
 export const authApi = {
   login:      (instanceUrl: string, username: string, password: string) =>
     axios.post(`${instanceUrl}/api/auth/login`, { username_or_email: username, password }),
-  register:   (data: any)        => api.post('/auth/register', data),
+  register:          (data: any)              => api.post('/auth/register', data),
+  registerWithUrl:   (url: string, data: any) => axios.post(`${url}/api/auth/register`, data),
   me:         ()                 => api.get('/auth/me'),
   meWithUrl:  (instanceUrl: string, token: string) =>
     axios.get(`${instanceUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } }),
@@ -51,6 +52,7 @@ export const feedApi = {
   getPost:      (id: string)         => api.get(`/posts/${id}`),
   createPost:   (data: any)          => api.post('/posts', data),
   deletePost:   (id: string)         => api.delete(`/posts/${id}`),
+  editPost:     (id: string, data: { content?: string; content_warning?: string }) => api.patch(`/posts/${id}`, data),
   likePost:     (id: string)         => api.post(`/posts/${id}/like`),
   unlikePost:   (id: string)         => api.delete(`/posts/${id}/like`),
   reactPost:    (id: string, type: string) => api.post(`/posts/${id}/react`, { type }),
