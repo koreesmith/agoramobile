@@ -82,9 +82,11 @@ export default function ProfileViewScreen() {
               </View>
             )}
           </View>
-          <Text style={s.name}>{profile.display_name || profile.username}</Text>
-          {profile.pronouns ? <Text style={s.pronouns}>({profile.pronouns})</Text> : null}
-          <Text style={s.username}>@{profile.username}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 6 }}>
+            <Text style={[s.name, { color: c.text }]}>{profile.display_name || profile.username}</Text>
+            {profile.pronouns ? <Text style={[s.pronouns, { color: c.textLight }]}>({profile.pronouns})</Text> : null}
+          </View>
+          <Text style={[s.username, { color: c.textMuted }]}>@{profile.username}</Text>
           {profile.bio ? <Text style={s.bio}>{profile.bio}</Text> : null}
           <Text style={s.friends}><Text style={{ fontWeight: 'bold', color: c.text }}>{profile.friend_count || 0}</Text> friends</Text>
         </View>
@@ -117,7 +119,7 @@ const s = StyleSheet.create({
   primaryBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
   primaryBtnText: { color: 'white', fontWeight: '600', fontSize: 13 },
   name: { fontSize: 20, fontWeight: 'bold', color: C.text },
-  pronouns: { fontSize: 13, color: C.textLight },
+  pronouns: { fontSize: 13 },
   username: { fontSize: 14, color: C.textMuted },
   bio: { fontSize: 14, color: C.textMd, marginTop: 6 },
   friends: { fontSize: 14, color: C.textMuted, marginTop: 10 },

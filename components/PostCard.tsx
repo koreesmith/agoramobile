@@ -51,6 +51,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
 
   const isOwn    = user?.id === post.author_id
   const author   = post.repost_of_id ? post.repost_author_display_name : (post.author_display_name || post.display_name)
+  const pronouns = post.repost_of_id ? post.repost_author_pronouns     : post.author_pronouns
   const username = post.repost_of_id ? post.repost_author_username    : (post.author_username || post.username)
   const avatar   = imgUrl(post.repost_of_id ? post.repost_author_avatar_url  : (post.author_avatar_url || post.avatar_url))
   const content  = post.repost_of_id ? post.repost_content            : post.content
@@ -94,7 +95,10 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         <TouchableOpacity style={s.authorRow} onPress={() => router.push(`/profile/${username}`)}>
           <Avatar url={avatar} name={author} size={40} />
           <View style={{ flex: 1 }}>
-            <Text style={[s.authorName, { color: c.text }]}>{author}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 }}>
+              <Text style={[s.authorName, { color: c.text }]}>{author}</Text>
+              {pronouns ? <Text style={[s.pronouns, { color: c.textLight }]}>({pronouns})</Text> : null}
+            </View>
             <Text style={[s.authorMeta, { color: c.textMuted }]}>@{username} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</Text>
           </View>
           {isOwn && (
@@ -291,6 +295,7 @@ const s = StyleSheet.create({
   body: { padding: 14 },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   authorName: { fontWeight: '600', fontSize: 14 },
+  pronouns:   { fontSize: 12, fontWeight: '400' },
   authorMeta: { fontSize: 12, marginTop: 1 },
   cw: { backgroundColor: '#fefce8', borderWidth: 1, borderColor: '#fde68a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8 },
   cwText: { fontSize: 12, color: '#92400e', fontWeight: '500' },

@@ -58,8 +58,9 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
       <View style={[s.comment, { marginLeft: indent, borderBottomColor: c.border }]}>
         <Avatar url={comment.avatar_url} name={comment.display_name || comment.username} size={avatarSize} />
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 }}>
             <Text style={[s.commentAuthor, { color: c.text }]}>{comment.display_name || comment.username}</Text>
+            {comment.pronouns ? <Text style={{ fontSize: 11, color: c.textLight }}>({comment.pronouns})</Text> : null}
             <Text style={[s.commentTime, { color: c.textLight }]}>{formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}</Text>
           </View>
           <Text style={[s.commentText, { color: c.textMd }]}>{comment.content}</Text>

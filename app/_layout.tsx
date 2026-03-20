@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Stack, router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useColorScheme } from 'react-native'
@@ -19,6 +19,32 @@ Notifications.setNotificationHandler({
   }),
 })
 
+// Map notification type to the route to navigate to
+function getRouteForNotification(data: Record<string, string>): string | null {
+  const { type, post_id, actor_username } = data
+  switch (type) {
+    case 'post_like':
+    case 'post_reaction':
+    case 'post_comment':
+    case 'comment_reply':
+    case 'post_mention':
+    case 'post_repost':
+    case 'wall_post':
+    case 'wall_post_pending':
+      return post_id ? `/post/${post_id}` : null
+    case 'friend_request':
+    case 'friend_accepted':
+      return actor_username ? `/profile/${actor_username}` : '/(tabs)/friends'
+    case 'group_join_request':
+    case 'group_join_approved':
+      return '/(tabs)/notifications'
+    case 'new_message':
+      return '/(tabs)/messages'
+    default:
+      return '/(tabs)/notifications'
+  }
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 1, staleTime: 30_000 },
@@ -29,6 +55,8 @@ function AppContent() {
   const { isAuthenticated, loadFromStorage } = useAuthStore()
   const { loadPreference } = useThemeStore()
   const scheme = useColorScheme()
+  const notifListener = useRef<any>()
+  const responseListener = useRef<any>()
 
   useEffect(() => {
     loadFromStorage()
@@ -38,6 +66,35 @@ function AppContent() {
   useEffect(() => {
     if (isAuthenticated) registerForPushNotifications()
   }, [isAuthenticated])
+
+  // Handle notification taps — deep link to the relevant screen
+  useEffect(() => {
+    // Handle tap when app is already open
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data as Record<string, string>
+      const route = getRouteForNotification(data)
+      if (route) {
+        // Small delay to ensure navigation is ready
+        setTimeout(() => router.push(route as any), 300)
+      }
+    })
+
+    // Handle tap when app was closed/backgrounded (last response)
+    Notifications.getLastNotificationResponseAsync().then(response => {
+      if (!response) return
+      const data = response.notification.request.content.data as Record<string, string>
+      const route = getRouteForNotification(data)
+      if (route) {
+        setTimeout(() => router.push(route as any), 500)
+      }
+    })
+
+    return () => {
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current)
+      }
+    }
+  }, [])
 
   return (
     <>

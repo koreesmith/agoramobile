@@ -61,8 +61,10 @@ export default function ProfileScreen() {
               <Text style={[s.editBtnText, { color: c.textMd }]}>Edit profile</Text>
             </TouchableOpacity>
           </View>
-          <Text style={[s.name, { color: c.text }]}>{p?.display_name || p?.username}</Text>
-          {p?.pronouns ? <Text style={[s.pronouns, { color: c.textLight }]}>({p.pronouns})</Text> : null}
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 6 }}>
+            <Text style={[s.name, { color: c.text }]}>{p?.display_name || p?.username}</Text>
+            {p?.pronouns ? <Text style={[s.pronouns, { color: c.textLight }]}>({p.pronouns})</Text> : null}
+          </View>
           <Text style={[s.username, { color: c.textMuted }]}>@{p?.username}</Text>
           {p?.bio ? <Text style={[s.bio, { color: c.textMd }]}>{p.bio}</Text> : null}
           <Text style={[s.friends, { color: c.textMuted }]}><Text style={[s.friendCount, { color: c.text }]}>{(p as any)?.friend_count || 0}</Text> friends</Text>
