@@ -18,12 +18,158 @@ const REACTIONS = [
   { type: 'vomit', emoji: '🤮' },
 ]
 
+function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
+  const c = useC()
+  const [showAddOption, setShowAddOption] = useState(false)
+  const [newOptionText, setNewOptionText] = useState('')
+
+  const vote = useMutation({
+    mutationFn: (optionId: string | null) =>
+      optionId ? feedApi.pollVote(post.id, optionId) : feedApi.pollUnvote(post.id),
+    onSuccess: onRefresh,
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not vote'),
+  })
+
+  const addOption = useMutation({
+    mutationFn: () => feedApi.pollAddOption(post.id, newOptionText.trim()),
+    onSuccess: () => { setNewOptionText(''); setShowAddOption(false); onRefresh() },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not add option'),
+  })
+
+  const opts: any[] = post.poll_options || []
+  const totalVotes = opts.reduce((s: number, o: any) => s + (o.votes || 0), 0)
+  const myVotes = new Set([post.my_poll_vote, ...(post.my_poll_votes || [])].filter(Boolean))
+  const hasVoted = myVotes.size > 0
+  const isExpired = !!post.poll_expired
+  const canVote = !isExpired
+
+  return (
+    <View style={{ marginTop: 10, gap: 6 }}>
+      {isExpired && (
+        <Text style={{ fontSize: 12, color: c.textMuted }}>🔒 This poll has ended</Text>
+      )}
+      {!isExpired && post.poll_expires_at && (
+        <Text style={{ fontSize: 12, color: c.textMuted }}>
+          ⏱ Closes {new Date(post.poll_expires_at).toLocaleString()}
+        </Text>
+      )}
+      {post.poll_multiple_choice && canVote && !hasVoted && (
+        <Text style={{ fontSize: 11, color: c.textMuted }}>Select all that apply</Text>
+      )}
+
+      {opts.map((opt: any) => {
+        const isMyVote = myVotes.has(opt.id)
+        const pct = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0
+        const showResults = hasVoted || isExpired
+
+        return showResults ? (
+          <TouchableOpacity
+            key={opt.id}
+            onPress={() => canVote ? vote.mutate(isMyVote ? null : opt.id) : undefined}
+            disabled={!canVote}
+            style={[pw.resultRow, { borderColor: isMyVote ? c.primary : c.border }]}
+          >
+            <View style={[pw.resultFill, { width: `${pct}%` as any, backgroundColor: isMyVote ? c.primaryBg : c.bg }]} />
+            <View style={pw.resultContent}>
+              <Text style={[pw.resultText, { color: isMyVote ? c.primary : c.textMd, fontWeight: isMyVote ? '700' : '400' }]}>
+                {isMyVote ? '✓ ' : ''}{opt.text}
+              </Text>
+              <Text style={[pw.resultPct, { color: c.textMuted }]}>{pct}%</Text>
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            key={opt.id}
+            onPress={() => vote.mutate(opt.id)}
+            disabled={vote.isPending}
+            style={[pw.optionRow, { borderColor: c.border }]}
+          >
+            {post.poll_multiple_choice && (
+              <Ionicons name="square-outline" size={14} color={c.textMuted} style={{ marginRight: 6 }} />
+            )}
+            <Text style={[pw.optionText, { color: c.textMd }]}>{opt.text}</Text>
+          </TouchableOpacity>
+        )
+      })}
+
+      {canVote && post.poll_allows_new_options && !showAddOption && (
+        <TouchableOpacity
+          onPress={() => setShowAddOption(true)}
+          style={[pw.addOptionBtn, { borderColor: c.border }]}
+        >
+          <Ionicons name="add" size={14} color={c.textMuted} />
+          <Text style={[pw.addOptionText, { color: c.textMuted }]}>Add your own option…</Text>
+        </TouchableOpacity>
+      )}
+
+      {showAddOption && (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TextInput
+            style={[pw.addOptionInput, { borderColor: c.border, color: c.text, backgroundColor: c.card, flex: 1 }]}
+            placeholder="Your option…"
+            placeholderTextColor={c.textLight}
+            value={newOptionText}
+            onChangeText={setNewOptionText}
+            maxLength={100}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={() => newOptionText.trim() && addOption.mutate()}
+          />
+          <TouchableOpacity
+            onPress={() => addOption.mutate()}
+            disabled={!newOptionText.trim() || addOption.isPending}
+            style={[pw.addBtn, { backgroundColor: c.primary }]}
+          >
+            <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>
+              {addOption.isPending ? '…' : 'Add'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => { setShowAddOption(false); setNewOptionText('') }}
+            style={[pw.addBtn, { backgroundColor: c.bg, borderWidth: 1, borderColor: c.border }]}
+          >
+            <Text style={{ color: c.textMuted, fontSize: 13 }}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
+        <Text style={[pw.voteCount, { color: c.textMuted }]}>
+          {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
+        </Text>
+        {hasVoted && canVote && (
+          <TouchableOpacity onPress={() => vote.mutate(null)}>
+            <Text style={{ fontSize: 11, color: c.primary, textDecorationLine: 'underline' }}>Remove vote</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  )
+}
+
+const pw = StyleSheet.create({
+  resultRow:    { borderWidth: 1, borderRadius: 10, overflow: 'hidden', position: 'relative', marginBottom: 2 },
+  resultFill:   { position: 'absolute', top: 0, bottom: 0, left: 0 },
+  resultContent:{ flexDirection: 'row', justifyContent: 'space-between', padding: 10, alignItems: 'center' },
+  resultText:   { fontSize: 13, flex: 1 },
+  resultPct:    { fontSize: 12, flexShrink: 0 },
+  optionRow:    { borderWidth: 1, borderRadius: 10, padding: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
+  optionText:   { fontSize: 13 },
+  addOptionBtn: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  addOptionText:{ fontSize: 13 },
+  addOptionInput:{ borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13 },
+  addBtn:       { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', justifyContent: 'center' },
+  voteCount:    { fontSize: 11 },
+})
+
 export default function PostCard({ post, queryKey }: { post: any; queryKey: any[] }) {
   const { user } = useAuthStore()
   const qc = useQueryClient()
   const [showReactions, setShowReactions] = useState(false)
   const [twExpanded, setTwExpanded] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const [showShare, setShowShare] = useState(false)
+  const [shareContent, setShareContent] = useState('')
   const [showEdit, setShowEdit] = useState(false)
   const [editContent, setEditContent] = useState(post.content || '')
   const [editCW, setEditCW] = useState(post.content_warning || '')
@@ -38,7 +184,11 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
     onSuccess: invalidate,
   })
 
-  const repost = useMutation({ mutationFn: () => feedApi.repostPost(post.id), onSuccess: invalidate })
+  const repost = useMutation({
+    mutationFn: () => feedApi.repostPost(post.id, { content: shareContent, visibility: 'friends' }),
+    onSuccess: () => { setShowShare(false); setShareContent(''); invalidate() },
+    onError: (e: any) => Alert.alert('Cannot share', e.response?.data?.error || 'Could not share post'),
+  })
   const del    = useMutation({ mutationFn: () => feedApi.deletePost(post.id), onSuccess: invalidate })
   const edit   = useMutation({
     mutationFn: () => feedApi.editPost(post.id, {
@@ -162,6 +312,11 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
           </TouchableOpacity>
         ) : null}
 
+        {/* Poll */}
+        {post.poll_options && post.poll_options.length >= 2 && (
+          <PollWidget post={post} onRefresh={invalidate} />
+        )}
+
         {totalReactions > 0 && (
           <View style={s.reactionCounts}>
             {Object.entries(reactionCounts).filter(([,v]) => v > 0).map(([type, count]) => {
@@ -201,8 +356,11 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             {post.comment_count > 0 && <Text style={[s.actionCount, { color: c.textMuted }]}>{post.comment_count}</Text>}
           </TouchableOpacity>
 
-          <TouchableOpacity style={s.actionBtn} onPress={() => repost.mutate()}>
-            <Ionicons name="repeat" size={17} color={post.reposted ? c.primary : c.textMuted} />
+          <TouchableOpacity
+            style={s.actionBtn}
+            onPress={() => post.visibility === 'public' ? setShowShare(true) : Alert.alert('Cannot share', 'Friends-only posts cannot be shared.')}
+          >
+            <Ionicons name="repeat" size={17} color={post.reposted ? c.primary : post.visibility !== 'public' ? c.border : c.textMuted} />
             {post.repost_count > 0 && <Text style={[s.actionCount, { color: post.reposted ? c.primary : c.textMuted }]}>{post.repost_count}</Text>}
           </TouchableOpacity>
 
@@ -281,6 +439,48 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         </View>
       </Modal>
 
+      {/* ── Share modal ───────────────────────────────────────────── */}
+      <Modal visible={showShare} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowShare(false)}>
+        <View style={[s.editModal, { backgroundColor: c.card }]}>
+          <View style={[s.editHeader, { borderBottomColor: c.border }]}>
+            <TouchableOpacity onPress={() => { setShowShare(false); setShareContent('') }}>
+              <Text style={{ fontSize: 16, color: c.textMuted }}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[s.editTitle, { color: c.text }]}>Share post</Text>
+            <TouchableOpacity
+              onPress={() => repost.mutate()}
+              disabled={repost.isPending}
+              style={[s.editSaveBtn, repost.isPending && { backgroundColor: c.primaryLt }]}
+            >
+              <Text style={s.editSaveBtnText}>{repost.isPending ? '…' : 'Share'}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ padding: 16 }}>
+            <TextInput
+              style={[s.editInput, { color: c.text, borderColor: c.border }]}
+              value={shareContent}
+              onChangeText={setShareContent}
+              multiline
+              autoFocus
+              placeholderTextColor={c.textLight}
+              placeholder="Say something about this… (optional)"
+            />
+            {/* Preview of post being shared */}
+            <View style={[s.sharePreview, { borderColor: c.border, backgroundColor: c.bg }]}>
+              <Text style={[s.sharePreviewAuthor, { color: c.text }]}>
+                {post.author_display_name || post.author_username}
+                <Text style={{ color: c.textMuted, fontWeight: '400' }}> @{post.author_username}</Text>
+              </Text>
+              {post.content ? <Text style={[s.sharePreviewContent, { color: c.textMd }]} numberOfLines={3}>{post.content}</Text> : null}
+              {post.image_url ? <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 4 }}>📷 Photo</Text> : null}
+            </View>
+            <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 8 }}>
+              This will be shared with your friends.
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   )
 }
@@ -327,4 +527,7 @@ const s = StyleSheet.create({
   editSaveBtnText: { color: 'white', fontWeight: '600' },
   editInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15, minHeight: 120, textAlignVertical: 'top', marginBottom: 12 },
   editCWBtn: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  sharePreview:        { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12 },
+  sharePreviewAuthor:  { fontSize: 13, fontWeight: '600', marginBottom: 4 },
+  sharePreviewContent: { fontSize: 13, lineHeight: 19 },
 })

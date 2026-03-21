@@ -44,8 +44,17 @@ export default function FeedScreen() {
   const [uploading, setUploading] = useState(false)
   const [showCW, setShowCW] = useState(false)
   const [cwLabel, setCwLabel] = useState('')
+  const [showPoll, setShowPoll] = useState(false)
+  const [pollOptions, setPollOptions] = useState(['', ''])
+  const [pollMultiple, setPollMultiple] = useState(false)
+  const [pollAllowsNew, setPollAllowsNew] = useState(false)
+  const [pollExpiresHours, setPollExpiresHours] = useState(24)
 
-  const resetCompose = () => { setContent(''); setImageUrl(''); setShowCW(false); setCwLabel(''); setShowCompose(false) }
+  const resetCompose = () => {
+    setContent(''); setImageUrl(''); setShowCW(false); setCwLabel('')
+    setShowPoll(false); setPollOptions(['', '']); setPollMultiple(false)
+    setPollAllowsNew(false); setPollExpiresHours(24); setShowCompose(false)
+  }
 
   // Auto-detect GIF URLs pasted into content
   useEffect(() => {
@@ -84,6 +93,10 @@ export default function FeedScreen() {
       image_url: imageUrl,
       visibility: 'friends',
       content_warning: showCW && cwLabel.trim() ? cwLabel.trim() : '',
+      poll_options: showPoll ? pollOptions.filter(o => o.trim()) : [],
+      poll_multiple_choice: showPoll ? pollMultiple : false,
+      poll_allows_new_options: showPoll ? pollAllowsNew : false,
+      poll_expires_hours: showPoll ? pollExpiresHours : 0,
     }),
     onSuccess: () => { resetCompose(); qc.invalidateQueries({ queryKey: ['feed'] }) },
     onError: () => Alert.alert('Error', 'Could not create post'),
@@ -133,21 +146,26 @@ export default function FeedScreen() {
               <Text style={[s.cancelText, { color: c.textMuted }]}>Cancel</Text>
             </TouchableOpacity>
             <Text style={[s.modalTitle, { color: c.text }]}>New post</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               {/* CW toggle */}
               <TouchableOpacity onPress={() => setShowCW(v => !v)}
                 style={[s.cwBtn, showCW && { backgroundColor: '#fef3c7', borderColor: '#fcd34d' }]}>
                 <Text style={{ fontSize: 12, fontWeight: '600', color: showCW ? '#92400e' : c.textMuted }}>TW</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={pickImage} disabled={uploading}>
+              {/* Poll toggle */}
+              <TouchableOpacity onPress={() => setShowPoll(v => !v)}
+                style={[s.cwBtn, showPoll && { backgroundColor: c.primaryBg, borderColor: c.primaryLt }]}>
+                <Ionicons name="bar-chart-outline" size={16} color={showPoll ? c.primary : c.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={pickImage} disabled={uploading || showPoll}>
                 {uploading
                   ? <ActivityIndicator size="small" color={c.primary} />
-                  : <Ionicons name="image-outline" size={22} color={c.primary} />}
+                  : <Ionicons name="image-outline" size={22} color={showPoll ? c.border : c.primary} />}
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => createPost.mutate()}
-                disabled={(!content.trim() && !imageUrl) || createPost.isPending}
-                style={[s.submitBtn, (!content.trim() && !imageUrl) && s.submitBtnDisabled]}
+                disabled={(!content.trim() && !imageUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || createPost.isPending}
+                style={[s.submitBtn, (!content.trim() && !imageUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) && s.submitBtnDisabled]}
               >
                 <Text style={s.submitBtnText}>{createPost.isPending ? '…' : 'Post'}</Text>
               </TouchableOpacity>
@@ -155,32 +173,81 @@ export default function FeedScreen() {
           </View>
 
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-            {/* CW input — shown when TW toggled */}
+            {/* CW input */}
             {showCW && (
               <View style={[s.cwInputWrap, { borderColor: '#fcd34d', backgroundColor: '#fffbeb' }]}>
                 <Text style={s.cwInputLabel}>⚠️ Trigger warning label</Text>
-                <TextInput
-                  style={s.cwInput}
-                  placeholder="e.g. spoilers, violence, mental health…"
-                  placeholderTextColor="#d97706"
-                  value={cwLabel}
-                  onChangeText={setCwLabel}
-                  autoFocus
-                  returnKeyType="done"
-                />
+                <TextInput style={s.cwInput} placeholder="e.g. spoilers, violence…"
+                  placeholderTextColor="#d97706" value={cwLabel} onChangeText={setCwLabel}
+                  returnKeyType="done" />
               </View>
             )}
 
             <TextInput
               style={[s.composeInput, { color: c.text }]}
-              placeholder="What's on your mind?"
+              placeholder={showPoll ? 'Ask a question…' : 'What\'s on your mind?'}
               placeholderTextColor={c.textLight}
-              value={content}
-              onChangeText={setContent}
-              multiline
-              autoFocus={!showCW}
+              value={content} onChangeText={setContent} multiline autoFocus={!showCW}
             />
-            {imageUrl ? (
+
+            {/* Poll editor */}
+            {showPoll && (
+              <View style={[s.pollEditor, { borderColor: c.border }]}>
+                <Text style={[s.pollEditorLabel, { color: c.textMuted }]}>POLL OPTIONS</Text>
+                {pollOptions.map((opt, i) => (
+                  <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <TextInput
+                      style={[s.pollOptionInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg, flex: 1 }]}
+                      placeholder={i < 2 ? `Option ${i+1} (required)` : `Option ${i+1} (optional)`}
+                      placeholderTextColor={c.textLight}
+                      value={opt} onChangeText={t => setPollOptions(opts => opts.map((o,j)=>j===i?t:o))}
+                      maxLength={100} returnKeyType="next"
+                    />
+                    {pollOptions.length > 2 && (
+                      <TouchableOpacity onPress={() => setPollOptions(opts=>opts.filter((_,j)=>j!==i))}>
+                        <Ionicons name="close-circle" size={18} color={c.textMuted} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                {pollOptions.length < 6 && (
+                  <TouchableOpacity onPress={() => setPollOptions(opts=>[...opts,''])} style={s.pollAddBtn}>
+                    <Ionicons name="add" size={14} color={c.primary} />
+                    <Text style={{ fontSize: 13, color: c.primary }}>Add option</Text>
+                  </TouchableOpacity>
+                )}
+                {/* Poll settings */}
+                <View style={[s.pollSettings, { borderTopColor: c.border }]}>
+                  <Text style={[s.pollEditorLabel, { color: c.textMuted }]}>SETTINGS</Text>
+                  {/* Duration */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <Text style={{ fontSize: 13, color: c.textMd, flex: 1 }}>Duration</Text>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      {[{h:1,l:'1h'},{h:24,l:'1d'},{h:72,l:'3d'},{h:168,l:'1w'},{h:0,l:'∞'}].map(({h,l}) => (
+                        <TouchableOpacity key={h} onPress={() => setPollExpiresHours(h)}
+                          style={[s.durationBtn, { borderColor: pollExpiresHours===h ? c.primary : c.border, backgroundColor: pollExpiresHours===h ? c.primaryBg : 'transparent' }]}>
+                          <Text style={{ fontSize: 12, color: pollExpiresHours===h ? c.primary : c.textMuted }}>{l}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                  {/* Multiple choice */}
+                  <TouchableOpacity onPress={() => setPollMultiple(v=>!v)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}>
+                    <Ionicons name={pollMultiple ? 'checkbox' : 'square-outline'} size={18} color={pollMultiple ? c.primary : c.border} />
+                    <Text style={{ fontSize: 13, color: c.textMd }}>Allow multiple selections</Text>
+                  </TouchableOpacity>
+                  {/* Allow new options */}
+                  <TouchableOpacity onPress={() => setPollAllowsNew(v=>!v)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}>
+                    <Ionicons name={pollAllowsNew ? 'checkbox' : 'square-outline'} size={18} color={pollAllowsNew ? c.primary : c.border} />
+                    <Text style={{ fontSize: 13, color: c.textMd }}>Let respondents add options</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {!showPoll && imageUrl ? (
               <View style={{ marginTop: 12 }}>
                 <Image source={{ uri: imgUrl(imageUrl) }} style={s.imagePreview} contentFit="cover" />
                 <TouchableOpacity onPress={() => setImageUrl('')} style={s.removeImage}>
@@ -212,5 +279,11 @@ const s = StyleSheet.create({
   cwInputWrap: { borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 12 },
   cwInputLabel: { fontSize: 11, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
   cwInput: { fontSize: 14, color: '#92400e', padding: 0 },
+  pollEditor: { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12 },
+  pollEditorLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 0.8, marginBottom: 10 },
+  pollOptionInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14 },
+  pollAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, marginBottom: 4 },
+  pollSettings: { borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
+  durationBtn: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
 })
 
