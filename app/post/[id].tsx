@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { View, Text, Image, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, RefreshControl, StyleSheet, Modal } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, Stack } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -155,6 +156,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
 
 export default function PostScreen() {
   const c = useC()
+  const insets = useSafeAreaInsets()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { user } = useAuthStore()
   const [comment, setComment] = useState('')
@@ -217,7 +219,7 @@ export default function PostScreen() {
         headerShown: true, headerTitle: 'Post', headerBackTitle: 'Back',
         headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
       }} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={90}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={insets.top + 44}>
         <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={pl || cl} onRefresh={() => { refetch(); rc() }} tintColor={c.primary} />}>
           {pl ? <Spinner /> : post ? <PostCard post={post} queryKey={['post', id]} /> : null}
           <View style={{ paddingHorizontal: 16, paddingBottom: 24 }}>

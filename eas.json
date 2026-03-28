@@ -6,15 +6,17 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "ios": { "image": "macos-sequoia-15.5-xcode-26.0" }
     },
     "preview": {
       "distribution": "internal",
-      "ios": { "simulator": false },
+      "ios": { "image": "macos-sequoia-15.5-xcode-26.0", "simulator": false },
       "android": { "buildType": "apk" }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "ios": { "image": "macos-sequoia-15.5-xcode-26.0" }
     }
   },
   "submit": {

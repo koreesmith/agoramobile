@@ -8,8 +8,8 @@ import { useC } from '../../constants/ColorContext'
 
 const FEATURED_INSTANCES = [
   {
-    url: 'https://ameth.social',
-    name: 'Ameth Social',
+    url: 'https://agorasocial.online',
+    name: 'Agora Social',
     description: 'The original Agora instance',
     emoji: '🏛️',
   },
