@@ -148,3 +148,30 @@ export const inviteApi = {
 export const instanceApi = {
   getInfo: () => api.get('/instance'),
 }
+
+// ── Moderation (AGORA-74) ────────────────────────────────────────────────────
+export const moderationApi = {
+  createReport:       (data: any)             => api.post('/reports', data),
+  listReports:        (status?: string)       => api.get('/moderation/reports', { params: { status } }),
+  reviewReport:       (id: string, data: any) => api.post(`/moderation/reports/${id}/review`, data),
+  listModeratedUsers: (filter?: string)       => api.get('/moderation/users', { params: { filter } }),
+  suspendUser:        (id: string, data: any) => api.post(`/moderation/users/${id}/suspend`, data),
+  unsuspendUser:      (id: string)            => api.post(`/moderation/users/${id}/unsuspend`, {}),
+  banUser:            (id: string, data: any) => api.post(`/moderation/users/${id}/ban`, data),
+  unbanUser:          (id: string)            => api.post(`/moderation/users/${id}/unban`, {}),
+  listInstanceBans:   ()                      => api.get('/moderation/instance-bans'),
+  banInstance:        (data: any)             => api.post('/moderation/instance-bans', data),
+  unbanInstance:      (id: string)            => api.delete(`/moderation/instance-bans/${id}`),
+}
+
+// ── Instance rules ────────────────────────────────────────────────────────────
+export const rulesApi = {
+  list: () => api.get('/instance/rules'),
+}
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+export const adminApi = {
+  getStats:  ()                             => api.get('/admin/stats'),
+  listUsers: (q?: string)                   => api.get('/admin/users', { params: { q } }),
+  setRole:   (userID: string, role: string) => api.patch(`/admin/users/${userID}/role`, { role }),
+}

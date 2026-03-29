@@ -79,6 +79,12 @@ export default function SettingsScreen() {
         {invitesEnabled && (
           <Row icon="mail-outline" label="Invite a friend" onPress={() => router.push('/invite-friend')} />
         )}
+        {(user?.role === 'admin' || user?.role === 'moderator') && (
+          <>
+            <Text style={[s.section, { color: c.textMuted }]}>Administration</Text>
+            <Row icon="shield-outline" label="Admin Panel" onPress={() => router.push('/admin')} />
+          </>
+        )}
         <Text style={[s.section, { color: c.textMuted }]}>Appearance</Text>
         <View style={[s.themeRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
           <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>

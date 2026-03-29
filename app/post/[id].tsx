@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { View, Text, Image, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, RefreshControl, StyleSheet, Modal } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useLocalSearchParams, Stack } from 'expo-router'
+import { useLocalSearchParams, Stack, router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
@@ -114,12 +114,10 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
           </View>
         </View>
 
-        {/* Three-dots menu for own comments */}
-        {comment.author_id === userId && (
-          <TouchableOpacity onPress={() => setShowMenu(true)} style={{ paddingLeft: 6, paddingTop: 2 }}>
-            <Ionicons name="ellipsis-horizontal" size={15} color={c.textMuted} />
-          </TouchableOpacity>
-        )}
+        {/* Three-dots menu — show for all users */}
+        <TouchableOpacity onPress={() => setShowMenu(true)} style={{ paddingLeft: 6, paddingTop: 2 }}>
+          <Ionicons name="ellipsis-horizontal" size={15} color={c.textMuted} />
+        </TouchableOpacity>
       </View>
 
       {/* Nested replies */}
@@ -137,16 +135,28 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
       <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
         <TouchableOpacity style={s.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
           <View style={[s.menuSheet, { backgroundColor: c.card, borderColor: c.border }]}>
-            <TouchableOpacity style={s.menuItem} onPress={() => {
-              setShowMenu(false)
-              Alert.alert('Delete comment?', 'This cannot be undone.', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => del.mutate() },
-              ])
-            }}>
-              <Ionicons name="trash-outline" size={18} color={c.red} />
-              <Text style={[s.menuItemText, { color: c.red }]}>Delete comment</Text>
-            </TouchableOpacity>
+            {comment.author_id === userId ? (
+              <>
+                <TouchableOpacity style={s.menuItem} onPress={() => {
+                  setShowMenu(false)
+                  Alert.alert('Delete comment?', 'This cannot be undone.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: () => del.mutate() },
+                  ])
+                }}>
+                  <Ionicons name="trash-outline" size={18} color={c.red} />
+                  <Text style={[s.menuItemText, { color: c.red }]}>Delete comment</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity style={s.menuItem} onPress={() => {
+                setShowMenu(false)
+                router.push({ pathname: '/report', params: { commentId: comment.id } } as any)
+              }}>
+                <Ionicons name="flag-outline" size={18} color={c.red} />
+                <Text style={[s.menuItemText, { color: c.red }]}>Report comment</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>

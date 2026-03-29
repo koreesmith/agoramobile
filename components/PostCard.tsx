@@ -382,21 +382,33 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
       <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
         <TouchableOpacity style={s.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
           <View style={[s.menuSheet, { backgroundColor: c.card, borderColor: c.border }]}>
-            <TouchableOpacity style={s.menuItem} onPress={() => { setShowMenu(false); setEditContent(post.content || ''); setEditCW(post.content_warning || ''); setShowEditCW(!!post.content_warning); setShowEdit(true) }}>
-              <Ionicons name="pencil-outline" size={18} color={c.text} />
-              <Text style={[s.menuItemText, { color: c.text }]}>Edit post</Text>
-            </TouchableOpacity>
-            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-            <TouchableOpacity style={s.menuItem} onPress={() => {
-              setShowMenu(false)
-              Alert.alert('Delete post?', 'This cannot be undone.', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => del.mutate() },
-              ])
-            }}>
-              <Ionicons name="trash-outline" size={18} color={c.red} />
-              <Text style={[s.menuItemText, { color: c.red }]}>Delete post</Text>
-            </TouchableOpacity>
+            {isOwn ? (
+              <>
+                <TouchableOpacity style={s.menuItem} onPress={() => { setShowMenu(false); setEditContent(post.content || ''); setEditCW(post.content_warning || ''); setShowEditCW(!!post.content_warning); setShowEdit(true) }}>
+                  <Ionicons name="pencil-outline" size={18} color={c.text} />
+                  <Text style={[s.menuItemText, { color: c.text }]}>Edit post</Text>
+                </TouchableOpacity>
+                <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+                <TouchableOpacity style={s.menuItem} onPress={() => {
+                  setShowMenu(false)
+                  Alert.alert('Delete post?', 'This cannot be undone.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: () => del.mutate() },
+                  ])
+                }}>
+                  <Ionicons name="trash-outline" size={18} color={c.red} />
+                  <Text style={[s.menuItemText, { color: c.red }]}>Delete post</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity style={s.menuItem} onPress={() => {
+                setShowMenu(false)
+                router.push({ pathname: '/report', params: { postId: post.id } } as any)
+              }}>
+                <Ionicons name="flag-outline" size={18} color={c.red} />
+                <Text style={[s.menuItemText, { color: c.red }]}>Report post</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>
