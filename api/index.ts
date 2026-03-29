@@ -95,7 +95,7 @@ export const friendsApi = {
   acceptRequest:  (id: string)     => api.post(`/friends/accept/${id}`),
   declineRequest: (id: string)     => api.post(`/friends/decline/${id}`),
   unfriend:       (id: string)     => api.delete(`/friends/${id}`),
-  listGroups:     ()               => api.get('/friend-groups'),
+  listFriendLists: ()               => api.get('/friend-groups'),
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────
@@ -137,4 +137,14 @@ export const dmApi = {
 // ── Search ────────────────────────────────────────────────────────────────────
 export const searchApi = {
   search: (q: string) => api.get('/search', { params: { q } }),
+}
+
+// ── Invites ───────────────────────────────────────────────────────────────────
+export const inviteApi = {
+  send: (email: string) => api.post('/invites/send', { email }),
+}
+
+// ── Instance ──────────────────────────────────────────────────────────────────
+export const instanceApi = {
+  getInfo: () => api.get('/instance'),
 }

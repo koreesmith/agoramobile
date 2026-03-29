@@ -5,12 +5,12 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { Screen, Header, Spinner, EmptyState } from '../../components/ui'
 import PostCard from '../../components/PostCard'
-import { feedApi, imgUrl } from '../../api'
+import { feedApi, friendsApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
 
 import { C } from '../../constants/colors'
@@ -49,11 +49,26 @@ export default function FeedScreen() {
   const [pollMultiple, setPollMultiple] = useState(false)
   const [pollAllowsNew, setPollAllowsNew] = useState(false)
   const [pollExpiresHours, setPollExpiresHours] = useState(24)
+  const [visibility, setVisibility] = useState<'public'|'friends'|'group'>('friends')
+  const [friendListId, setFriendListId] = useState('')
+  const [showVisibilitySheet, setShowVisibilitySheet] = useState(false)
+  const [showListSheet, setShowListSheet] = useState(false)
+
+  const { data: groupsData } = useQuery({
+    queryKey: ['friend-lists'],
+    queryFn: () => friendsApi.listFriendLists().then(r => r.data),
+    enabled: showCompose,
+  })
+  const friendLists: any[] = groupsData?.groups || []
+
+  const selectedFriendList = friendLists.find((g: any) => g.id === friendListId)
 
   const resetCompose = () => {
     setContent(''); setImageUrl(''); setShowCW(false); setCwLabel('')
     setShowPoll(false); setPollOptions(['', '']); setPollMultiple(false)
-    setPollAllowsNew(false); setPollExpiresHours(24); setShowCompose(false)
+    setPollAllowsNew(false); setPollExpiresHours(24)
+    setVisibility('friends'); setFriendListId('')
+    setShowCompose(false)
   }
 
   // Auto-detect GIF URLs pasted into content
@@ -91,7 +106,8 @@ export default function FeedScreen() {
     mutationFn: () => feedApi.createPost({
       content,
       image_url: imageUrl,
-      visibility: 'friends',
+      visibility,
+      group_id: visibility === 'group' ? friendListId : undefined,
       content_warning: showCW && cwLabel.trim() ? cwLabel.trim() : '',
       poll_options: showPoll ? pollOptions.filter(o => o.trim()) : [],
       poll_multiple_choice: showPoll ? pollMultiple : false,
@@ -137,10 +153,11 @@ export default function FeedScreen() {
       )}
 
       <Modal visible={showCompose} animationType="slide" presentationStyle="pageSheet">
-        <KeyboardAvoidingView
-          style={[s.modal, { backgroundColor: c.card }]}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
+        <View style={{ flex: 1, backgroundColor: c.card }}>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
           <View style={[s.modalHeader, { borderBottomColor: c.border }]}>
             <TouchableOpacity onPress={resetCompose}>
               <Text style={[s.cancelText, { color: c.textMuted }]}>Cancel</Text>
@@ -171,6 +188,82 @@ export default function FeedScreen() {
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* Audience row — tapping expands inline picker */}
+          <TouchableOpacity
+            onPress={() => setShowVisibilitySheet(v => !v)}
+            style={[s.audienceRow, { borderBottomColor: c.border, backgroundColor: c.card }]}
+          >
+            <Ionicons
+              name={visibility === 'public' ? 'globe-outline' : visibility === 'group' ? 'people-outline' : 'person-outline'}
+              size={15}
+              color={c.primary}
+            />
+            <Text style={[s.audienceLabel, { color: c.primary }]}>
+              {visibility === 'public' ? 'Public' : visibility === 'group' ? (selectedFriendList?.name || 'Select a list…') : 'Friends'}
+            </Text>
+            <Ionicons name={showVisibilitySheet ? 'chevron-up' : 'chevron-down'} size={13} color={c.textMuted} style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
+
+          {/* Inline visibility picker */}
+          {showVisibilitySheet && (
+            <View style={[s.inlinePicker, { backgroundColor: c.bg, borderBottomColor: c.border }]}>
+              {[
+                { value: 'public',  icon: 'globe-outline',  label: 'Public',      desc: 'Anyone on Agora' },
+                { value: 'friends', icon: 'person-outline', label: 'Friends',     desc: 'Only your friends' },
+                { value: 'group',   icon: 'people-outline', label: 'Friend List', desc: 'Pick a specific list' },
+              ].map(opt => (
+                <TouchableOpacity
+                  key={opt.value}
+                  onPress={() => {
+                    setVisibility(opt.value as any)
+                    if (opt.value !== 'group') setFriendListId('')
+                    setShowVisibilitySheet(false)
+                    if (opt.value === 'group') setShowListSheet(true)
+                  }}
+                  style={[s.inlineOption, { borderBottomColor: c.border, backgroundColor: visibility === opt.value ? c.primaryBg : 'transparent' }]}
+                >
+                  <Ionicons name={opt.icon as any} size={18} color={visibility === opt.value ? c.primary : c.textMuted} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '500', color: visibility === opt.value ? c.primary : c.text }}>{opt.label}</Text>
+                    <Text style={{ fontSize: 12, color: c.textMuted }}>{opt.desc}</Text>
+                  </View>
+                  {visibility === opt.value && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Inline group list picker */}
+          {showListSheet && visibility === 'group' && (
+            <View style={[s.inlinePicker, { backgroundColor: c.bg, borderBottomColor: c.border }]}>
+              <TouchableOpacity onPress={() => setShowListSheet(false)} style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+                <Text style={{ fontSize: 12, color: c.textMuted }}>← Back to audience</Text>
+              </TouchableOpacity>
+              {friendLists.length === 0 ? (
+                <View style={{ padding: 16, alignItems: 'center' }}>
+                  <Text style={{ color: c.textMuted, fontSize: 13, textAlign: 'center' }}>
+                    No friend lists yet. Create one in the Friends tab.
+                  </Text>
+                </View>
+              ) : (
+                friendLists.map((g: any) => (
+                  <TouchableOpacity
+                    key={g.id}
+                    onPress={() => { setFriendListId(g.id); setShowListSheet(false) }}
+                    style={[s.inlineOption, { borderBottomColor: c.border, backgroundColor: friendListId === g.id ? c.primaryBg : 'transparent' }]}
+                  >
+                    <Ionicons name="people-outline" size={18} color={friendListId === g.id ? c.primary : c.textMuted} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '500', color: friendListId === g.id ? c.primary : c.text }}>{g.name}</Text>
+                      <Text style={{ fontSize: 12, color: c.textMuted }}>{g.member_count ?? 0} friends</Text>
+                    </View>
+                    {friendListId === g.id && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          )}
 
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
             {/* CW input */}
@@ -256,7 +349,9 @@ export default function FeedScreen() {
               </View>
             ) : null}
           </ScrollView>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+
+        </View>
       </Modal>
     </Screen>
   )
@@ -285,5 +380,9 @@ const s = StyleSheet.create({
   pollAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, marginBottom: 4 },
   pollSettings: { borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
   durationBtn: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  audienceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 1 },
+  audienceLabel: { fontSize: 13, fontWeight: '600' },
+  inlinePicker: { borderBottomWidth: 1 },
+  inlineOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
 })
 

@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Switch, Alert, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native'
 import { router, Stack } from 'expo-router'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen } from '../components/ui'
-import { usersApi, authApi } from '../api'
+import { usersApi, authApi, instanceApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
@@ -22,6 +22,13 @@ export default function SettingsScreen() {
     mutationFn: () => usersApi.updateProfile({ profile_private: !user?.profile_private }),
     onSuccess: () => updateUser({ profile_private: !user?.profile_private }),
   })
+
+  const { data: instanceData } = useQuery({
+    queryKey: ['instance-info'],
+    queryFn: () => instanceApi.getInfo().then(r => r.data),
+    staleTime: 5 * 60_000,
+  })
+  const invitesEnabled = instanceData?.user_invites_enabled === 'true'
 
   const changePassword = useMutation({
     mutationFn: () => authApi.changePassword({ current_password: currentPassword, new_password: newPassword }),
@@ -69,6 +76,9 @@ export default function SettingsScreen() {
         <Text style={[s.section, { color: c.textMuted }]}>Account</Text>
         <Row icon="person-outline" label="Edit profile" onPress={() => router.push('/edit-profile')} />
         <Row icon="key-outline" label="Change password" onPress={() => setSection('password')} />
+        {invitesEnabled && (
+          <Row icon="mail-outline" label="Invite a friend" onPress={() => router.push('/invite-friend')} />
+        )}
         <Text style={[s.section, { color: c.textMuted }]}>Appearance</Text>
         <View style={[s.themeRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
           <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
