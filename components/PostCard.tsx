@@ -249,7 +249,18 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               <Text style={[s.authorName, { color: c.text }]}>{author}</Text>
               {pronouns ? <Text style={[s.pronouns, { color: c.textLight }]}>({pronouns})</Text> : null}
             </View>
-            <Text style={[s.authorMeta, { color: c.textMuted }]}>@{username} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={[s.authorMeta, { color: c.textMuted }]}>@{username} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</Text>
+              <Ionicons
+                name={
+                  post.visibility === 'public'  ? 'globe-outline' :
+                  post.visibility === 'friends' ? 'people-outline' :
+                  'lock-closed-outline'
+                }
+                size={11}
+                color={c.textLight}
+              />
+            </View>
           </View>
           {isOwn && (
             <TouchableOpacity onPress={() => setShowMenu(true)} style={{ padding: 4 }}>

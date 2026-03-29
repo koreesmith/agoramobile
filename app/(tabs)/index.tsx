@@ -7,10 +7,11 @@ import {
 import { Image } from 'expo-image'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
+import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { Screen, Header, Spinner, EmptyState } from '../../components/ui'
 import PostCard from '../../components/PostCard'
-import { feedApi, friendsApi, imgUrl } from '../../api'
+import { feedApi, friendsApi, instanceApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
 
 import { C } from '../../constants/colors'
@@ -37,6 +38,12 @@ const URL_RE = /https?:\/\/[^\s]+/g
 export default function FeedScreen() {
   const c = useC()
   const { user } = useAuthStore()
+  const { data: instanceData } = useQuery({
+    queryKey: ['instance-info'],
+    queryFn: () => instanceApi.getInfo().then(r => r.data),
+    staleTime: 5 * 60_000,
+  })
+  const invitesEnabled = instanceData?.user_invites_enabled === 'true'
   const qc = useQueryClient()
   const [showCompose, setShowCompose] = useState(false)
   const [content, setContent] = useState('')
@@ -138,19 +145,32 @@ export default function FeedScreen() {
         </TouchableOpacity>
       } />
 
-      {isLoading ? <Spinner /> : (
-        <FlatList
-          data={posts}
-          keyExtractor={p => p.id}
-          renderItem={({ item }) => <PostCard post={item} queryKey={['feed']} />}
-          contentContainerStyle={{ paddingVertical: 8 }}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={c.primary} />}
-          onEndReached={() => hasNextPage && fetchNextPage()}
-          onEndReachedThreshold={0.3}
-          ListEmptyComponent={<EmptyState icon="📭" title="Nothing here yet" subtitle="Follow some friends to see their posts" />}
-          ListFooterComponent={isFetchingNextPage ? <ActivityIndicator style={{ padding: 16 }} color={c.primary} /> : null}
-        />
-      )}
+      <View style={{ flex: 1 }}>
+        {isLoading ? <Spinner /> : (
+          <FlatList
+            data={posts}
+            keyExtractor={p => p.id}
+            renderItem={({ item }) => <PostCard post={item} queryKey={['feed']} />}
+            contentContainerStyle={{ paddingVertical: 8, paddingBottom: invitesEnabled ? 88 : 8 }}
+            refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={c.primary} />}
+            onEndReached={() => hasNextPage && fetchNextPage()}
+            onEndReachedThreshold={0.3}
+            ListEmptyComponent={<EmptyState icon="📭" title="Nothing here yet" subtitle="Follow some friends to see their posts" />}
+            ListFooterComponent={isFetchingNextPage ? <ActivityIndicator style={{ padding: 16 }} color={c.primary} /> : null}
+          />
+        )}
+
+        {invitesEnabled && (
+          <TouchableOpacity
+            onPress={() => router.push('/invite-friend')}
+            style={[s.fab, { backgroundColor: c.primary }]}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="mail" size={20} color="white" />
+            <Text style={s.fabText}>Invite a Friend</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       <Modal visible={showCompose} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: c.card }}>
@@ -360,6 +380,23 @@ export default function FeedScreen() {
 const s = StyleSheet.create({
   postBtn: { backgroundColor: '#486581', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
   postBtnText: { color: 'white', fontWeight: '600', fontSize: 14 },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+    borderRadius: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  fabText: { color: 'white', fontWeight: '700', fontSize: 15 },
   modal: { flex: 1, backgroundColor: 'white' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
   cancelText: { color: '#6b7280', fontSize: 16 },
