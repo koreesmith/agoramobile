@@ -63,6 +63,18 @@ export default function EditProfileScreen() {
     onError: () => Alert.alert('Error', 'Could not update notification settings'),
   })
 
+  const togglePrivate = useMutation({
+    mutationFn: (val: boolean) => usersApi.updateProfile({ profile_private: val } as any),
+    onSuccess: (_, val) => updateUser({ profile_private: val } as any),
+    onError: () => Alert.alert('Error', 'Could not update setting'),
+  })
+
+  const toggleHideTimeline = useMutation({
+    mutationFn: (val: boolean) => usersApi.updateProfile({ hide_timeline: val } as any),
+    onSuccess: (_, val) => updateUser({ hide_timeline: val } as any),
+    onError: () => Alert.alert('Error', 'Could not update setting'),
+  })
+
   const save = useMutation({
     mutationFn: () => usersApi.updateProfile({ display_name: displayName, pronouns, bio, location, website }),
     onSuccess: () => {
@@ -184,6 +196,33 @@ export default function EditProfileScreen() {
               onValueChange={(val) => toggleEmail.mutate(val)}
               trackColor={{ false: c.border, true: c.primary }}
               disabled={toggleEmail.isPending}
+            />
+          </View>
+
+          {/* Privacy settings */}
+          <Text style={[f.sectionLabel, { color: c.textMuted, marginTop: 8 }]}>Privacy</Text>
+          <View style={[f.toggleRow, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, color: c.text, fontWeight: '500' }}>Private profile</Text>
+              <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 2 }}>Only friends can see your profile and timeline</Text>
+            </View>
+            <Switch
+              value={!!(user as any)?.profile_private}
+              onValueChange={(val) => togglePrivate.mutate(val)}
+              trackColor={{ false: c.border, true: c.primary }}
+              disabled={togglePrivate.isPending}
+            />
+          </View>
+          <View style={[f.toggleRow, { backgroundColor: c.card, borderColor: c.border, marginTop: 8 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, color: c.text, fontWeight: '500' }}>Hide timeline</Text>
+              <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 2 }}>Nobody can browse your posts on your profile — posts still appear in friends' feeds</Text>
+            </View>
+            <Switch
+              value={!!(user as any)?.hide_timeline}
+              onValueChange={(val) => toggleHideTimeline.mutate(val)}
+              trackColor={{ false: c.border, true: c.primary }}
+              disabled={toggleHideTimeline.isPending}
             />
           </View>
 
