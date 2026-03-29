@@ -19,10 +19,14 @@ export default function ProfileViewScreen() {
     queryFn: () => usersApi.getProfile(username!).then(r => r.data),
   })
 
+  const isSelf = me?.username === username
+  const status = profile?.friend_status
+  const canSeeTimeline = isSelf || (!profile?.hide_timeline && (!profile?.profile_private || status === 'accepted'))
+
   const { data: postsData } = useQuery({
     queryKey: ['user-posts', username],
     queryFn: () => feedApi.getUserPosts(username!).then(r => r.data),
-    enabled: !!profile && !profile.profile_private,
+    enabled: !!profile && canSeeTimeline,
   })
 
   const inv = () => {
@@ -39,8 +43,6 @@ export default function ProfileViewScreen() {
   })
 
   const posts = postsData?.posts || []
-  const isSelf = me?.username === username
-  const status = profile?.friend_status
 
   if (isLoading) return <Screen><Spinner /></Screen>
   if (!profile) return (
@@ -134,13 +136,25 @@ export default function ProfileViewScreen() {
           </Text>
         </View>
 
-        {profile.profile_private && status !== 'accepted' ? (
-          <View style={s.private}>
+        {/* Timeline */}
+        {!canSeeTimeline ? (
+          <View style={[s.private, { backgroundColor: c.card, marginTop: 8 }]}>
             <Ionicons name="lock-closed" size={32} color={c.textLight} />
-            <Text style={[s.privateTitle, { color: c.textMd }]}>This profile is private</Text>
-            <Text style={[s.privateText, { color: c.textMuted }]}>
-              Add {profile.display_name} as a friend to see their posts
-            </Text>
+            {(profile as any).hide_timeline ? (
+              <>
+                <Text style={[s.privateTitle, { color: c.textMd }]}>Timeline hidden</Text>
+                <Text style={[s.privateText, { color: c.textMuted }]}>
+                  {profile.display_name} has hidden their post timeline.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={[s.privateTitle, { color: c.textMd }]}>This profile is private</Text>
+                <Text style={[s.privateText, { color: c.textMuted }]}>
+                  Add {profile.display_name} as a friend to see their posts.
+                </Text>
+              </>
+            )}
           </View>
         ) : (
           <View style={{ marginTop: 8 }}>
@@ -171,7 +185,7 @@ const s = StyleSheet.create({
   username:      { fontSize: 14, marginTop: 2 },
   bio:           { fontSize: 14, marginTop: 6, lineHeight: 20 },
   friends:       { fontSize: 14, marginTop: 10 },
-  private:       { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 32 },
+  private:       { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 32, marginHorizontal: 12, borderRadius: 16 },
   privateTitle:  { fontSize: 16, fontWeight: '600', marginTop: 12 },
   privateText:   { fontSize: 14, textAlign: 'center', marginTop: 4 },
   noPosts:       { textAlign: 'center', fontSize: 14, paddingVertical: 48 },

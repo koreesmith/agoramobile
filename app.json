@@ -12,13 +12,16 @@
       "resizeMode": "contain",
       "backgroundColor": "#486581"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "social.agora.app",
       "infoPlist": {
         "NSCameraUsageDescription": "Used to take photos for posts and your profile.",
-        "NSPhotoLibraryUsageDescription": "Used to choose photos for posts and your profile."
+        "NSPhotoLibraryUsageDescription": "Used to choose photos for posts and your profile.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -51,4 +54,3 @@
     }
   }
 }
-
