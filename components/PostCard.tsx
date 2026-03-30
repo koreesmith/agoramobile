@@ -262,11 +262,9 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               />
             </View>
           </View>
-          {isOwn && (
-            <TouchableOpacity onPress={() => setShowMenu(true)} style={{ padding: 4 }}>
-              <Ionicons name="ellipsis-horizontal" size={18} color={c.textMuted} />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity onPress={() => setShowMenu(true)} style={{ padding: 4 }}>
+            <Ionicons name="ellipsis-horizontal" size={18} color={c.textMuted} />
+          </TouchableOpacity>
         </TouchableOpacity>
 
         {post.content_warning && !twExpanded && (
