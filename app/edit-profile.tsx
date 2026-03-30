@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image, StyleSheet, Switch } from 'react-native'
 import { router, Stack } from 'expo-router'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { Screen, Avatar } from '../components/ui'
@@ -40,6 +40,7 @@ export default function EditProfileScreen() {
   const c = useC()
   const insets = useSafeAreaInsets()
   const { user, updateUser } = useAuthStore()
+  const queryClient = useQueryClient()
 
   const [displayName, setDisplayName] = useState(user?.display_name || '')
   const [pronouns, setPronouns] = useState(user?.pronouns || '')
@@ -60,6 +61,7 @@ export default function EditProfileScreen() {
 
   const toggleEmail = useMutation({
     mutationFn: (enabled: boolean) => notificationsApi.updateEmailPrefs(enabled),
+    onSuccess: (_, enabled) => queryClient.setQueryData(['email-prefs'], { email_notifications_enabled: enabled }),
     onError: () => Alert.alert('Error', 'Could not update notification settings'),
   })
 
