@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, Dimensions, Linking, TextInput } from 'react-native'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
+import * as MediaLibrary from 'expo-media-library'
+import * as FileSystem from 'expo-file-system'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { formatDistanceToNow } from 'date-fns'
@@ -211,6 +213,30 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const [showLightbox, setShowLightbox] = useState(false)
   const screenWidth = Dimensions.get('window').width
   const screenHeight = Dimensions.get('window').height
+
+  const saveImageToLibrary = async () => {
+    const { status } = await MediaLibrary.requestPermissionsAsync()
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Please allow access to your photo library to save images.')
+      return
+    }
+    try {
+      const filename = imageUrl.split('/').pop() || 'image.jpg'
+      const localUri = FileSystem.cacheDirectory + filename
+      await FileSystem.downloadAsync(imageUrl, localUri)
+      await MediaLibrary.saveToLibraryAsync(localUri)
+      Alert.alert('Saved', 'Image saved to your photo library.')
+    } catch {
+      Alert.alert('Error', 'Could not save the image.')
+    }
+  }
+
+  const onLightboxLongPress = () => {
+    Alert.alert('Save image', 'Save this image to your photo library?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Save', onPress: saveImageToLibrary },
+    ])
+  }
   const reactionCounts: Record<string, number> = post.reaction_counts || {}
   const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + b, 0)
   const myReactionEmoji = REACTIONS.find(r => r.type === post.my_reaction)?.emoji
@@ -302,8 +328,10 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             </TouchableOpacity>
             <Modal visible={showLightbox} transparent animationType="fade" onRequestClose={() => setShowLightbox(false)}>
               <TouchableOpacity style={s.lightboxBg} activeOpacity={1} onPress={() => setShowLightbox(false)}>
-                <Image source={{ uri: imageUrl }} style={{ width: screenWidth, height: screenHeight * 0.8 }} contentFit="contain" />
-                <Text style={s.lightboxClose}>✕ tap to close</Text>
+                <TouchableOpacity activeOpacity={1} onLongPress={onLightboxLongPress} delayLongPress={400}>
+                  <Image source={{ uri: imageUrl }} style={{ width: screenWidth, height: screenHeight * 0.8 }} contentFit="contain" />
+                </TouchableOpacity>
+                <Text style={s.lightboxClose}>✕ tap to close · hold to save</Text>
               </TouchableOpacity>
             </Modal>
           </View>
