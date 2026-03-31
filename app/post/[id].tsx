@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { View, Text, Image, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, RefreshControl, StyleSheet, Modal } from 'react-native'
+import { View, Text, Image, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, RefreshControl, StyleSheet, Modal, Dimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, Stack, router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -35,6 +35,8 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
   const c = useC()
   const [showPicker, setShowPicker] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const [showCommentLightbox, setShowCommentLightbox] = useState(false)
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window')
 
   const del = useMutation({
     mutationFn: () => feedApi.deleteComment(postId, comment.id),
@@ -66,7 +68,21 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
           </View>
           <Text style={[s.commentText, { color: c.textMd }]}>{comment.content}</Text>
           {comment.image_url ? (
-            <Image source={{ uri: imgUrl(comment.image_url) }} style={{ width: '100%', height: 140, borderRadius: 8, marginTop: 6 }} resizeMode="cover" />
+            <>
+              <TouchableOpacity onPress={() => setShowCommentLightbox(true)} activeOpacity={0.9}>
+                <Image source={{ uri: imgUrl(comment.image_url) }} style={{ width: '100%', height: 140, borderRadius: 8, marginTop: 6 }} resizeMode="cover" />
+              </TouchableOpacity>
+              <Modal visible={showCommentLightbox} transparent animationType="fade" onRequestClose={() => setShowCommentLightbox(false)}>
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' }}
+                  activeOpacity={1}
+                  onPress={() => setShowCommentLightbox(false)}
+                >
+                  <Image source={{ uri: imgUrl(comment.image_url) }} style={{ width: screenWidth, height: screenHeight * 0.8 }} resizeMode="contain" />
+                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 16 }}>✕ tap to close</Text>
+                </TouchableOpacity>
+              </Modal>
+            </>
           ) : null}
 
           {/* Reaction chips */}

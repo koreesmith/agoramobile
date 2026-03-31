@@ -549,7 +549,7 @@ const s = StyleSheet.create({
   cw: { backgroundColor: '#fefce8', borderWidth: 1, borderColor: '#fde68a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8 },
   cwText: { fontSize: 12, color: '#92400e', fontWeight: '500' },
   content: { fontSize: 14, lineHeight: 21, marginBottom: 8 },
-  image: { height: 260, marginHorizontal: -14, marginVertical: 8 },
+  image: { aspectRatio: 1, marginHorizontal: -14, marginVertical: 8 },
   linkPreview: { marginTop: 8, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
   linkDomain: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3 },
   linkTitle: { fontSize: 13, fontWeight: '600', marginTop: 2 },
