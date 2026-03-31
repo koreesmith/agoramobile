@@ -16,7 +16,7 @@ export default function SettingsScreen() {
   const { preference, setPreference } = useThemeStore()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
-  const [section, setSection] = useState<'main' | 'password'>('main')
+  const [section, setSection] = useState<'main' | 'password' | 'email'>('main')
 
   const togglePrivacy = useMutation({
     mutationFn: () => usersApi.updateProfile({ profile_private: !user?.profile_private }),
@@ -29,6 +29,19 @@ export default function SettingsScreen() {
     staleTime: 5 * 60_000,
   })
   const invitesEnabled = instanceData?.user_invites_enabled === 'true'
+
+  const [newEmail, setNewEmail] = useState('')
+  const [emailPassword, setEmailPassword] = useState('')
+
+  const changeEmail = useMutation({
+    mutationFn: () => authApi.changeEmail({ new_email: newEmail, current_password: emailPassword }),
+    onSuccess: () => {
+      setNewEmail(''); setEmailPassword('')
+      Alert.alert('Verification email sent', `A verification link has been sent to ${newEmail}. Please check your inbox to confirm the change.`)
+      setSection('main')
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not change email'),
+  })
 
   const changePassword = useMutation({
     mutationFn: () => authApi.changePassword({ current_password: currentPassword, new_password: newPassword }),
@@ -50,6 +63,26 @@ export default function SettingsScreen() {
     headerShown: true, headerTitle: title, headerBackTitle: back,
     headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
   })
+
+  if (section === 'email') return (
+    <Screen>
+      <Stack.Screen options={headerOpts('Change Email', 'Settings')} />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView style={{ flex: 1, padding: 16 }} keyboardShouldPersistTaps="handled">
+          <Text style={[s.label, { color: c.textMd }]}>Current email</Text>
+          <Text style={[s.input, { marginBottom: 16, backgroundColor: c.card, borderColor: c.border, color: c.textMuted, paddingTop: 11 }]}>{user?.email}</Text>
+          <Text style={[s.label, { color: c.textMd }]}>New email address</Text>
+          <TextInput style={[s.input, { marginBottom: 16, backgroundColor: c.card, borderColor: c.border, color: c.text }]} keyboardType="email-address" autoCapitalize="none" value={newEmail} onChangeText={setNewEmail} placeholder="new@example.com" placeholderTextColor={c.textLight} />
+          <Text style={[s.label, { color: c.textMd }]}>Current password</Text>
+          <TextInput style={[s.input, { marginBottom: 24, backgroundColor: c.card, borderColor: c.border, color: c.text }]} secureTextEntry value={emailPassword} onChangeText={setEmailPassword} placeholder="••••••••" placeholderTextColor={c.textLight} />
+          <TouchableOpacity onPress={() => changeEmail.mutate()} disabled={!newEmail || !emailPassword || changeEmail.isPending}
+            style={[s.btn, (!newEmail || !emailPassword) && { backgroundColor: c.primaryLt }]}>
+            <Text style={s.btnText}>{changeEmail.isPending ? 'Sending…' : 'Send verification email'}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Screen>
+  )
 
   if (section === 'password') return (
     <Screen>
@@ -75,6 +108,7 @@ export default function SettingsScreen() {
       <ScrollView>
         <Text style={[s.section, { color: c.textMuted }]}>Account</Text>
         <Row icon="person-outline" label="Edit profile" onPress={() => router.push('/edit-profile')} />
+        <Row icon="mail-outline" label="Change email" onPress={() => setSection('email')} />
         <Row icon="key-outline" label="Change password" onPress={() => setSection('password')} />
         {invitesEnabled && (
           <Row icon="mail-outline" label="Invite a friend" onPress={() => router.push('/invite-friend')} />

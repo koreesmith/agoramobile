@@ -44,6 +44,7 @@ export const authApi = {
     axios.get(`${instanceUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } }),
   instance:   (baseUrl: string)  => axios.get(`${baseUrl}/api/instance`),
   changePassword: (data: any)    => api.post('/auth/change-password', data),
+  changeEmail:    (data: any)    => api.post('/auth/change-email', data),
 }
 
 // ── Feed ──────────────────────────────────────────────────────────────────────
