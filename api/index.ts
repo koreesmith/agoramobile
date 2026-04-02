@@ -170,6 +170,13 @@ export const rulesApi = {
   list: () => api.get('/instance/rules'),
 }
 
+// ── Blocking ──────────────────────────────────────────────────────────────────
+export const blockApi = {
+  blockUser:   (id: string) => api.post(`/users/${id}/block`),
+  unblockUser: (id: string) => api.delete(`/users/${id}/block`),
+  listBlocked: ()           => api.get('/users/blocked'),
+}
+
 // ── Admin ─────────────────────────────────────────────────────────────────────
 export const adminApi = {
   getStats:  ()                             => api.get('/admin/stats'),
