@@ -7,8 +7,9 @@ import * as FileSystem from 'expo-file-system'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { formatDistanceToNow } from 'date-fns'
-import { feedApi, imgUrl } from '../api'
+import { feedApi, imgUrl, blockApi, moderationApi } from '../api'
 import { useAuthStore } from '../store/auth'
+import { useBlockStore } from '../store/blocks'
 import { Avatar } from './ui'
 import { useC } from '../constants/ColorContext'
 
@@ -166,6 +167,7 @@ const pw = StyleSheet.create({
 
 export default function PostCard({ post, queryKey }: { post: any; queryKey: any[] }) {
   const { user } = useAuthStore()
+  const { addBlock } = useBlockStore()
   const qc = useQueryClient()
   const [showReactions, setShowReactions] = useState(false)
   const [twExpanded, setTwExpanded] = useState(false)
@@ -199,6 +201,22 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
     }),
     onSuccess: () => { setShowEdit(false); invalidate() },
     onError: () => Alert.alert('Error', 'Could not save changes'),
+  })
+
+  const blockUser = useMutation({
+    mutationFn: async () => {
+      await blockApi.blockUser(post.author_id)
+      await moderationApi.createReport({
+        reported_user_id: post.author_id,
+        violation_type: 'harassment',
+        details: 'User blocked by another user.',
+      }).catch(() => {})
+    },
+    onSuccess: () => {
+      addBlock(post.author_id)
+      qc.invalidateQueries({ queryKey })
+    },
+    onError: () => Alert.alert('Error', 'Could not block user. Please try again.'),
   })
 
   const isOwn    = user?.id === post.author_id
@@ -427,13 +445,30 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 </TouchableOpacity>
               </>
             ) : (
-              <TouchableOpacity style={s.menuItem} onPress={() => {
-                setShowMenu(false)
-                router.push({ pathname: '/report', params: { postId: post.id } } as any)
-              }}>
-                <Ionicons name="flag-outline" size={18} color={c.red} />
-                <Text style={[s.menuItemText, { color: c.red }]}>Report post</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity style={s.menuItem} onPress={() => {
+                  setShowMenu(false)
+                  router.push({ pathname: '/report', params: { postId: post.id } } as any)
+                }}>
+                  <Ionicons name="flag-outline" size={18} color={c.red} />
+                  <Text style={[s.menuItemText, { color: c.red }]}>Report post</Text>
+                </TouchableOpacity>
+                <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+                <TouchableOpacity style={s.menuItem} onPress={() => {
+                  setShowMenu(false)
+                  Alert.alert(
+                    'Block user?',
+                    `@${username} will be removed from your feed instantly and our team will be notified.`,
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Block', style: 'destructive', onPress: () => blockUser.mutate() },
+                    ]
+                  )
+                }}>
+                  <Ionicons name="ban-outline" size={18} color={c.red} />
+                  <Text style={[s.menuItemText, { color: c.red }]}>Block @{username}</Text>
+                </TouchableOpacity>
+              </>
             )}
           </View>
         </TouchableOpacity>
