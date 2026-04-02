@@ -13,6 +13,7 @@ import { Screen, Header, Spinner, EmptyState } from '../../components/ui'
 import PostCard from '../../components/PostCard'
 import { feedApi, friendsApi, instanceApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
+import { useBlockStore } from '../../store/blocks'
 
 import { C } from '../../constants/colors'
 import { useC } from '../../constants/ColorContext'
@@ -38,6 +39,7 @@ const URL_RE = /https?:\/\/[^\s]+/g
 export default function FeedScreen() {
   const c = useC()
   const { user } = useAuthStore()
+  const { blockedIds } = useBlockStore()
   const { data: instanceData } = useQuery({
     queryKey: ['instance-info'],
     queryFn: () => instanceApi.getInfo().then(r => r.data),
@@ -107,7 +109,8 @@ export default function FeedScreen() {
     initialPageParam: 0,
   })
 
-  const posts = data?.pages.flatMap(p => p.posts) ?? []
+  const posts = (data?.pages.flatMap(p => p.posts) ?? [])
+    .filter((p: any) => !blockedIds.includes(p.author_id))
 
   const createPost = useMutation({
     mutationFn: () => feedApi.createPost({
