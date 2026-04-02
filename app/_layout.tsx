@@ -9,6 +9,7 @@ import { useAuthStore } from '../store/auth'
 import { usersApi } from '../api'
 import { ColorProvider } from '../constants/ColorContext'
 import { useThemeStore } from '../store/theme'
+import { useBlockStore } from '../store/blocks'
 import SplashScreen from '../components/SplashScreen'
 
 Notifications.setNotificationHandler({
@@ -54,6 +55,7 @@ const queryClient = new QueryClient({
 function AppContent() {
   const { isAuthenticated, loadFromStorage } = useAuthStore()
   const { loadPreference } = useThemeStore()
+  const { loadBlocked } = useBlockStore()
   const scheme = useColorScheme()
   const notifListener = useRef<any>()
   const responseListener = useRef<any>()
@@ -61,6 +63,7 @@ function AppContent() {
   useEffect(() => {
     loadFromStorage()
     loadPreference()
+    loadBlocked()
   }, [])
 
   useEffect(() => {
