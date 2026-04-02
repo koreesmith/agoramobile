@@ -4,14 +4,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Spinner, Avatar } from '../../components/ui'
 import PostCard from '../../components/PostCard'
-import { usersApi, friendsApi, feedApi, dmApi, imgUrl } from '../../api'
+import { usersApi, friendsApi, feedApi, dmApi, imgUrl, blockApi, moderationApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
+import { useBlockStore } from '../../store/blocks'
 import { useC } from '../../constants/ColorContext'
 
 export default function ProfileViewScreen() {
   const c = useC()
   const { username } = useLocalSearchParams<{ username: string }>()
   const { user: me } = useAuthStore()
+  const { addBlock, removeBlock, isBlocked } = useBlockStore()
   const qc = useQueryClient()
 
   const { data: profile, isLoading, refetch, isRefetching } = useQuery({
@@ -40,6 +42,35 @@ export default function ProfileViewScreen() {
   const startDM  = useMutation({
     mutationFn: () => dmApi.startConversation(username!),
     onSuccess: (res) => router.push(`/conversation/${res.data.id}`)
+  })
+
+  const blocked = profile ? isBlocked(profile.id) : false
+
+  const blockUser = useMutation({
+    mutationFn: async () => {
+      await blockApi.blockUser(profile!.id)
+      // Notify developer automatically per Apple guideline 1.2
+      await moderationApi.createReport({
+        reported_user_id: profile!.id,
+        violation_type: 'harassment',
+        details: 'User blocked by another user.',
+      }).catch(() => {})
+    },
+    onSuccess: () => {
+      addBlock(profile!.id)
+      Alert.alert('User blocked', `@${username} has been blocked and removed from your feed.`)
+      router.back()
+    },
+    onError: () => Alert.alert('Error', 'Could not block user. Please try again.'),
+  })
+
+  const unblockUser = useMutation({
+    mutationFn: () => blockApi.unblockUser(profile!.id),
+    onSuccess: () => {
+      removeBlock(profile!.id)
+      Alert.alert('Unblocked', `@${username} has been unblocked.`)
+    },
+    onError: () => Alert.alert('Error', 'Could not unblock user. Please try again.'),
   })
 
   const posts = postsData?.posts || []
@@ -107,6 +138,31 @@ export default function ProfileViewScreen() {
                   ])} style={[s.actionBtn, { borderColor: c.border }]}>
                     <Ionicons name="checkmark" size={15} color={c.green} />
                     <Text style={[s.actionBtnText, { color: c.textMd }]}>Friends</Text>
+                  </TouchableOpacity>
+                )}
+                {blocked ? (
+                  <TouchableOpacity
+                    onPress={() => Alert.alert('Unblock user?', `@${username} will be able to appear in your feed again.`, [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Unblock', onPress: () => unblockUser.mutate() },
+                    ])}
+                    disabled={unblockUser.isPending}
+                    style={[s.actionBtn, { borderColor: c.border }]}
+                  >
+                    <Ionicons name="remove-circle-outline" size={15} color={c.textMuted} />
+                    <Text style={[s.actionBtnText, { color: c.textMuted }]}>Unblock</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => Alert.alert('Block user?', `@${username} will be removed from your feed and won't be able to interact with you.`, [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Block', style: 'destructive', onPress: () => blockUser.mutate() },
+                    ])}
+                    disabled={blockUser.isPending}
+                    style={[s.actionBtn, { borderColor: c.border }]}
+                  >
+                    <Ionicons name="ban-outline" size={15} color={c.red} />
+                    <Text style={[s.actionBtnText, { color: c.red }]}>Block</Text>
                   </TouchableOpacity>
                 )}
               </View>
