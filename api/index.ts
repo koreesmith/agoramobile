@@ -186,3 +186,10 @@ export const adminApi = {
   listUsers: (q?: string)                   => api.get('/admin/users', { params: { q } }),
   setRole:   (userID: string, role: string) => api.patch(`/admin/users/${userID}/role`, { role }),
 }
+
+// ── Waitlist ──────────────────────────────────────────────────────────────────
+export const waitlistApi = {
+  list:    ()            => api.get('/admin/waitlist'),
+  approve: (id: string)  => api.post(`/admin/waitlist/${id}/approve`),
+  reject:  (id: string)  => api.post(`/admin/waitlist/${id}/reject`),
+}
