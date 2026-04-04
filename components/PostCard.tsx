@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, Dimensions, Linking, TextInput, PanResponder } from 'react-native'
 import { Image } from 'expo-image'
+import ZoomableImage from './ZoomableImage'
 import { router } from 'expo-router'
 import * as MediaLibrary from 'expo-media-library'
 import * as FileSystem from 'expo-file-system'
@@ -411,12 +412,16 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               <Image source={{ uri: imageUrl }} style={s.image} contentFit="cover" />
             </TouchableOpacity>
             <Modal visible={showLightbox} transparent animationType="fade" onRequestClose={() => setShowLightbox(false)}>
-              <TouchableOpacity style={s.lightboxBg} activeOpacity={1} onPress={() => setShowLightbox(false)}>
-                <TouchableOpacity activeOpacity={1} onLongPress={onLightboxLongPress} delayLongPress={400}>
-                  <Image source={{ uri: imageUrl }} style={{ width: screenWidth, height: screenHeight * 0.8 }} contentFit="contain" />
-                </TouchableOpacity>
-                <Text style={s.lightboxClose}>✕ tap to close · hold to save</Text>
-              </TouchableOpacity>
+              <View style={s.lightboxBg}>
+                <ZoomableImage
+                  uri={imageUrl}
+                  width={screenWidth}
+                  height={screenHeight * 0.8}
+                  onClose={() => setShowLightbox(false)}
+                  onLongPress={onLightboxLongPress}
+                />
+                <Text style={s.lightboxClose}>✕ tap to close · pinch to zoom · hold to save</Text>
+              </View>
             </Modal>
           </View>
         ) : null}
