@@ -41,6 +41,8 @@ function getRouteForNotification(data: Record<string, string>): string | null {
       return '/(tabs)/notifications'
     case 'new_message':
       return '/(tabs)/messages'
+    case 'waitlist_signup':
+      return '/admin?tab=waitlist'
     default:
       return '/(tabs)/notifications'
   }
