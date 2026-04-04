@@ -183,6 +183,8 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const panResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => gestureState.current.isPicking,
+    onMoveShouldSetPanResponderCapture: () => gestureState.current.isPicking,
+    onPanResponderTerminationRequest: () => !gestureState.current.isPicking,
     onPanResponderGrant: () => {
       const gs = gestureState.current
       gs.isPicking = false
