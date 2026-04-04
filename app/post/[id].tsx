@@ -18,7 +18,8 @@ const REACTIONS = [
   { type: 'like', emoji: '❤️' }, { type: 'love', emoji: '😍' },
   { type: 'laugh', emoji: '😂' }, { type: 'wow', emoji: '😮' },
   { type: 'angry', emoji: '😡' }, { type: 'care', emoji: '🤗' },
-  { type: 'thankful', emoji: '🙏' }, { type: 'vomit', emoji: '🤮' },
+  { type: 'pride', emoji: '🏳️‍🌈' }, { type: 'thankful', emoji: '🙏' },
+  { type: 'vomit', emoji: '🤮' },
 ]
 
 // Depth controls indentation and avatar size
