@@ -78,14 +78,17 @@ export const feedApi = {
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const usersApi = {
-  getProfile:    (username: string) => api.get(`/users/${username}`),
-  updateProfile: (data: any)        => api.patch('/users/me', data),
-  uploadAvatar:  (file: any)        => {
+  getProfile:      (username: string) => api.get(`/users/${username}`),
+  updateProfile:   (data: any)        => api.patch('/users/me', data),
+  uploadAvatar:    (file: any)        => {
     const form = new FormData()
     form.append('file', file)
     return api.post('/users/me/avatar', form, { headers: { 'Content-Type': 'multipart/form-data' } })
   },
-  discover:      ()                 => api.get('/users/discover'),
+  discover:        ()                 => api.get('/users/discover'),
+  exportData:      ()                 => api.get('/users/me/export', { responseType: 'blob' }),
+  requestDeletion: ()                 => api.post('/users/me/request-deletion'),
+  cancelDeletion:  ()                 => api.delete('/users/me/request-deletion'),
 }
 
 // ── Friends ───────────────────────────────────────────────────────────────────
