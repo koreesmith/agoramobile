@@ -4,10 +4,10 @@ import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import * as MediaLibrary from 'expo-media-library'
 import * as FileSystem from 'expo-file-system'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { formatDistanceToNow } from 'date-fns'
-import { feedApi, imgUrl, blockApi, moderationApi } from '../api'
+import { feedApi, imgUrl, blockApi, moderationApi, friendsApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useBlockStore } from '../store/blocks'
 import { Avatar } from './ui'
@@ -227,7 +227,21 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const [editContent, setEditContent] = useState(post.content || '')
   const [editCW, setEditCW] = useState(post.content_warning || '')
   const [showEditCW, setShowEditCW] = useState(!!post.content_warning)
+  const [editVisibility, setEditVisibility] = useState<'public'|'friends'|'group'>(
+    post.visibility === 'locked' ? 'group' : (post.visibility || 'friends')
+  )
+  const [editFriendListId, setEditFriendListId] = useState<string>(post.group_id || '')
+  const [showEditVisibilitySheet, setShowEditVisibilitySheet] = useState(false)
+  const [showEditListSheet, setShowEditListSheet] = useState(false)
   const c = useC()
+
+  const { data: friendListsData } = useQuery({
+    queryKey: ['friend-lists'],
+    queryFn: () => friendsApi.listFriendLists().then(r => r.data),
+    enabled: showEdit,
+  })
+  const editFriendLists: any[] = friendListsData?.groups || []
+  const selectedEditFriendList = editFriendLists.find((g: any) => g.id === editFriendListId)
 
   const invalidate = () => qc.invalidateQueries({ queryKey })
 
@@ -248,6 +262,8 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
     mutationFn: () => feedApi.editPost(post.id, {
       content: editContent,
       content_warning: showEditCW && editCW.trim() ? editCW.trim() : '',
+      visibility: editVisibility,
+      group_id: editVisibility === 'group' ? editFriendListId : undefined,
     }),
     onSuccess: () => { setShowEdit(false); invalidate() },
     onError: () => Alert.alert('Error', 'Could not save changes'),
@@ -493,7 +509,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
           <View style={[s.menuSheet, { backgroundColor: c.card, borderColor: c.border }]}>
             {isOwn ? (
               <>
-                <TouchableOpacity style={s.menuItem} onPress={() => { setShowMenu(false); setEditContent(post.content || ''); setEditCW(post.content_warning || ''); setShowEditCW(!!post.content_warning); setShowEdit(true) }}>
+                <TouchableOpacity style={s.menuItem} onPress={() => { setShowMenu(false); setEditContent(post.content || ''); setEditCW(post.content_warning || ''); setShowEditCW(!!post.content_warning); setEditVisibility(post.visibility === 'locked' ? 'group' : (post.visibility || 'friends')); setEditFriendListId(post.group_id || ''); setShowEditVisibilitySheet(false); setShowEditListSheet(false); setShowEdit(true) }}>
                   <Ionicons name="pencil-outline" size={18} color={c.text} />
                   <Text style={[s.menuItemText, { color: c.text }]}>Edit post</Text>
                 </TouchableOpacity>
@@ -555,6 +571,82 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               <Text style={s.editSaveBtnText}>{edit.isPending ? '…' : 'Save'}</Text>
             </TouchableOpacity>
           </View>
+          {/* Audience row */}
+          <TouchableOpacity
+            onPress={() => setShowEditVisibilitySheet(v => !v)}
+            style={[s.editAudienceRow, { borderBottomColor: c.border, backgroundColor: c.card }]}
+          >
+            <Ionicons
+              name={editVisibility === 'public' ? 'globe-outline' : editVisibility === 'group' ? 'people-outline' : 'person-outline'}
+              size={15}
+              color={c.primary}
+            />
+            <Text style={[s.editAudienceLabel, { color: c.primary }]}>
+              {editVisibility === 'public' ? 'Public' : editVisibility === 'group' ? (selectedEditFriendList?.name || 'Select a list…') : 'Friends'}
+            </Text>
+            <Ionicons name={showEditVisibilitySheet ? 'chevron-up' : 'chevron-down'} size={13} color={c.textMuted} style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
+
+          {/* Inline visibility picker */}
+          {showEditVisibilitySheet && (
+            <View style={[s.editInlinePicker, { backgroundColor: c.bg, borderBottomColor: c.border }]}>
+              {[
+                { value: 'public',  icon: 'globe-outline',  label: 'Public',      desc: 'Anyone on Agora' },
+                { value: 'friends', icon: 'person-outline', label: 'Friends',     desc: 'Only your friends' },
+                { value: 'group',   icon: 'people-outline', label: 'Friend List', desc: 'Pick a specific list' },
+              ].map(opt => (
+                <TouchableOpacity
+                  key={opt.value}
+                  onPress={() => {
+                    setEditVisibility(opt.value as any)
+                    if (opt.value !== 'group') setEditFriendListId('')
+                    setShowEditVisibilitySheet(false)
+                    if (opt.value === 'group') setShowEditListSheet(true)
+                  }}
+                  style={[s.editInlineOption, { borderBottomColor: c.border, backgroundColor: editVisibility === opt.value ? c.primaryBg : 'transparent' }]}
+                >
+                  <Ionicons name={opt.icon as any} size={18} color={editVisibility === opt.value ? c.primary : c.textMuted} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '500', color: editVisibility === opt.value ? c.primary : c.text }}>{opt.label}</Text>
+                    <Text style={{ fontSize: 12, color: c.textMuted }}>{opt.desc}</Text>
+                  </View>
+                  {editVisibility === opt.value && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Inline group list picker */}
+          {showEditListSheet && editVisibility === 'group' && (
+            <View style={[s.editInlinePicker, { backgroundColor: c.bg, borderBottomColor: c.border }]}>
+              <TouchableOpacity onPress={() => setShowEditListSheet(false)} style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+                <Text style={{ fontSize: 12, color: c.textMuted }}>← Back to audience</Text>
+              </TouchableOpacity>
+              {editFriendLists.length === 0 ? (
+                <View style={{ padding: 16, alignItems: 'center' }}>
+                  <Text style={{ color: c.textMuted, fontSize: 13, textAlign: 'center' }}>
+                    No friend lists yet. Create one in the Friends tab.
+                  </Text>
+                </View>
+              ) : (
+                editFriendLists.map((g: any) => (
+                  <TouchableOpacity
+                    key={g.id}
+                    onPress={() => { setEditFriendListId(g.id); setShowEditListSheet(false) }}
+                    style={[s.editInlineOption, { borderBottomColor: c.border, backgroundColor: editFriendListId === g.id ? c.primaryBg : 'transparent' }]}
+                  >
+                    <Ionicons name="people-outline" size={18} color={editFriendListId === g.id ? c.primary : c.textMuted} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '500', color: editFriendListId === g.id ? c.primary : c.text }}>{g.name}</Text>
+                      <Text style={{ fontSize: 12, color: c.textMuted }}>{g.member_count ?? 0} friends</Text>
+                    </View>
+                    {editFriendListId === g.id && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          )}
+
           <View style={{ padding: 16 }}>
             {showEditCW && (
               <View style={{ borderWidth: 1, borderColor: '#fcd34d', backgroundColor: '#fffbeb', borderRadius: 10, padding: 10, marginBottom: 12 }}>
@@ -678,6 +770,10 @@ const s = StyleSheet.create({
   editSaveBtnText: { color: 'white', fontWeight: '600' },
   editInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15, minHeight: 120, textAlignVertical: 'top', marginBottom: 12 },
   editCWBtn: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  editAudienceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
+  editAudienceLabel: { fontSize: 13, fontWeight: '600' },
+  editInlinePicker: { borderBottomWidth: 1 },
+  editInlineOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   sharePreview:        { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12 },
   sharePreviewAuthor:  { fontSize: 13, fontWeight: '600', marginBottom: 4 },
   sharePreviewContent: { fontSize: 13, lineHeight: 19 },
