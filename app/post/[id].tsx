@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { View, Text, Image, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, RefreshControl, StyleSheet, Modal, Dimensions, PanResponder } from 'react-native'
+import ZoomableImage from '../../components/ZoomableImage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, Stack, router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -123,14 +124,15 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
                 <Image source={{ uri: imgUrl(comment.image_url) }} style={{ width: '100%', height: 140, borderRadius: 8, marginTop: 6 }} resizeMode="cover" />
               </TouchableOpacity>
               <Modal visible={showCommentLightbox} transparent animationType="fade" onRequestClose={() => setShowCommentLightbox(false)}>
-                <TouchableOpacity
-                  style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' }}
-                  activeOpacity={1}
-                  onPress={() => setShowCommentLightbox(false)}
-                >
-                  <Image source={{ uri: imgUrl(comment.image_url) }} style={{ width: screenWidth, height: screenHeight * 0.8 }} resizeMode="contain" />
-                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 16 }}>✕ tap to close</Text>
-                </TouchableOpacity>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' }}>
+                  <ZoomableImage
+                    uri={imgUrl(comment.image_url)}
+                    width={screenWidth}
+                    height={screenHeight * 0.8}
+                    onClose={() => setShowCommentLightbox(false)}
+                  />
+                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 16 }}>✕ tap to close · pinch to zoom</Text>
+                </View>
               </Modal>
             </>
           ) : null}
