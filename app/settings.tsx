@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, ScrollView, TextInput, Switch, Alert, Key
 import { router, Stack } from 'expo-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
+import * as FileSystem from 'expo-file-system'
+import * as Sharing from 'expo-sharing'
 import { Screen } from '../components/ui'
 import { usersApi, authApi, instanceApi } from '../api'
 import { useAuthStore } from '../store/auth'
@@ -17,6 +19,8 @@ export default function SettingsScreen() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [section, setSection] = useState<'main' | 'password' | 'email'>('main')
+  const [deletionScheduledAt, setDeletionScheduledAt] = useState<string | null>(null)
+  const [exportLoading, setExportLoading] = useState(false)
 
   const togglePrivacy = useMutation({
     mutationFn: () => usersApi.updateProfile({ profile_private: !user?.profile_private }),
@@ -47,6 +51,49 @@ export default function SettingsScreen() {
     mutationFn: () => authApi.changePassword({ current_password: currentPassword, new_password: newPassword }),
     onSuccess: () => { setCurrentPassword(''); setNewPassword(''); Alert.alert('Password changed!'); setSection('main') },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not change password'),
+  })
+
+  const exportData = async () => {
+    setExportLoading(true)
+    try {
+      const { token, instanceUrl } = useAuthStore.getState()
+      const fileUri = FileSystem.cacheDirectory + 'agora-data-export.zip'
+      const result = await FileSystem.downloadAsync(
+        `${instanceUrl}/api/users/me/export`,
+        fileUri,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (result.status !== 200) throw new Error('Export failed')
+      const canShare = await Sharing.isAvailableAsync()
+      if (canShare) {
+        await Sharing.shareAsync(result.uri, { mimeType: 'application/zip', dialogTitle: 'Save your data export' })
+      } else {
+        Alert.alert('Export saved', `Your data has been saved to:\n${result.uri}`)
+      }
+    } catch {
+      Alert.alert('Error', 'Could not export data. Please try again.')
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
+  const requestDeletion = useMutation({
+    mutationFn: () => usersApi.requestDeletion(),
+    onSuccess: (res) => {
+      setDeletionScheduledAt(res.data.deletion_scheduled_at)
+      const date = new Date(res.data.deletion_scheduled_at).toLocaleDateString()
+      Alert.alert('Account deletion scheduled', `Your account will be permanently deleted on ${date}. You can cancel this before then.`)
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not schedule deletion'),
+  })
+
+  const cancelDeletion = useMutation({
+    mutationFn: () => usersApi.cancelDeletion(),
+    onSuccess: () => {
+      setDeletionScheduledAt(null)
+      Alert.alert('Deletion cancelled', 'Your account deletion has been cancelled.')
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not cancel deletion'),
   })
 
   const Row = ({ icon, label, onPress, right, destructive = false }: any) => (
@@ -139,6 +186,21 @@ export default function SettingsScreen() {
         <Text style={[s.section, { color: c.textMuted }]}>Privacy</Text>
         <Row icon="lock-closed-outline" label="Private profile"
           right={<Switch value={user?.profile_private ?? false} onValueChange={() => togglePrivacy.mutate()} trackColor={{ false: c.border, true: c.primary }} />} />
+        <Text style={[s.section, { color: c.textMuted }]}>Data</Text>
+        <Row icon="download-outline" label={exportLoading ? 'Exporting…' : 'Export my data'} onPress={exportData} />
+        {deletionScheduledAt ? (
+          <Row icon="refresh-outline" label="Cancel account deletion" onPress={() =>
+            Alert.alert('Cancel deletion?', `Your account is scheduled for deletion on ${new Date(deletionScheduledAt).toLocaleDateString()}. Cancel this?`, [
+              { text: 'Keep scheduled', style: 'cancel' },
+              { text: 'Cancel deletion', onPress: () => cancelDeletion.mutate() },
+            ])} />
+        ) : (
+          <Row icon="trash-outline" label="Delete account" destructive onPress={() =>
+            Alert.alert('Delete account?', 'Your account will be scheduled for deletion. You\'ll have a grace period to cancel before it\'s permanently removed.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete account', style: 'destructive', onPress: () => requestDeletion.mutate() },
+            ])} right={<View />} />
+        )}
         <Text style={[s.section, { color: c.textMuted }]}>About</Text>
         <Row icon="person-circle-outline" label={`Signed in as @${user?.username}`} onPress={() => {}} right={<View />} />
         <Row icon="server-outline" label={`Instance: ${useAuthStore.getState().instanceUrl?.replace(/^https?:\/\//, '')}`} onPress={() => {}} right={<View />} />
