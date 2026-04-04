@@ -1,20 +1,22 @@
 import { useState } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, StyleSheet, Switch, ActivityIndicator } from 'react-native'
-import { Stack, router } from 'expo-router'
+import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Spinner } from '../components/ui'
-import { moderationApi, adminApi } from '../api'
+import { moderationApi, adminApi, waitlistApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
 
-type Tab = 'reports' | 'moderation' | 'users'
+type Tab = 'reports' | 'moderation' | 'users' | 'waitlist'
 
 export default function AdminScreen() {
   const c = useC()
   const { user } = useAuthStore()
   const qc = useQueryClient()
-  const [tab, setTab] = useState<Tab>('reports')
+  const params = useLocalSearchParams<{ tab?: string }>()
+  const initialTab = (params.tab as Tab) || 'reports'
+  const [tab, setTab] = useState<Tab>(initialTab)
   const [reportStatus, setReportStatus] = useState('pending')
   const [suspendForms, setSuspendForms] = useState<Record<string,{days:string,reason:string,notes:string}>>({})
   const [banForms, setBanForms] = useState<Record<string,{reason:string,notes:string}>>({})
@@ -88,9 +90,26 @@ export default function AdminScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
   })
 
+  const { data: waitlistData, isLoading: waitlistLoading } = useQuery({
+    queryKey: ['admin-waitlist'],
+    queryFn: () => waitlistApi.list().then(r => r.data),
+    enabled: tab === 'waitlist',
+  })
+
+  const approveWaitlist = useMutation({
+    mutationFn: (id: string) => waitlistApi.approve(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-waitlist'] }),
+  })
+
+  const rejectWaitlist = useMutation({
+    mutationFn: (id: string) => waitlistApi.reject(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-waitlist'] }),
+  })
+
   const reports: any[] = repsData?.reports || []
   const modUsers: any[] = modData?.users || []
   const users: any[] = usersData?.users || []
+  const waitlistUsers: any[] = waitlistData?.users || []
 
   return (
     <Screen>
@@ -102,7 +121,7 @@ export default function AdminScreen() {
 
       {/* Tab bar */}
       <View style={[s.tabBar, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-        {(['reports', 'moderation', 'users'] as Tab[]).map(t => (
+        {(['reports', 'moderation', 'users', 'waitlist'] as Tab[]).map(t => (
           <TouchableOpacity key={t} onPress={() => setTab(t)}
             style={[s.tabItem, tab === t && { borderBottomColor: c.primary }]}>
             <Text style={[s.tabText, { color: tab === t ? c.primary : c.textMuted }]}>
@@ -306,6 +325,48 @@ export default function AdminScreen() {
                     </TouchableOpacity>
                   </View>
                 )}
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      )}
+
+      {/* Waitlist tab */}
+      {tab === 'waitlist' && (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+          <Text style={[s.sectionTitle, { color: c.textMuted }]}>Pending Waitlist</Text>
+          {waitlistLoading ? <Spinner /> : waitlistUsers.length === 0 ? (
+            <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>No users on the waitlist.</Text>
+          ) : waitlistUsers.map((u: any) => (
+            <View key={u.id} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{u.display_name || u.username}</Text>
+                  <Text style={{ fontSize: 12, color: c.textMuted }}>@{u.username}</Text>
+                  <Text style={{ fontSize: 12, color: c.textMuted }}>{u.email}</Text>
+                  {u.created_at && (
+                    <Text style={{ fontSize: 11, color: c.textLight, marginTop: 2 }}>
+                      Joined {new Date(u.created_at).toLocaleDateString()}
+                    </Text>
+                  )}
+                </View>
+                <View style={{ gap: 6 }}>
+                  <TouchableOpacity
+                    disabled={approveWaitlist.isPending}
+                    onPress={() => approveWaitlist.mutate(u.id)}
+                    style={[s.smallBtn, { borderColor: '#22c55e', backgroundColor: '#f0fdf4' }]}>
+                    <Text style={{ fontSize: 12, color: '#15803d', fontWeight: '600' }}>Approve</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    disabled={rejectWaitlist.isPending}
+                    onPress={() => Alert.alert('Reject user?', `This will reject @${u.username} from the waitlist.`, [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Reject', style: 'destructive', onPress: () => rejectWaitlist.mutate(u.id) },
+                    ])}
+                    style={[s.smallBtn, { borderColor: '#ef4444', backgroundColor: '#fef2f2' }]}>
+                    <Text style={{ fontSize: 12, color: '#dc2626', fontWeight: '600' }}>Reject</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           ))}

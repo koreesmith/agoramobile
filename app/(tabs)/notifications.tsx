@@ -15,6 +15,7 @@ const ICONS: Record<string, any> = {
   comment_reaction: 'happy', post_comment: 'chatbubble', post_repost: 'repeat',
   post_mention: 'at', comment_reply: 'return-down-forward', wall_post: 'pencil',
   wall_post_pending: 'time', wall_post_approved: 'checkmark-circle', user_post: 'notifications',
+  waitlist_signup: 'person-add-outline',
 }
 
 const COLORS: Record<string, string> = {
@@ -22,6 +23,7 @@ const COLORS: Record<string, string> = {
   comment_like: '#ef4444', post_reaction: '#f59e0b', comment_reaction: '#f59e0b',
   post_comment: '#486581', post_repost: '#22c55e', post_mention: '#3b82f6',
   wall_post: '#486581', wall_post_pending: '#f59e0b', wall_post_approved: '#22c55e', user_post: '#486581',
+  waitlist_signup: '#8b5cf6',
 }
 
 const TEXT: Record<string, string> = {
@@ -32,6 +34,7 @@ const TEXT: Record<string, string> = {
   post_mention: 'mentioned you in a post', comment_reply: 'replied to your comment',
   wall_post: 'posted on your wall', wall_post_pending: 'wants to post on your wall',
   wall_post_approved: 'approved your wall post', user_post: 'made a new post',
+  waitlist_signup: 'joined the waitlist',
 }
 
 export default function NotificationsScreen() {
@@ -54,6 +57,8 @@ export default function NotificationsScreen() {
     qc.invalidateQueries({ queryKey: ['notifications'] })
     if (n.type === 'friend_request' || n.type === 'friend_accepted') {
       if (n.actor_username) router.push(`/profile/${n.actor_username}`)
+    } else if (n.type === 'waitlist_signup') {
+      router.push('/admin?tab=waitlist' as any)
     } else if (n.post_id) router.push(`/post/${n.post_id}`)
   }
 
