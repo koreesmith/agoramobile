@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, Dimensions, Linking, TextInput } from 'react-native'
+import { useState, useRef } from 'react'
+import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, Dimensions, Linking, TextInput, PanResponder } from 'react-native'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import * as MediaLibrary from 'expo-media-library'
@@ -170,6 +170,55 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const { addBlock } = useBlockStore()
   const qc = useQueryClient()
   const [showReactions, setShowReactions] = useState(false)
+  const [hoveredReaction, setHoveredReaction] = useState<string | null>(null)
+  const pickerRef = useRef<View>(null)
+  const gestureState = useRef({
+    isPicking: false,
+    hoveredType: null as string | null,
+    timer: null as ReturnType<typeof setTimeout> | null,
+    pickerLayout: null as { x: number; width: number } | null,
+  })
+  const reactMutateRef = useRef<(vars: { type: string }) => void>(() => {})
+  const panResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => gestureState.current.isPicking,
+    onPanResponderGrant: () => {
+      const gs = gestureState.current
+      gs.isPicking = false
+      gs.hoveredType = null
+      gs.timer = setTimeout(() => { gs.isPicking = true; setShowReactions(true) }, 400)
+    },
+    onPanResponderMove: (evt) => {
+      const gs = gestureState.current
+      if (!gs.isPicking || !gs.pickerLayout) return
+      const relX = evt.nativeEvent.pageX - gs.pickerLayout.x
+      const idx = Math.floor(relX / (gs.pickerLayout.width / REACTIONS.length))
+      const hovered = idx >= 0 && idx < REACTIONS.length ? REACTIONS[idx].type : null
+      gs.hoveredType = hovered
+      setHoveredReaction(hovered)
+    },
+    onPanResponderRelease: () => {
+      const gs = gestureState.current
+      if (gs.timer) { clearTimeout(gs.timer); gs.timer = null }
+      if (!gs.isPicking) {
+        reactMutateRef.current({ type: 'like' })
+      } else {
+        if (gs.hoveredType) reactMutateRef.current({ type: gs.hoveredType })
+        setShowReactions(false)
+        setHoveredReaction(null)
+      }
+      gs.isPicking = false
+      gs.hoveredType = null
+    },
+    onPanResponderTerminate: () => {
+      const gs = gestureState.current
+      if (gs.timer) { clearTimeout(gs.timer); gs.timer = null }
+      gs.isPicking = false
+      gs.hoveredType = null
+      setShowReactions(false)
+      setHoveredReaction(null)
+    },
+  })).current
   const [twExpanded, setTwExpanded] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showShare, setShowShare] = useState(false)
@@ -187,6 +236,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
       post.my_reaction === type ? feedApi.unreactPost(post.id) : feedApi.reactPost(post.id, type),
     onSuccess: invalidate,
   })
+  reactMutateRef.current = (vars) => react.mutate(vars)
 
   const repost = useMutation({
     mutationFn: () => feedApi.repostPost(post.id, { content: shareContent, visibility: 'friends' }),
@@ -390,16 +440,31 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
 
         <View style={[s.actions, { borderTopColor: c.border }]}>
           <View>
-            <TouchableOpacity style={s.actionBtn} onPress={() => setShowReactions(v => !v)}>
-              <Text style={{ fontSize: 17 }}>{myReactionEmoji ?? '🤍'}</Text>
+            <View style={s.actionBtn} {...panResponder.panHandlers}>
+              <Text style={{ fontSize: 19 }}>{myReactionEmoji ?? '🤍'}</Text>
               {totalReactions > 0 && <Text style={[s.actionCount, { color: c.textMuted }]}>{totalReactions}</Text>}
-            </TouchableOpacity>
+            </View>
             {showReactions && (
-              <View style={[s.picker, { backgroundColor: c.card, borderColor: c.border }]}>
+              <View
+                ref={pickerRef}
+                onLayout={() => {
+                  pickerRef.current?.measure((_x, _y, w, _h, pageX) => {
+                    gestureState.current.pickerLayout = { x: pageX, width: w }
+                  })
+                }}
+                style={[s.picker, { backgroundColor: c.card, borderColor: c.border }]}
+              >
                 {REACTIONS.map(r => (
-                  <TouchableOpacity key={r.type} onPress={() => { react.mutate({ type: r.type }); setShowReactions(false) }}
-                    style={post.my_reaction === r.type ? [s.pickerItemActive, { backgroundColor: c.primaryBg }] : undefined}>
-                    <Text style={{ fontSize: 24 }}>{r.emoji}</Text>
+                  <TouchableOpacity
+                    key={r.type}
+                    onPress={() => { react.mutate({ type: r.type }); setShowReactions(false); setHoveredReaction(null) }}
+                    style={[
+                      s.pickerItem,
+                      (post.my_reaction === r.type || hoveredReaction === r.type) && { backgroundColor: c.primaryBg },
+                      hoveredReaction === r.type && { transform: [{ scale: 1.25 }] },
+                    ]}
+                  >
+                    <Text style={{ fontSize: 28 }}>{r.emoji}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -591,13 +656,14 @@ const s = StyleSheet.create({
   linkTitle: { fontSize: 13, fontWeight: '600', marginTop: 2 },
   linkDesc: { fontSize: 12, marginTop: 2 },
   reactionCounts: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, borderWidth: 1 },
-  chipCount: { fontSize: 12 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 14, borderWidth: 1 },
+  chipCount: { fontSize: 13 },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   actionCount: { fontSize: 12 },
-  picker: { position: 'absolute', bottom: 36, left: 0, borderWidth: 1, borderRadius: 20, padding: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10, zIndex: 99, width: 240 },
-  pickerItemActive: { borderRadius: 8 },
+  picker: { position: 'absolute', bottom: 40, left: 0, borderWidth: 1, borderRadius: 24, padding: 8, flexDirection: 'row', gap: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10, zIndex: 99 },
+  pickerItem: { borderRadius: 10, padding: 4 },
+  pickerItemActive: { borderRadius: 10 },
   lightboxBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' },
   lightboxClose: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 16 },
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
