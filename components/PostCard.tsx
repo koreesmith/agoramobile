@@ -184,7 +184,11 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => gestureState.current.isPicking,
     onMoveShouldSetPanResponderCapture: () => gestureState.current.isPicking,
-    onPanResponderTerminationRequest: () => !gestureState.current.isPicking,
+    onPanResponderTerminationRequest: (_evt, pgState) => {
+      if (gestureState.current.isPicking) return false
+      const absX = Math.abs(pgState.dx), absY = Math.abs(pgState.dy)
+      return absY > absX && absY > 3
+    },
     onPanResponderGrant: () => {
       const gs = gestureState.current
       gs.isPicking = false
@@ -487,7 +491,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                       hoveredReaction === r.type && { transform: [{ scale: 1.25 }] },
                     ]}
                   >
-                    <Text style={{ fontSize: 28 }}>{r.emoji}</Text>
+                    <Text style={{ fontSize: 24 }}>{r.emoji}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -761,7 +765,7 @@ const s = StyleSheet.create({
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   actionCount: { fontSize: 12 },
   picker: { position: 'absolute', bottom: 40, left: 0, borderWidth: 1, borderRadius: 24, padding: 8, flexDirection: 'row', gap: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10, zIndex: 99 },
-  pickerItem: { borderRadius: 10, padding: 4 },
+  pickerItem: { borderRadius: 10, padding: 3 },
   pickerItemActive: { borderRadius: 10 },
   lightboxBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' },
   lightboxClose: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 16 },
