@@ -184,11 +184,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => gestureState.current.isPicking,
     onMoveShouldSetPanResponderCapture: () => gestureState.current.isPicking,
-    onPanResponderTerminationRequest: (_evt, pgState) => {
-      if (gestureState.current.isPicking) return false
-      const absX = Math.abs(pgState.dx), absY = Math.abs(pgState.dy)
-      return absY > absX && absY > 3
-    },
+    onPanResponderTerminationRequest: () => !gestureState.current.isPicking,
     onPanResponderGrant: () => {
       const gs = gestureState.current
       gs.isPicking = false
@@ -466,7 +462,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         )}
 
         <View style={[s.actions, { borderTopColor: c.border }]}>
-          <View>
+          <View style={{ position: 'relative' }}>
             <View style={s.actionBtn} {...panResponder.panHandlers}>
               <Text style={{ fontSize: 19 }}>{myReactionEmoji ?? '🤍'}</Text>
               {totalReactions > 0 && <Text style={[s.actionCount, { color: c.textMuted }]}>{totalReactions}</Text>}
