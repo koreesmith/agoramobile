@@ -98,8 +98,8 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
   const react = useMutation({
     mutationFn: ({ type }: { type: string }) =>
       comment.my_reaction === type
-        ? feedApi.unreactPost(comment.id)
-        : feedApi.reactPost(comment.id, type),
+        ? feedApi.unreactComment(postId, comment.id)
+        : feedApi.reactComment(postId, comment.id, type),
     onSuccess: () => { setShowPicker(false); setHoveredReaction(null); onRefresh() },
   })
   reactMutateRef.current = (vars) => react.mutate(vars)
