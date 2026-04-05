@@ -49,7 +49,11 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => gestureState.current.isPicking,
     onMoveShouldSetPanResponderCapture: () => gestureState.current.isPicking,
-    onPanResponderTerminationRequest: () => !gestureState.current.isPicking,
+    onPanResponderTerminationRequest: (_evt, pgState) => {
+      if (gestureState.current.isPicking) return false
+      const absX = Math.abs(pgState.dx), absY = Math.abs(pgState.dy)
+      return absY > absX && absY > 3
+    },
     onPanResponderGrant: () => {
       const gs = gestureState.current
       gs.isPicking = false
