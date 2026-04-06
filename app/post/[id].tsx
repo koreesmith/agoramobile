@@ -52,7 +52,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
         ? feedApi.unreactComment(postId, comment.id)
         : feedApi.reactComment(postId, comment.id, type),
     onSuccess: () => { setShowPicker(false); setPickerPosition(null); onRefresh() },
-    onError: (e: any) => Alert.alert('Error', e?.response?.data?.error || 'Could not react to comment'),
+    onError: (e: any) => Alert.alert('React Error', `${e?.response?.status} ${e?.response?.data?.error || e?.message || JSON.stringify(e?.response?.data) || 'unknown'}`),
   })
 
   const reactionCounts: Record<string, number> = comment.reaction_counts || {}
