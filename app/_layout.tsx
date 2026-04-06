@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { Stack, router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { useColorScheme } from 'react-native'
+import { useColorScheme, StyleSheet, View } from 'react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import { useAuthStore } from '../store/auth'
@@ -115,22 +116,25 @@ function AppContent() {
 export default function RootLayout() {
   const [showSplash, setShowSplash] = useState(true)
 
-  if (showSplash) {
-    return (
-      <ColorProvider>
-        <SplashScreen onFinish={() => setShowSplash(false)} />
-      </ColorProvider>
-    )
-  }
-
   return (
-    <ColorProvider>
-      <QueryClientProvider client={queryClient}>
-        <AppContent />
-      </QueryClientProvider>
-    </ColorProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <ColorProvider>
+        <QueryClientProvider client={queryClient}>
+          <AppContent />
+        </QueryClientProvider>
+        {showSplash && (
+          <View style={StyleSheet.absoluteFill}>
+            <SplashScreen onFinish={() => setShowSplash(false)} />
+          </View>
+        )}
+      </ColorProvider>
+    </GestureHandlerRootView>
   )
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+})
 
 async function registerForPushNotifications() {
   if (!Device.isDevice) return
