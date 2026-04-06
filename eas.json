@@ -7,7 +7,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "ios": { "image": "macos-sequoia-15.5-xcode-26.0" }
+      "ios": { "image": "macos-sequoia-15.5-xcode-26.4" }
     },
     "ios-simulator": {
       "extends": "development",
@@ -18,12 +18,12 @@
     },
     "preview": {
       "distribution": "internal",
-      "ios": { "image": "macos-sequoia-15.5-xcode-26.0", "simulator": false },
+      "ios": { "image": "macos-sequoia-15.5-xcode-26.4", "simulator": false },
       "android": { "buildType": "apk" }
     },
     "production": {
       "autoIncrement": true,
-      "ios": { "image": "macos-sequoia-15.5-xcode-26.0" }
+      "ios": { "image": "macos-sequoia-15.5-xcode-26.4" }
     }
   },
   "submit": {
