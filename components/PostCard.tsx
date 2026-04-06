@@ -172,7 +172,9 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const qc = useQueryClient()
   const [showReactions, setShowReactions] = useState(false)
   const [hoveredReaction, setHoveredReaction] = useState<string | null>(null)
+  const [pickerPosition, setPickerPosition] = useState<{ bottom: number; left: number } | null>(null)
   const pickerRef = useRef<View>(null)
+  const wrapperRef = useRef<View>(null)
   const gestureState = useRef({
     isPicking: false,
     hoveredType: null as string | null,
@@ -189,7 +191,14 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
       const gs = gestureState.current
       gs.isPicking = false
       gs.hoveredType = null
-      gs.timer = setTimeout(() => { gs.isPicking = true; setShowReactions(true) }, 400)
+      gs.timer = setTimeout(() => {
+        gs.isPicking = true
+        wrapperRef.current?.measure((_x, _y, _w, h, pageX, pageY) => {
+          const sh = Dimensions.get('window').height
+          setPickerPosition({ bottom: sh - pageY - h + 40, left: pageX })
+          setShowReactions(true)
+        })
+      }, 400)
     },
     onPanResponderMove: (evt) => {
       const gs = gestureState.current
@@ -462,36 +471,11 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         )}
 
         <View style={[s.actions, { borderTopColor: c.border }]}>
-          <View style={{ position: 'relative' }}>
+          <View ref={wrapperRef}>
             <View style={s.actionBtn} {...panResponder.panHandlers}>
               <Text style={{ fontSize: 19 }}>{myReactionEmoji ?? '🤍'}</Text>
               {totalReactions > 0 && <Text style={[s.actionCount, { color: c.textMuted }]}>{totalReactions}</Text>}
             </View>
-            {showReactions && (
-              <View
-                ref={pickerRef}
-                onLayout={() => {
-                  pickerRef.current?.measure((_x, _y, w, _h, pageX) => {
-                    gestureState.current.pickerLayout = { x: pageX, width: w }
-                  })
-                }}
-                style={[s.picker, { backgroundColor: c.card, borderColor: c.border }]}
-              >
-                {REACTIONS.map(r => (
-                  <TouchableOpacity
-                    key={r.type}
-                    onPress={() => { react.mutate({ type: r.type }); setShowReactions(false); setHoveredReaction(null) }}
-                    style={[
-                      s.pickerItem,
-                      (post.my_reaction === r.type || hoveredReaction === r.type) && { backgroundColor: c.primaryBg },
-                      hoveredReaction === r.type && { transform: [{ scale: 1.25 }] },
-                    ]}
-                  >
-                    <Text style={{ fontSize: 24 }}>{r.emoji}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
           </View>
 
           <TouchableOpacity style={s.actionBtn} onPress={() => router.push(`/post/${post.id}`)}>
@@ -729,6 +713,37 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         </View>
       </Modal>
 
+      {/* ── Reaction picker modal ─────────────────────────────────── */}
+      <Modal visible={showReactions} transparent animationType="none" onRequestClose={() => { setShowReactions(false); setHoveredReaction(null) }}>
+        <View style={{ flex: 1 }} pointerEvents="box-none">
+          {pickerPosition && (
+            <View
+              ref={pickerRef}
+              onLayout={() => {
+                pickerRef.current?.measure((_x, _y, w, _h, pageX) => {
+                  gestureState.current.pickerLayout = { x: pageX, width: w }
+                })
+              }}
+              style={[s.pickerModal, { backgroundColor: c.card, borderColor: c.border, bottom: pickerPosition.bottom, left: pickerPosition.left }]}
+            >
+              {REACTIONS.map(r => (
+                <TouchableOpacity
+                  key={r.type}
+                  onPress={() => { react.mutate({ type: r.type }); setShowReactions(false); setHoveredReaction(null) }}
+                  style={[
+                    s.pickerItem,
+                    (post.my_reaction === r.type || hoveredReaction === r.type) && { backgroundColor: c.primaryBg },
+                    hoveredReaction === r.type && { transform: [{ scale: 1.25 }] },
+                  ]}
+                >
+                  <Text style={{ fontSize: 24 }}>{r.emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      </Modal>
+
     </View>
   )
 }
@@ -761,6 +776,7 @@ const s = StyleSheet.create({
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   actionCount: { fontSize: 12 },
   picker: { position: 'absolute', bottom: 40, left: 0, borderWidth: 1, borderRadius: 24, padding: 8, flexDirection: 'row', gap: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10, zIndex: 99 },
+  pickerModal: { position: 'absolute', borderWidth: 1, borderRadius: 24, padding: 8, flexDirection: 'row', gap: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10 },
   pickerItem: { borderRadius: 10, padding: 3 },
   pickerItemActive: { borderRadius: 10 },
   lightboxBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' },
