@@ -64,9 +64,15 @@ function AppContent() {
   const responseListener = useRef<any>()
 
   useEffect(() => {
-    loadFromStorage()
-    loadPreference()
-    loadBlocked()
+    // Defer SecureStore reads by one frame to allow the Hermes runtime and
+    // concurrent GC to fully initialise before async Keychain operations
+    // resolve back into JS — avoids a HadesGC write barrier crash on startup.
+    const t = setTimeout(() => {
+      loadFromStorage()
+      loadPreference()
+      loadBlocked()
+    }, 0)
+    return () => clearTimeout(t)
   }, [])
 
   useEffect(() => {
