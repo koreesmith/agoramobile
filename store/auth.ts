@@ -24,7 +24,7 @@ interface AuthState {
   setAuth: (user: User, token: string, instanceUrl: string) => void
   updateUser: (updates: Partial<User>) => void
   logout: () => void
-  loadFromStorage: () => Promise<void>
+  loadFromStorage: () => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -54,13 +54,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: null, token: null, instanceUrl: null, isAuthenticated: false })
   },
 
-  loadFromStorage: async () => {
+  loadFromStorage: () => {
     try {
-      const [token, userStr, instanceUrl] = await Promise.all([
-        SecureStore.getItemAsync('agora_token'),
-        SecureStore.getItemAsync('agora_user'),
-        SecureStore.getItemAsync('agora_instance'),
-      ])
+      const token = SecureStore.getItem('agora_token')
+      const userStr = SecureStore.getItem('agora_user')
+      const instanceUrl = SecureStore.getItem('agora_instance')
       if (token && userStr && instanceUrl) {
         set({ token, user: JSON.parse(userStr), instanceUrl, isAuthenticated: true })
       }
