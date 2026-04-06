@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { View, Text, Image, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, RefreshControl, StyleSheet, Modal, Dimensions, PanResponder } from 'react-native'
+import { View, Text, Image, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, RefreshControl, StyleSheet, Modal, Dimensions } from 'react-native'
 import ZoomableImage from '../../components/ZoomableImage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, Stack, router } from 'expo-router'
@@ -36,68 +36,8 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
 }) {
   const c = useC()
   const [showPicker, setShowPicker] = useState(false)
-  const [hoveredReaction, setHoveredReaction] = useState<string | null>(null)
   const [pickerPosition, setPickerPosition] = useState<{ bottom: number; left: number } | null>(null)
-  const pickerRef = useRef<View>(null)
   const wrapperRef = useRef<View>(null)
-  const gestureState = useRef({
-    isPicking: false,
-    hoveredType: null as string | null,
-    timer: null as ReturnType<typeof setTimeout> | null,
-    pickerLayout: null as { x: number; width: number } | null,
-  })
-  const reactMutateRef = useRef<(vars: { type: string }) => void>(() => {})
-  const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => gestureState.current.isPicking,
-    onMoveShouldSetPanResponderCapture: () => gestureState.current.isPicking,
-    onPanResponderTerminationRequest: () => !gestureState.current.isPicking,
-    onPanResponderGrant: () => {
-      const gs = gestureState.current
-      gs.isPicking = false
-      gs.hoveredType = null
-      gs.timer = setTimeout(() => {
-        gs.isPicking = true
-        wrapperRef.current?.measure((_x, _y, _w, h, pageX, pageY) => {
-          const sh = Dimensions.get('window').height
-          setPickerPosition({ bottom: sh - pageY - h + 40, left: pageX })
-          setShowPicker(true)
-        })
-      }, 400)
-    },
-    onPanResponderMove: (evt) => {
-      const gs = gestureState.current
-      if (!gs.isPicking || !gs.pickerLayout) return
-      const relX = evt.nativeEvent.pageX - gs.pickerLayout.x
-      const idx = Math.floor(relX / (gs.pickerLayout.width / REACTIONS.length))
-      const hovered = idx >= 0 && idx < REACTIONS.length ? REACTIONS[idx].type : null
-      gs.hoveredType = hovered
-      setHoveredReaction(hovered)
-    },
-    onPanResponderRelease: () => {
-      const gs = gestureState.current
-      if (gs.timer) { clearTimeout(gs.timer); gs.timer = null }
-      if (!gs.isPicking) {
-        reactMutateRef.current({ type: 'like' })
-      } else {
-        if (gs.hoveredType) reactMutateRef.current({ type: gs.hoveredType })
-        setShowPicker(false)
-        setPickerPosition(null)
-        setHoveredReaction(null)
-      }
-      gs.isPicking = false
-      gs.hoveredType = null
-    },
-    onPanResponderTerminate: () => {
-      const gs = gestureState.current
-      if (gs.timer) { clearTimeout(gs.timer); gs.timer = null }
-      gs.isPicking = false
-      gs.hoveredType = null
-      setShowPicker(false)
-      setPickerPosition(null)
-      setHoveredReaction(null)
-    },
-  })).current
   const [showMenu, setShowMenu] = useState(false)
   const [showCommentLightbox, setShowCommentLightbox] = useState(false)
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window')
@@ -111,9 +51,8 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
       comment.my_reaction === type
         ? feedApi.unreactComment(postId, comment.id)
         : feedApi.reactComment(postId, comment.id, type),
-    onSuccess: () => { setShowPicker(false); setHoveredReaction(null); onRefresh() },
+    onSuccess: () => { setShowPicker(false); onRefresh() },
   })
-  reactMutateRef.current = (vars) => react.mutate(vars)
 
   const reactionCounts: Record<string, number> = comment.reaction_counts || {}
   const totalReactions = Object.values(reactionCounts).reduce((a: any, b: any) => a + b, 0) as number
@@ -171,22 +110,27 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
           {/* Action row */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 6 }}>
             {/* React */}
-            <View ref={wrapperRef}>
-              <View style={s.actionBtn} {...panResponder.panHandlers}>
+            <View ref={wrapperRef} collapsable={false}>
+              <TouchableOpacity
+                style={s.actionBtn}
+                onPress={() => react.mutate({ type: 'like' })}
+                onLongPress={() => {
+                  wrapperRef.current?.measure((_x, _y, _w, h, pageX, pageY) => {
+                    const sh = Dimensions.get('window').height
+                    setPickerPosition({ bottom: sh - pageY - h + 40, left: pageX })
+                    setShowPicker(true)
+                  })
+                }}
+                delayLongPress={400}
+              >
                 <Text style={{ fontSize: 14 }}>{myEmoji ?? '🤍'}</Text>
                 <Text style={[s.actionBtnText, { color: c.textLight }]}>React</Text>
-              </View>
+              </TouchableOpacity>
             </View>
-            <Modal visible={showPicker} transparent animationType="none" onRequestClose={() => { setShowPicker(false); setPickerPosition(null); setHoveredReaction(null) }}>
-              <View style={{ flex: 1 }} pointerEvents="box-none">
+            <Modal visible={showPicker} transparent animationType="none" onRequestClose={() => { setShowPicker(false); setPickerPosition(null) }}>
+              <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => { setShowPicker(false); setPickerPosition(null) }}>
                 {pickerPosition && (
                   <View
-                    ref={pickerRef}
-                    onLayout={() => {
-                      pickerRef.current?.measure((_x, _y, w, _h, pageX) => {
-                        gestureState.current.pickerLayout = { x: pageX, width: w }
-                      })
-                    }}
                     style={[s.pickerModal, { backgroundColor: c.card, borderColor: c.border, bottom: pickerPosition.bottom, left: pickerPosition.left }]}
                   >
                     {REACTIONS.map(r => (
@@ -195,8 +139,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
                         onPress={() => react.mutate({ type: r.type })}
                         style={[
                           s.pickerItem,
-                          (comment.my_reaction === r.type || hoveredReaction === r.type) && { backgroundColor: c.primaryBg },
-                          hoveredReaction === r.type && { transform: [{ scale: 1.25 }] },
+                          comment.my_reaction === r.type && { backgroundColor: c.primaryBg },
                         ]}
                       >
                         <Text style={{ fontSize: 24 }}>{r.emoji}</Text>
@@ -204,7 +147,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
                     ))}
                   </View>
                 )}
-              </View>
+              </TouchableOpacity>
             </Modal>
             {/* Reply — only available at depth < 2 */}
             {depth < 2 && (
