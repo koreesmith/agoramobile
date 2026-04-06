@@ -51,7 +51,8 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
       comment.my_reaction === type
         ? feedApi.unreactComment(postId, comment.id)
         : feedApi.reactComment(postId, comment.id, type),
-    onSuccess: () => { setShowPicker(false); onRefresh() },
+    onSuccess: () => { setShowPicker(false); setPickerPosition(null); onRefresh() },
+    onError: (e: any) => Alert.alert('Error', e?.response?.data?.error || 'Could not react to comment'),
   })
 
   const reactionCounts: Record<string, number> = comment.reaction_counts || {}
@@ -112,8 +113,11 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
             {/* React */}
             <View ref={wrapperRef} collapsable={false}>
               <TouchableOpacity
-                style={s.actionBtn}
-                onPress={() => react.mutate({ type: 'like' })}
+                style={[s.actionBtn, { paddingVertical: 4, paddingHorizontal: 2 }]}
+                onPress={() => {
+                  if (showPicker) { setShowPicker(false); setPickerPosition(null); return }
+                  react.mutate({ type: 'like' })
+                }}
                 onLongPress={() => {
                   wrapperRef.current?.measure((_x, _y, _w, h, pageX, pageY) => {
                     const sh = Dimensions.get('window').height
@@ -128,7 +132,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
               </TouchableOpacity>
             </View>
             <Modal visible={showPicker} transparent animationType="none" onRequestClose={() => { setShowPicker(false); setPickerPosition(null) }}>
-              <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => { setShowPicker(false); setPickerPosition(null) }}>
+              <View style={{ flex: 1 }} pointerEvents="box-none">
                 {pickerPosition && (
                   <View
                     style={[s.pickerModal, { backgroundColor: c.card, borderColor: c.border, bottom: pickerPosition.bottom, left: pickerPosition.left }]}
@@ -136,7 +140,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
                     {REACTIONS.map(r => (
                       <TouchableOpacity
                         key={r.type}
-                        onPress={() => react.mutate({ type: r.type })}
+                        onPress={() => { react.mutate({ type: r.type }); setShowPicker(false); setPickerPosition(null) }}
                         style={[
                           s.pickerItem,
                           comment.my_reaction === r.type && { backgroundColor: c.primaryBg },
@@ -147,7 +151,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
                     ))}
                   </View>
                 )}
-              </TouchableOpacity>
+              </View>
             </Modal>
             {/* Reply — only available at depth < 2 */}
             {depth < 2 && (
