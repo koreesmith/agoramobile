@@ -6,7 +6,7 @@ export type ThemePreference = 'light' | 'dark' | 'system'
 interface ThemeState {
   preference: ThemePreference
   setPreference: (p: ThemePreference) => Promise<void>
-  loadPreference: () => Promise<void>
+  loadPreference: () => void
 }
 
 export const useThemeStore = create<ThemeState>((set) => ({
@@ -17,9 +17,9 @@ export const useThemeStore = create<ThemeState>((set) => ({
     set({ preference })
   },
 
-  loadPreference: async () => {
+  loadPreference: () => {
     try {
-      const stored = await SecureStore.getItemAsync('agora_theme')
+      const stored = SecureStore.getItem('agora_theme')
       if (stored === 'light' || stored === 'dark' || stored === 'system') {
         set({ preference: stored })
       }

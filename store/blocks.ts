@@ -5,7 +5,7 @@ const STORAGE_KEY = 'agora_blocked_ids'
 
 interface BlockState {
   blockedIds: string[]
-  loadBlocked: () => Promise<void>
+  loadBlocked: () => void
   addBlock: (id: string) => void
   removeBlock: (id: string) => void
   isBlocked: (id: string) => boolean
@@ -14,9 +14,9 @@ interface BlockState {
 export const useBlockStore = create<BlockState>((set, get) => ({
   blockedIds: [],
 
-  loadBlocked: async () => {
+  loadBlocked: () => {
     try {
-      const stored = await SecureStore.getItemAsync(STORAGE_KEY)
+      const stored = SecureStore.getItem(STORAGE_KEY)
       if (stored) set({ blockedIds: JSON.parse(stored) })
     } catch {}
   },
