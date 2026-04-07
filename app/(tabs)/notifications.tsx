@@ -45,16 +45,17 @@ export default function NotificationsScreen() {
     queryFn: () => notificationsApi.list().then(r => r.data),
     refetchInterval: 30_000,
   })
-  const markAll = useMutation({ mutationFn: () => notificationsApi.markAllRead(), onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }) })
-  const accept = useMutation({ mutationFn: (id: string) => friendsApi.acceptRequest(id), onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }) })
-  const decline = useMutation({ mutationFn: (id: string) => friendsApi.declineRequest(id), onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }) })
+  const invalidateNotifs = () => { qc.invalidateQueries({ queryKey: ['notifications'] }); qc.invalidateQueries({ queryKey: ['unread-count'] }) }
+  const markAll = useMutation({ mutationFn: () => notificationsApi.markAllRead(), onSuccess: invalidateNotifs })
+  const accept = useMutation({ mutationFn: (id: string) => friendsApi.acceptRequest(id), onSuccess: invalidateNotifs })
+  const decline = useMutation({ mutationFn: (id: string) => friendsApi.declineRequest(id), onSuccess: invalidateNotifs })
 
   const notifs = data?.notifications || []
   const hasUnread = notifs.some((n: any) => !n.read)
 
   const handlePress = (n: any) => {
     notificationsApi.markRead(n.id)
-    qc.invalidateQueries({ queryKey: ['notifications'] })
+    invalidateNotifs()
     if (n.type === 'friend_request' || n.type === 'friend_accepted') {
       if (n.actor_username) router.push(`/profile/${n.actor_username}`)
     } else if (n.type === 'waitlist_signup') {
