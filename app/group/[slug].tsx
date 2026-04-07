@@ -4,6 +4,7 @@ import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useQuery, useMutation, useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
+import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Spinner, Avatar } from '../../components/ui'
 import PostCard from '../../components/PostCard'
 import { groupsApi, feedApi, imgUrl } from '../../api'
@@ -52,7 +53,8 @@ export default function GroupScreen() {
     if (result.canceled) return
     setUploading(true)
     try {
-      const file = { uri: result.assets[0].uri, type: 'image/jpeg', name: 'photo.jpg' } as any
+      const uri = await normalizeImageOrientation(result.assets[0].uri)
+      const file = { uri, type: 'image/jpeg', name: 'photo.jpg' } as any
       const res = await feedApi.uploadMedia(file, 'posts')
       setImageUrl(res.data.url)
     } catch { Alert.alert('Upload failed') }

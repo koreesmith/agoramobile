@@ -6,6 +6,7 @@ import { useLocalSearchParams, Stack, router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
+import { normalizeImageOrientation } from '../../utils/image'
 import { formatDistanceToNow } from 'date-fns'
 import { Screen, Spinner, Avatar } from '../../components/ui'
 import PostCard from '../../components/PostCard'
@@ -249,7 +250,8 @@ export default function PostScreen() {
     if (result.canceled) return
     setUploading(true)
     try {
-      const file = { uri: result.assets[0].uri, type: 'image/jpeg', name: 'photo.jpg' } as any
+      const uri = await normalizeImageOrientation(result.assets[0].uri)
+      const file = { uri, type: 'image/jpeg', name: 'photo.jpg' } as any
       const res = await feedApi.uploadMedia(file, 'posts')
       setCommentImage(res.data.url)
     } catch { Alert.alert('Upload failed') }
