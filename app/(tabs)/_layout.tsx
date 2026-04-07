@@ -3,6 +3,7 @@ import { Tabs, router } from 'expo-router'
 import { Platform, useColorScheme } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useQuery } from '@tanstack/react-query'
+import * as Notifications from 'expo-notifications'
 import { useAuthStore } from '../../store/auth'
 import { notificationsApi } from '../../api'
 import { light, dark } from '../../constants/colors'
@@ -26,6 +27,10 @@ export default function TabsLayout() {
     enabled: isAuthenticated,
   })
   const unread: number = unreadData?.count ?? 0
+
+  useEffect(() => {
+    Notifications.setBadgeCountAsync(unread)
+  }, [unread])
 
   return (
     <Tabs screenOptions={{
