@@ -9,6 +9,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
+import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Header, Spinner, EmptyState } from '../../components/ui'
 import PostCard from '../../components/PostCard'
 import { feedApi, friendsApi, instanceApi, imgUrl } from '../../api'
@@ -133,7 +134,8 @@ export default function FeedScreen() {
     if (result.canceled) return
     setUploading(true)
     try {
-      const file = { uri: result.assets[0].uri, type: 'image/jpeg', name: 'photo.jpg' } as any
+      const uri = await normalizeImageOrientation(result.assets[0].uri)
+      const file = { uri, type: 'image/jpeg', name: 'photo.jpg' } as any
       const res = await feedApi.uploadMedia(file, 'posts')
       setImageUrl(res.data.url)
     } catch { Alert.alert('Upload failed') }
