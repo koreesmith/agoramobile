@@ -4,6 +4,7 @@ import { router, Stack } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
+import { normalizeImageOrientation } from '../utils/image'
 import { Screen, Avatar } from '../components/ui'
 import { usersApi, notificationsApi, feedApi, imgUrl } from '../api'
 import { useAuthStore } from '../store/auth'
@@ -91,7 +92,8 @@ export default function EditProfileScreen() {
     if (result.canceled) return
     setUploadingAvatar(true)
     try {
-      const file = { uri: result.assets[0].uri, type: 'image/jpeg', name: 'avatar.jpg' } as any
+      const uri = await normalizeImageOrientation(result.assets[0].uri)
+      const file = { uri, type: 'image/jpeg', name: 'avatar.jpg' } as any
       const res = await usersApi.uploadAvatar(file)
       setAvatarUrl(res.data.avatar_url)
       updateUser({ avatar_url: res.data.avatar_url })
@@ -104,7 +106,8 @@ export default function EditProfileScreen() {
     if (result.canceled) return
     setUploadingCover(true)
     try {
-      const file = { uri: result.assets[0].uri, type: 'image/jpeg', name: 'cover.jpg' } as any
+      const uri = await normalizeImageOrientation(result.assets[0].uri)
+      const file = { uri, type: 'image/jpeg', name: 'cover.jpg' } as any
       const res = await feedApi.uploadMedia(file, 'covers')
       await usersApi.updateProfile({ cover_url: res.data.url })
       setCoverUrl(res.data.url)
