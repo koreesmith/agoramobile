@@ -49,7 +49,7 @@ export default function GroupScreen() {
   })
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 })
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 })
     if (result.canceled) return
     setUploading(true)
     try {
