@@ -1,4 +1,5 @@
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Image, StyleSheet } from 'react-native'
+import { useState } from 'react'
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Image, TextInput, StyleSheet } from 'react-native'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -11,6 +12,8 @@ import { useC } from '../../constants/ColorContext'
 export default function GroupsScreen() {
   const c = useC()
   const qc = useQueryClient()
+  const [search, setSearch] = useState('')
+
   const { data: joinedData, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['groups', 'joined'],
     queryFn: () => groupsApi.listFilter('joined').then(r => r.data),
@@ -23,7 +26,11 @@ export default function GroupsScreen() {
   const join = useMutation({ mutationFn: (slug: string) => groupsApi.join(slug), onSuccess: () => { qc.invalidateQueries({ queryKey: ['groups'] }) } })
 
   const myGroups = joinedData?.groups || []
-  const discover = (discoverData?.groups || []).filter((g: any) => !myGroups.find((m: any) => m.id === g.id))
+  const allDiscover = (discoverData?.groups || []).filter((g: any) => !myGroups.find((m: any) => m.id === g.id))
+
+  const q = search.toLowerCase()
+  const filteredMyGroups = q ? myGroups.filter((g: any) => g.name.toLowerCase().includes(q) || (g.description || '').toLowerCase().includes(q)) : myGroups
+  const discover = q ? allDiscover.filter((g: any) => g.name.toLowerCase().includes(q) || (g.description || '').toLowerCase().includes(q)) : allDiscover
 
   const GroupRow = ({ group }: { group: any }) => (
     <TouchableOpacity onPress={() => router.push(`/group/${group.slug}`)} style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
@@ -41,30 +48,55 @@ export default function GroupsScreen() {
   )
 
   if (isLoading) return <Screen><Header title="Groups" /><Spinner /></Screen>
-  const allGroups = [...myGroups, ...discover]
+  const allGroups = [...filteredMyGroups, ...discover]
 
   return (
     <Screen>
       <Header title="Groups" />
+      <View style={[s.searchWrap, { backgroundColor: c.card, borderBottomColor: c.border }]}>
+        <Ionicons name="search" size={16} color={c.textMuted} style={{ marginRight: 6 }} />
+        <TextInput
+          style={[s.searchInput, { color: c.text }]}
+          placeholder="Search groups..."
+          placeholderTextColor={c.textMuted}
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+          autoCorrect={false}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')}>
+            <Ionicons name="close-circle" size={16} color={c.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
       <FlatList
         data={allGroups}
         keyExtractor={(g: any) => g.id}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={c.primary} />}
-        ListEmptyComponent={<EmptyState icon="👥" title="No groups yet" subtitle="Join a group to get started" />}
-        ListHeaderComponent={myGroups.length > 0 ? (
+        ListEmptyComponent={
+          <EmptyState
+            icon="👥"
+            title={search ? 'No groups found' : 'No groups yet'}
+            subtitle={search ? `No groups match "${search}"` : 'Join a group to get started'}
+          />
+        }
+        ListHeaderComponent={filteredMyGroups.length > 0 ? (
           <View>
             <Text style={[s.sectionHeader, { color: c.textMuted }]}>Joined</Text>
-            {myGroups.map((g: any) => <GroupRow key={g.id} group={g} />)}
+            {filteredMyGroups.map((g: any) => <GroupRow key={g.id} group={g} />)}
             {discover.length > 0 && <Text style={[s.sectionHeader, { color: c.textMuted }]}>Discover</Text>}
           </View>
         ) : discover.length > 0 ? <Text style={[s.sectionHeader, { color: c.textMuted }]}>Discover</Text> : null}
-        renderItem={({ item }) => myGroups.includes(item) ? null : <GroupRow group={item} />}
+        renderItem={({ item }) => filteredMyGroups.includes(item) ? null : <GroupRow group={item} />}
       />
     </Screen>
   )
 }
 
 const s = StyleSheet.create({
+  searchWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1 },
+  searchInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
   groupIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#d9e2ec', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   groupLetter: { color: '#486581', fontWeight: 'bold', fontSize: 20 },
