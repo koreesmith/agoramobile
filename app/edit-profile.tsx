@@ -88,7 +88,7 @@ export default function EditProfileScreen() {
   })
 
   const pickAvatar = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8, allowsEditing: true, aspect: [1, 1] })
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8, allowsEditing: true, aspect: [1, 1] })
     if (result.canceled) return
     setUploadingAvatar(true)
     try {
@@ -102,7 +102,7 @@ export default function EditProfileScreen() {
   }
 
   const pickCover = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 })
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 })
     if (result.canceled) return
     setUploadingCover(true)
     try {
