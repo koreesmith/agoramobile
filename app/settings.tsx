@@ -5,6 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
+import Constants from 'expo-constants'
 import { Screen } from '../components/ui'
 import { usersApi, authApi, instanceApi } from '../api'
 import { useAuthStore } from '../store/auth'
@@ -204,6 +205,7 @@ export default function SettingsScreen() {
         <Text style={[s.section, { color: c.textMuted }]}>About</Text>
         <Row icon="person-circle-outline" label={`Signed in as @${user?.username}`} onPress={() => {}} right={<View />} />
         <Row icon="server-outline" label={`Instance: ${useAuthStore.getState().instanceUrl?.replace(/^https?:\/\//, '')}`} onPress={() => {}} right={<View />} />
+        <Row icon="information-circle-outline" label={`Version ${Constants.expoConfig?.version ?? '—'}`} onPress={() => {}} right={<View />} />
         <View style={{ marginTop: 8 }}>
           <Row icon="log-out-outline" label="Sign out" destructive onPress={() => Alert.alert('Sign out?', undefined, [
             { text: 'Cancel', style: 'cancel' },
