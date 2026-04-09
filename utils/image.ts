@@ -10,9 +10,12 @@
  */
 export async function normalizeImageOrientation(uri: string): Promise<string> {
   try {
-    const { ImageManipulator, SaveFormat } = await import('expo-image-manipulator')
-    const ref = await ImageManipulator.manipulate(uri).renderAsync()
-    const result = await ref.saveAsync({ compress: 0.8, format: SaveFormat.JPEG })
+    const ImageManipulator = await import('expo-image-manipulator')
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [],
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+    )
     return result.uri
   } catch {
     return uri
