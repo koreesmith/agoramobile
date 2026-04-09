@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Tabs, router } from 'expo-router'
 import { Platform, useColorScheme } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
@@ -15,10 +15,18 @@ export default function TabsLayout() {
   const { preference } = useThemeStore()
   const isDark = preference === 'dark' || (preference === 'system' && systemScheme === 'dark')
   const c = isDark ? dark : light
+  const notificationsReady = useRef(false)
 
   useEffect(() => {
     if (!isAuthenticated) router.replace('/(auth)')
   }, [isAuthenticated])
+
+  // Mirror the 1500ms deferral from _layout.tsx — calling any Notifications
+  // native method before this window closes crashes on iOS 26.3.1.
+  useEffect(() => {
+    const t = setTimeout(() => { notificationsReady.current = true }, 1500)
+    return () => clearTimeout(t)
+  }, [])
 
   const { data: unreadData } = useQuery({
     queryKey: ['unread-count'],
@@ -30,6 +38,7 @@ export default function TabsLayout() {
 
   useEffect(() => {
     if (unread === 0 && !unreadData) return
+    if (!notificationsReady.current) return
     Notifications.setBadgeCountAsync(unread).catch(() => {})
   }, [unread, unreadData])
 
