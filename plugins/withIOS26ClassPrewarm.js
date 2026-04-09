@@ -1,37 +1,40 @@
 /**
- * Expo config plugin: withIOS26ClassPrewarm
+ * Expo config plugin: withIOS26NativePrewarm
  *
- * On iOS 26.x, Apple changed how lazy ObjC class stubs are registered. When an
- * ObjC class is first messaged on a background GCD thread, the runtime calls
- * _dyld_objc_class_count() to realize all pending lazy stubs. This call races
- * with Hermes VM initialization on the JS thread, corrupting a JSI function
- * pointer and crashing the app at launch (EXC_BAD_ACCESS / null PC in
- * hermes::vm::Runtime::drainJobs).
+ * On iOS 26.x, certain system singletons (URLSession, UNUserNotificationCenter)
+ * throw NSException when first accessed from a background GCD thread. React
+ * Native's TurboModule dispatcher runs native module calls on background serial
+ * queues, so the first call to any module that lazily initializes one of these
+ * singletons crashes the app.
  *
- * The fix: call objc_copyClassList() on the main thread in
- * application:didFinishLaunchingWithOptions: before the React Native bridge
- * starts. This forces every lazy class stub to be realized upfront so that
- * background threads never need to trigger _dyld_objc_class_count themselves.
+ * In release/TestFlight builds React Native rethrows ALL ObjC exceptions as
+ * fatal (instead of showing a red screen), so the crash is silent and immediate.
+ *
+ * Fix: force the relevant singletons to be initialized on the main thread in
+ * application:didFinishLaunchingWithOptions: before the bridge starts. Subsequent
+ * reads from background threads hit an already-initialized singleton and don't
+ * throw.
+ *
+ * Previous attempt (objc_copyClassList) was wrong — it only slowed startup by
+ * ~880ms (the time to enumerate all ObjC classes) without addressing the actual
+ * singleton-initialization race.
  */
 
 const { withAppDelegate } = require('@expo/config-plugins')
 
-const PREWARM_MARKER = '// [withIOS26ClassPrewarm]'
+const PREWARM_MARKER = '// [withIOS26NativePrewarm]'
 
 const PREWARM_CODE = `    ${PREWARM_MARKER}
-    // Pre-realize all lazy ObjC class stubs on the main thread before the React
-    // Native bridge starts. On iOS 26.x, the first ObjC message sent to any
-    // unrealized class from a background thread triggers _dyld_objc_class_count,
-    // which races with Hermes VM initialization and corrupts a JSI function
-    // pointer, causing a null-PC crash in hermes::vm::Runtime::drainJobs.
-    var _rnPrewarmCount: UInt32 = 0
-    _ = objc_copyClassList(&_rnPrewarmCount)
+    // Pre-initialize system singletons on the main thread before the React Native
+    // bridge starts. On iOS 26.x, first access from a background GCD thread
+    // throws NSException; React Native rethrows these as fatal in release builds.
+    _ = URLSession.shared
+    _ = UNUserNotificationCenter.current()
 `
 
-module.exports = function withIOS26ClassPrewarm(config) {
+module.exports = function withIOS26NativePrewarm(config) {
   return withAppDelegate(config, (config) => {
     if (config.modResults.language !== 'swift') {
-      // Objective-C AppDelegate (rare for Expo 55+) — skip
       return config
     }
 
@@ -42,22 +45,24 @@ module.exports = function withIOS26ClassPrewarm(config) {
       return config
     }
 
-    // Ensure ObjectiveC is imported so objc_copyClassList is available
-    if (!contents.includes('import ObjectiveC')) {
-      // Insert after the first import line
-      contents = contents.replace(/^(import .+)$/m, '$1\nimport ObjectiveC')
+    // Add UserNotifications import if not present
+    if (!contents.includes('import UserNotifications')) {
+      contents = contents.replace(/^(import .+)$/m, '$1\nimport UserNotifications')
     }
 
+    // Remove the old ObjectiveC import and objc_copyClassList block if present
+    // (previous incorrect fix — it added ~880ms startup delay for no benefit)
+    contents = contents.replace(/\n?import ObjectiveC\n?/g, '\n')
+    contents = contents.replace(/[ \t]*\/\/ \[withIOS26ClassPrewarm\][^\n]*\n([ \t][^\n]*\n)*/g, '')
+
     // Insert the pre-warm block as the very first statement inside
-    // application(_:didFinishLaunchingWithOptions:).
-    // Match the opening brace of the method regardless of exact signature
-    // formatting differences across Expo/RN template versions.
+    // application(_:didFinishLaunchingWithOptions:)
     const methodPattern = /(func application\b[^{]*didFinishLaunchingWithOptions[^{]*\{[ \t]*\n)/
     if (methodPattern.test(contents)) {
       contents = contents.replace(methodPattern, `$1${PREWARM_CODE}`)
     } else {
       console.warn(
-        '[withIOS26ClassPrewarm] Could not find didFinishLaunchingWithOptions in AppDelegate — skipping patch.'
+        '[withIOS26NativePrewarm] Could not find didFinishLaunchingWithOptions in AppDelegate — skipping patch.'
       )
     }
 
