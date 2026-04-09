@@ -13,14 +13,6 @@ import { useThemeStore } from '../store/theme'
 import { useBlockStore } from '../store/blocks'
 import SplashScreen from '../components/SplashScreen'
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-})
-
 // Map notification type to the route to navigate to
 function getRouteForNotification(data: Record<string, string>): string | null {
   const { type, post_id, actor_username } = data
@@ -80,29 +72,41 @@ function AppContent() {
     return () => clearTimeout(t)
   }, [isAuthenticated])
 
-  // Handle notification taps — deep link to the relevant screen
+  // Defer all notification native module setup past the HadesGC-sensitive
+  // startup window on iOS 26.3.1. setNotificationHandler was previously called
+  // at module level (during bundle execution), and the listener/lastResponse
+  // calls ran immediately on mount — any of these async native calls could
+  // trip the Hermes GC write barrier and crash before the app finishes loading.
   useEffect(() => {
-    // Handle tap when app is already open
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      const data = response.notification.request.content.data as Record<string, string>
-      const route = getRouteForNotification(data)
-      if (route) {
-        // Small delay to ensure navigation is ready
-        setTimeout(() => router.push(route as any), 300)
-      }
-    })
+    const t = setTimeout(() => {
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+        }),
+      })
 
-    // Handle tap when app was closed/backgrounded (last response)
-    Notifications.getLastNotificationResponseAsync().then(response => {
-      if (!response) return
-      const data = response.notification.request.content.data as Record<string, string>
-      const route = getRouteForNotification(data)
-      if (route) {
-        setTimeout(() => router.push(route as any), 500)
-      }
-    })
+      responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+        const data = response.notification.request.content.data as Record<string, string>
+        const route = getRouteForNotification(data)
+        if (route) {
+          setTimeout(() => router.push(route as any), 300)
+        }
+      })
+
+      Notifications.getLastNotificationResponseAsync().then(response => {
+        if (!response) return
+        const data = response.notification.request.content.data as Record<string, string>
+        const route = getRouteForNotification(data)
+        if (route) {
+          setTimeout(() => router.push(route as any), 500)
+        }
+      })
+    }, 1500)
 
     return () => {
+      clearTimeout(t)
       if (responseListener.current) {
         responseListener.current.remove()
       }
