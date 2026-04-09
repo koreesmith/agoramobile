@@ -41,6 +41,7 @@
       "bundler": "metro"
     },
     "plugins": [
+      "./plugins/withIOS26ClassPrewarm",
       "expo-router",
       "expo-secure-store",
       "expo-notifications"
