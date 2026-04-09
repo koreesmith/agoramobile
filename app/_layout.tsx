@@ -72,7 +72,12 @@ function AppContent() {
   }, [])
 
   useEffect(() => {
-    if (isAuthenticated) registerForPushNotifications()
+    if (!isAuthenticated) return
+    // Defer past the startup HadesGC crash window on iOS 26.3.1 — calling
+    // getExpoPushTokenAsync() immediately at startup generates a native ObjC
+    // exception that React Native cannot catch on the bridge queue.
+    const t = setTimeout(registerForPushNotifications, 1500)
+    return () => clearTimeout(t)
   }, [isAuthenticated])
 
   // Handle notification taps — deep link to the relevant screen
