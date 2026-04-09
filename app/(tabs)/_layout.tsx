@@ -29,8 +29,9 @@ export default function TabsLayout() {
   const unread: number = unreadData?.count ?? 0
 
   useEffect(() => {
-    Notifications.setBadgeCountAsync(unread)
-  }, [unread])
+    if (unread === 0 && !unreadData) return
+    Notifications.setBadgeCountAsync(unread).catch(() => {})
+  }, [unread, unreadData])
 
   return (
     <Tabs screenOptions={{
