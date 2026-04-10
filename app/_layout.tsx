@@ -83,7 +83,7 @@ function AppContent() {
         handleNotification: async () => ({
           shouldShowAlert: true,
           shouldPlaySound: true,
-          shouldSetBadge: true,
+          shouldSetBadge: false,
         }),
       })
 
@@ -153,7 +153,7 @@ async function registerForPushNotifications() {
   let finalStatus = existing
   if (existing !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync({
-      ios: { allowAlert: true, allowBadge: true, allowSound: true },
+      ios: { allowAlert: true, allowBadge: false, allowSound: true },
     })
     finalStatus = status
   }
