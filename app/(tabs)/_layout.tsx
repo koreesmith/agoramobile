@@ -1,8 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Tabs, router } from 'expo-router'
 import { Platform, useColorScheme } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useQuery } from '@tanstack/react-query'
+import * as Notifications from 'expo-notifications'
 import { useAuthStore } from '../../store/auth'
+import { notificationsApi } from '../../api'
 import { light, dark } from '../../constants/colors'
 import { useThemeStore } from '../../store/theme'
 
@@ -12,10 +15,29 @@ export default function TabsLayout() {
   const { preference } = useThemeStore()
   const isDark = preference === 'dark' || (preference === 'system' && systemScheme === 'dark')
   const c = isDark ? dark : light
+  const [notificationsReady, setNotificationsReady] = useState(false)
 
   useEffect(() => {
     if (!isAuthenticated) router.replace('/(auth)')
   }, [isAuthenticated])
+
+  useEffect(() => {
+    const t = setTimeout(() => setNotificationsReady(true), 1500)
+    return () => clearTimeout(t)
+  }, [])
+
+  const { data: unreadData } = useQuery({
+    queryKey: ['unread-count'],
+    queryFn: () => notificationsApi.unreadCount().then(r => r.data),
+    refetchInterval: 30_000,
+    enabled: isAuthenticated,
+  })
+  const unread: number = unreadData?.count ?? 0
+
+  useEffect(() => {
+    if (!notificationsReady || (unread === 0 && !unreadData)) return
+    Notifications.setBadgeCountAsync(unread).catch(() => {})
+  }, [unread, unreadData, notificationsReady])
 
   return (
     <Tabs screenOptions={{
