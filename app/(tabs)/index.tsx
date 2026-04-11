@@ -63,6 +63,8 @@ export default function FeedScreen() {
   const [friendListId, setFriendListId] = useState('')
   const [showVisibilitySheet, setShowVisibilitySheet] = useState(false)
   const [showListSheet, setShowListSheet] = useState(false)
+  const [linkPreview, setLinkPreview] = useState<{url:string,title:string,description:string,image:string,domain:string}|null>(null)
+  const [linkFetching, setLinkFetching] = useState(false)
 
   const { data: groupsData } = useQuery({
     queryKey: ['friend-lists'],
@@ -78,29 +80,41 @@ export default function FeedScreen() {
     setShowPoll(false); setPollOptions(['', '']); setPollMultiple(false)
     setPollAllowsNew(false); setPollExpiresHours(24)
     setVisibility('friends'); setFriendListId('')
+    setLinkPreview(null); setLinkFetching(false)
     setShowCompose(false)
   }
 
-  // Auto-detect GIF URLs pasted into content
+  // Auto-detect URLs pasted into content: GIFs become inline images, others become link preview cards
   useEffect(() => {
     if (imageUrl) return
     const match = content.match(URL_RE)
     if (!match) return
     const url = match[0].replace(/[.,!?)]+$/, '')
-    if (!isGifUrl(url)) return
 
-    // Call preview API to resolve share URLs (tenor.com/xPpM.gif) to direct media URLs
+    if (isGifUrl(url)) {
+      // Call preview API to resolve share URLs (tenor.com/xPpM.gif) to direct media URLs
+      feedApi.previewUrl(url).then(res => {
+        const preview = res.data
+        const resolvedUrl = preview?.image || url
+        setImageUrl(resolvedUrl)
+        setContent(c => c.replace(url, '').trim())
+      }).catch(() => {
+        setImageUrl(url)
+        setContent(c => c.replace(url, '').trim())
+      })
+      return
+    }
+
+    // Non-GIF URL: fetch link preview (skip if we already have one for this URL)
+    if (linkPreview?.url === url) return
+    setLinkPreview(null)
+    setLinkFetching(true)
     feedApi.previewUrl(url).then(res => {
       const preview = res.data
-      // If preview returns a direct image URL (for GIFs), use that
-      const resolvedUrl = preview?.image || url
-      setImageUrl(resolvedUrl)
-      setContent(c => c.replace(url, '').trim())
+      if (preview?.url) setLinkPreview(preview)
     }).catch(() => {
-      // Fallback: use the URL as-is
-      setImageUrl(url)
-      setContent(c => c.replace(url, '').trim())
-    })
+      // No preview available — silently ignore
+    }).finally(() => setLinkFetching(false))
   }, [content])
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch, isRefetching } = useInfiniteQuery({
@@ -124,6 +138,11 @@ export default function FeedScreen() {
       poll_multiple_choice: showPoll ? pollMultiple : false,
       poll_allows_new_options: showPoll ? pollAllowsNew : false,
       poll_expires_hours: showPoll ? pollExpiresHours : 0,
+      link_url: linkPreview?.url ?? '',
+      link_title: linkPreview?.title ?? '',
+      link_description: linkPreview?.description ?? '',
+      link_image: linkPreview?.image ?? '',
+      link_domain: linkPreview?.domain ?? '',
     }),
     onSuccess: () => { resetCompose(); qc.invalidateQueries({ queryKey: ['feed'] }) },
     onError: () => Alert.alert('Error', 'Could not create post'),
@@ -373,6 +392,28 @@ export default function FeedScreen() {
                 </TouchableOpacity>
               </View>
             ) : null}
+
+            {!showPoll && !imageUrl && linkFetching && (
+              <View style={[s.linkPreviewCard, { borderColor: c.border, backgroundColor: c.bg }]}>
+                <ActivityIndicator size="small" color={c.primary} />
+              </View>
+            )}
+
+            {!showPoll && !imageUrl && linkPreview && (
+              <View style={[s.linkPreviewCard, { borderColor: c.border, backgroundColor: c.bg }]}>
+                {linkPreview.image ? (
+                  <Image source={{ uri: linkPreview.image }} style={s.linkPreviewImage} contentFit="cover" />
+                ) : null}
+                <View style={s.linkPreviewBody}>
+                  {linkPreview.domain ? <Text style={[s.linkPreviewDomain, { color: c.textMuted }]}>{linkPreview.domain}</Text> : null}
+                  {linkPreview.title ? <Text style={[s.linkPreviewTitle, { color: c.text }]} numberOfLines={2}>{linkPreview.title}</Text> : null}
+                  {linkPreview.description ? <Text style={[s.linkPreviewDesc, { color: c.textMuted }]} numberOfLines={2}>{linkPreview.description}</Text> : null}
+                </View>
+                <TouchableOpacity onPress={() => setLinkPreview(null)} style={s.removeImage}>
+                  <Ionicons name="close" size={14} color="white" />
+                </TouchableOpacity>
+              </View>
+            )}
           </ScrollView>
           </KeyboardAvoidingView>
 
@@ -422,6 +463,12 @@ const s = StyleSheet.create({
   pollAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, marginBottom: 4 },
   pollSettings: { borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
   durationBtn: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  linkPreviewCard: { marginTop: 12, borderWidth: 1, borderRadius: 12, overflow: 'hidden', minHeight: 48, justifyContent: 'center' },
+  linkPreviewImage: { width: '100%', height: 160 },
+  linkPreviewBody: { padding: 10, gap: 2 },
+  linkPreviewDomain: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 },
+  linkPreviewTitle: { fontSize: 14, fontWeight: '600' },
+  linkPreviewDesc: { fontSize: 12 },
   audienceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 1 },
   audienceLabel: { fontSize: 13, fontWeight: '600' },
   inlinePicker: { borderBottomWidth: 1 },
