@@ -46,7 +46,26 @@ export default function NotificationsScreen() {
     refetchInterval: 30_000,
   })
   const invalidateNotifs = () => { qc.invalidateQueries({ queryKey: ['notifications'] }); qc.invalidateQueries({ queryKey: ['unread-count'] }) }
-  const markAll = useMutation({ mutationFn: () => notificationsApi.markAllRead(), onSuccess: invalidateNotifs })
+  const markAll = useMutation({
+    mutationFn: () => notificationsApi.markAllRead(),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ['notifications'] })
+      await qc.cancelQueries({ queryKey: ['unread-count'] })
+      const prevNotifs = qc.getQueryData(['notifications'])
+      const prevUnread = qc.getQueryData(['unread-count'])
+      qc.setQueryData(['notifications'], (old: any) => ({
+        ...old,
+        notifications: old?.notifications?.map((n: any) => ({ ...n, read: true })) || [],
+      }))
+      qc.setQueryData(['unread-count'], { count: 0 })
+      return { prevNotifs, prevUnread }
+    },
+    onError: (_err: any, _vars: any, ctx: any) => {
+      if (ctx?.prevNotifs) qc.setQueryData(['notifications'], ctx.prevNotifs)
+      if (ctx?.prevUnread) qc.setQueryData(['unread-count'], ctx.prevUnread)
+    },
+    onSettled: invalidateNotifs,
+  })
   const accept = useMutation({ mutationFn: (id: string) => friendsApi.acceptRequest(id), onSuccess: invalidateNotifs })
   const decline = useMutation({ mutationFn: (id: string) => friendsApi.declineRequest(id), onSuccess: invalidateNotifs })
 
@@ -54,8 +73,16 @@ export default function NotificationsScreen() {
   const hasUnread = notifs.some((n: any) => !n.read)
 
   const handlePress = (n: any) => {
-    notificationsApi.markRead(n.id)
-    invalidateNotifs()
+    if (!n.read) {
+      qc.setQueryData(['notifications'], (old: any) => ({
+        ...old,
+        notifications: old?.notifications?.map((item: any) =>
+          item.id === n.id ? { ...item, read: true } : item
+        ) || [],
+      }))
+      qc.setQueryData(['unread-count'], (old: any) => ({ count: Math.max(0, (old?.count ?? 1) - 1) }))
+      notificationsApi.markRead(n.id).then(invalidateNotifs)
+    }
     if (n.type === 'friend_request' || n.type === 'friend_accepted') {
       if (n.actor_username) router.push(`/profile/${n.actor_username}`)
     } else if (n.type === 'waitlist_signup') {
