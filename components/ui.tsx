@@ -1,5 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { Image } from 'expo-image'
+import { useRouter } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
 import { imgUrl } from '../api'
@@ -22,11 +24,17 @@ export function Screen({ children }: { children: React.ReactNode }) {
   return <View style={[lay.screen, { backgroundColor: c.bg }]}>{children}</View>
 }
 
-export function Header({ title, right }: { title: string; right?: React.ReactNode }) {
+export function Header({ title, right, back }: { title: string; right?: React.ReactNode; back?: boolean }) {
   const c = useC()
+  const router = useRouter()
   return (
     <View style={[lay.header, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-      <Text style={[lay.headerTitle, { color: c.text }]}>{title}</Text>
+      {back
+        ? <TouchableOpacity onPress={() => router.back()} style={lay.headerBack}>
+            <Ionicons name="chevron-back" size={24} color={c.primary} />
+          </TouchableOpacity>
+        : null}
+      <Text style={[lay.headerTitle, { color: c.text, flex: back ? 1 : undefined }]}>{title}</Text>
       {right && <View>{right}</View>}
     </View>
   )
@@ -79,6 +87,7 @@ const lay = StyleSheet.create({
   screen: { flex: 1 },
   header: { borderBottomWidth: 1, paddingHorizontal: 16, paddingTop: 56, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  headerBack: { marginRight: 8, marginLeft: -4 },
   card: { borderRadius: 16, marginHorizontal: 12, marginVertical: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
   button: { borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   buttonText: { fontWeight: '600', fontSize: 15 },
