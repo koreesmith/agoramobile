@@ -142,7 +142,7 @@ export default function ManageFeedsScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ headerShown: false }} />
-      <Header title="Manage Feeds" />
+      <Header title="Manage Feeds" back />
 
       {isLoading ? <Spinner /> : (
         <FlatList
