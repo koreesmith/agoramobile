@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../utils/image'
-import { Screen, Avatar } from '../components/ui'
+import { Screen, Avatar, UploadingModal } from '../components/ui'
 import { usersApi, notificationsApi, feedApi, imgUrl } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
@@ -52,6 +52,7 @@ export default function EditProfileScreen() {
   const [coverUrl, setCoverUrl] = useState((user as any)?.cover_url || '')
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
 
   // Email notification prefs
   const { data: emailPrefs } = useQuery({
@@ -91,6 +92,7 @@ export default function EditProfileScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8, allowsEditing: true, aspect: [1, 1] })
     if (result.canceled) return
     setUploadingAvatar(true)
+    const slowTimer = setTimeout(() => setShowUploadModal(true), 1000)
     try {
       const uri = await normalizeImageOrientation(result.assets[0].uri)
       const file = { uri, type: 'image/jpeg', name: 'avatar.jpg' } as any
@@ -98,13 +100,14 @@ export default function EditProfileScreen() {
       setAvatarUrl(res.data.avatar_url)
       updateUser({ avatar_url: res.data.avatar_url })
     } catch { Alert.alert('Upload failed') }
-    finally { setUploadingAvatar(false) }
+    finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploadingAvatar(false) }
   }
 
   const pickCover = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 })
     if (result.canceled) return
     setUploadingCover(true)
+    const slowTimer = setTimeout(() => setShowUploadModal(true), 1000)
     try {
       const uri = await normalizeImageOrientation(result.assets[0].uri)
       const file = { uri, type: 'image/jpeg', name: 'cover.jpg' } as any
@@ -113,7 +116,7 @@ export default function EditProfileScreen() {
       setCoverUrl(res.data.url)
       updateUser({ cover_url: res.data.url } as any)
     } catch { Alert.alert('Upload failed') }
-    finally { setUploadingCover(false) }
+    finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploadingCover(false) }
   }
 
   // Stable handlers — won't cause Field to re-render unnecessarily
@@ -125,6 +128,7 @@ export default function EditProfileScreen() {
 
   return (
     <Screen>
+      <UploadingModal visible={showUploadModal} />
       <Stack.Screen options={{
         headerShown: true, headerTitle: 'Edit Profile', headerBackTitle: 'Back',
         headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
