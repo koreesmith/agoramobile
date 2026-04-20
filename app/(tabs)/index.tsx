@@ -187,7 +187,6 @@ export default function FeedScreen() {
 
   return (
     <Screen>
-      <UploadingModal visible={showUploadModal} />
       <Header title="Feed" right={
         <TouchableOpacity onPress={() => setShowCompose(true)} style={s.postBtn}>
           <Text style={s.postBtnText}>Post</Text>
@@ -250,6 +249,7 @@ export default function FeedScreen() {
 
       <Modal visible={showCompose} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: c.card }}>
+          <UploadingModal visible={showUploadModal} />
           <KeyboardAvoidingView
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
