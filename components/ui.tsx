@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Modal } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -78,16 +78,15 @@ export function Spinner() {
 
 export function UploadingModal({ visible }: { visible: boolean }) {
   const c = useC()
+  if (!visible) return null
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={lay.uploadOverlay}>
-        <View style={[lay.uploadBox, { backgroundColor: c.card }]}>
-          <ActivityIndicator color={c.primary} size="large" style={{ marginBottom: 12 }} />
-          <Text style={[lay.uploadBoxTitle, { color: c.text }]}>Uploading Photos</Text>
-          <Text style={[lay.uploadBoxSub, { color: c.textLight }]}>Please wait a moment while your photos are processed.</Text>
-        </View>
+    <View style={lay.uploadOverlay}>
+      <View style={[lay.uploadBox, { backgroundColor: c.card }]}>
+        <ActivityIndicator color={c.primary} size="large" style={{ marginBottom: 12 }} />
+        <Text style={[lay.uploadBoxTitle, { color: c.text }]}>Uploading Photos</Text>
+        <Text style={[lay.uploadBoxSub, { color: c.textLight }]}>Please wait a moment while your photos are processed.</Text>
       </View>
-    </Modal>
+    </View>
   )
 }
 
@@ -111,7 +110,7 @@ const lay = StyleSheet.create({
   emptySubtitle: { textAlign: 'center', marginTop: 4, fontSize: 14 },
   spinner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   divider: { height: 1, marginHorizontal: 16 },
-  uploadOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  uploadOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },
   uploadBox: { borderRadius: 16, padding: 28, alignItems: 'center', marginHorizontal: 40, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 },
   uploadBoxTitle: { fontSize: 17, fontWeight: '600', marginBottom: 6 },
   uploadBoxSub: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
