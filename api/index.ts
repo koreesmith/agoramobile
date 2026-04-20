@@ -118,6 +118,7 @@ export const notificationsApi = {
   list:            ()                   => api.get('/notifications'),
   unreadCount:     ()                   => api.get('/notifications/unread-count'),
   markRead:        (id: string)         => api.post(`/notifications/${id}/read`),
+  markManyRead:    (ids: string[])      => api.post('/notifications/read-many', { ids }),
   markAllRead:     ()                   => api.post('/notifications/read-all'),
   getEmailPrefs:   ()                   => api.get('/notifications/email-preferences'),
   updateEmailPrefs:(enabled: boolean)   => api.put('/notifications/email-preferences', { email_notifications_enabled: enabled }),
