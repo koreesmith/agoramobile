@@ -12,7 +12,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Header, Spinner, EmptyState } from '../../components/ui'
 import PostCard from '../../components/PostCard'
-import { feedApi, friendsApi, instanceApi, imgUrl } from '../../api'
+import { feedApi, feedsApi, friendsApi, instanceApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
 
@@ -65,6 +65,13 @@ export default function FeedScreen() {
   const [showListSheet, setShowListSheet] = useState(false)
   const [linkPreview, setLinkPreview] = useState<{url:string,title:string,description:string,image:string,domain:string}|null>(null)
   const [linkFetching, setLinkFetching] = useState(false)
+  const [activeFeedId, setActiveFeedId] = useState<string | null>(null)
+
+  const { data: customFeedsData } = useQuery({
+    queryKey: ['custom-feeds'],
+    queryFn: () => feedsApi.list().then(r => r.data),
+  })
+  const customFeeds: any[] = customFeedsData?.feeds || []
 
   const { data: groupsData } = useQuery({
     queryKey: ['friend-lists'],
@@ -118,8 +125,8 @@ export default function FeedScreen() {
   }, [content])
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch, isRefetching } = useInfiniteQuery({
-    queryKey: ['feed'],
-    queryFn: ({ pageParam = 0 }) => feedApi.getFeed(pageParam).then(r => r.data),
+    queryKey: ['feed', activeFeedId],
+    queryFn: ({ pageParam = 0 }) => feedApi.getFeed(pageParam, activeFeedId ?? undefined).then(r => r.data),
     getNextPageParam: (last, pages) => last.posts?.length === 20 ? pages.length * 20 : undefined,
     initialPageParam: 0,
   })
@@ -169,12 +176,39 @@ export default function FeedScreen() {
         </TouchableOpacity>
       } />
 
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[s.switcher, { borderBottomColor: c.border }]}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: 'center' }}
+      >
+        <TouchableOpacity
+          onPress={() => setActiveFeedId(null)}
+          style={[s.feedTab, { borderColor: c.border }, activeFeedId === null && { backgroundColor: c.primary, borderColor: c.primary }]}
+        >
+          <Text style={[s.feedTabText, { color: activeFeedId === null ? 'white' : c.textMuted }]}>Home</Text>
+        </TouchableOpacity>
+        {customFeeds.map((feed: any) => (
+          <TouchableOpacity
+            key={feed.id}
+            onPress={() => setActiveFeedId(feed.id)}
+            style={[s.feedTab, { borderColor: c.border }, activeFeedId === feed.id && { backgroundColor: c.primary, borderColor: c.primary }]}
+          >
+            <Text style={[s.feedTabText, { color: activeFeedId === feed.id ? 'white' : c.textMuted }]}>{feed.name}</Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity onPress={() => router.push('/manage-feeds')} style={[s.feedTab, { borderColor: c.border }]}>
+          <Ionicons name="options-outline" size={14} color={c.textMuted} />
+          <Text style={[s.feedTabText, { color: c.textMuted }]}>Manage</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
       <View style={{ flex: 1 }}>
         {isLoading ? <Spinner /> : (
           <FlatList
             data={posts}
             keyExtractor={p => p.id}
-            renderItem={({ item }) => <PostCard post={item} queryKey={['feed']} />}
+            renderItem={({ item }) => <PostCard post={item} queryKey={['feed', activeFeedId]} />}
             contentContainerStyle={{ paddingVertical: 8, paddingBottom: invitesEnabled ? 88 : 8 }}
             refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={c.primary} />}
             onEndReached={() => hasNextPage && fetchNextPage()}
@@ -424,6 +458,9 @@ export default function FeedScreen() {
 }
 
 const s = StyleSheet.create({
+  switcher: { flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth },
+  feedTab: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  feedTabText: { fontSize: 13, fontWeight: '500' },
   postBtn: { backgroundColor: '#486581', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
   postBtnText: { color: 'white', fontWeight: '600', fontSize: 14 },
   fab: {
