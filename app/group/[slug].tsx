@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, FlatList, TouchableOpacity, TextInput, RefreshControl, Image, ActivityIndicator, Alert, StyleSheet } from 'react-native'
+import { View, Text, FlatList, TouchableOpacity, TextInput, RefreshControl, Image, ActivityIndicator, Alert, StyleSheet, ScrollView, Dimensions } from 'react-native'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useQuery, useMutation, useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -18,11 +18,12 @@ export default function GroupScreen() {
   const { user } = useAuthStore()
   const qc = useQueryClient()
   const [content, setContent] = useState('')
-  const [imageUrl, setImageUrl] = useState('')
+  const [imageUrls, setImageUrls] = useState<string[]>([])
   const [showCW, setShowCW] = useState(false)
   const [cwLabel, setCwLabel] = useState('')
+  const MAX_IMAGES = 4
 
-  const resetCompose = () => { setContent(''); setImageUrl(''); setShowCW(false); setCwLabel(''); setShowCompose(false) }
+  const resetCompose = () => { setContent(''); setImageUrls([]); setShowCW(false); setCwLabel(''); setShowCompose(false) }
   const [uploading, setUploading] = useState(false)
   const [showCompose, setShowCompose] = useState(false)
 
@@ -42,21 +43,33 @@ export default function GroupScreen() {
   const createPost = useMutation({
     mutationFn: () => groupsApi.createPost(slug!, {
       content,
-      image_url: imageUrl,
+      image_url: imageUrls[0] || '',
+      image_urls: imageUrls,
       content_warning: showCW && cwLabel.trim() ? cwLabel.trim() : '',
     }),
     onSuccess: () => { resetCompose(); qc.invalidateQueries({ queryKey: ['group-feed', slug] }) },
   })
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 })
+    const remaining = MAX_IMAGES - imageUrls.length
+    if (remaining <= 0) return
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+    })
     if (result.canceled) return
     setUploading(true)
     try {
-      const uri = await normalizeImageOrientation(result.assets[0].uri)
-      const file = { uri, type: 'image/jpeg', name: 'photo.jpg' } as any
-      const res = await feedApi.uploadMedia(file, 'posts')
-      setImageUrl(res.data.url)
+      const uploaded: string[] = []
+      for (const asset of result.assets) {
+        const uri = await normalizeImageOrientation(asset.uri)
+        const file = { uri, type: 'image/jpeg', name: 'photo.jpg' } as any
+        const res = await feedApi.uploadMedia(file, 'posts')
+        uploaded.push(res.data.url)
+      }
+      setImageUrls(prev => [...prev, ...uploaded].slice(0, MAX_IMAGES))
     } catch { Alert.alert('Upload failed') }
     finally { setUploading(false) }
   }
@@ -118,18 +131,39 @@ export default function GroupScreen() {
                     )}
                     <TextInput style={s.composeInput} placeholder={`Post to ${group.name}…`} placeholderTextColor={c.textLight}
                       value={content} onChangeText={setContent} multiline autoFocus={!showCW} />
-                    {imageUrl ? (
-                      <View>
-                        <Image source={{ uri: imageUrl }} style={{ height: 120, borderRadius: 8, width: '100%' }} resizeMode="cover" />
-                        <TouchableOpacity onPress={() => setImageUrl('')} style={s.removeImg}>
-                          <Ionicons name="close" size={12} color="white" />
-                        </TouchableOpacity>
-                      </View>
+                    {imageUrls.length > 0 ? (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={{ marginBottom: 8 }}
+                        contentContainerStyle={{ gap: 6 }}
+                      >
+                        {imageUrls.map((url, i) => (
+                          <View key={i} style={{ position: 'relative' }}>
+                            <Image
+                              source={{ uri: url }}
+                              style={[{ height: 100, borderRadius: 8 }, imageUrls.length > 1 ? { width: Dimensions.get('window').width * 0.45 } : { width: '100%' }]}
+                              resizeMode="cover"
+                            />
+                            <TouchableOpacity
+                              onPress={() => setImageUrls(prev => prev.filter((_, j) => j !== i))}
+                              style={s.removeImg}
+                            >
+                              <Ionicons name="close" size={12} color="white" />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </ScrollView>
                     ) : null}
                     <View style={s.composeActions}>
                       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                        <TouchableOpacity onPress={pickImage} disabled={uploading}>
-                          {uploading ? <ActivityIndicator size="small" color={c.primary} /> : <Ionicons name="image-outline" size={20} color={c.primary} />}
+                        <TouchableOpacity onPress={pickImage} disabled={uploading || imageUrls.length >= MAX_IMAGES}>
+                          {uploading
+                            ? <ActivityIndicator size="small" color={c.primary} />
+                            : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                                <Ionicons name="image-outline" size={20} color={imageUrls.length >= MAX_IMAGES ? c.border : c.primary} />
+                                {imageUrls.length > 0 && <Text style={{ fontSize: 11, color: c.primary, fontWeight: '600' }}>{imageUrls.length}/{MAX_IMAGES}</Text>}
+                              </View>}
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setShowCW(v => !v)}
                           style={{ borderWidth: 1, borderColor: showCW ? '#fcd34d' : c.border, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: showCW ? '#fef3c7' : 'transparent' }}>
@@ -140,7 +174,7 @@ export default function GroupScreen() {
                         <TouchableOpacity onPress={resetCompose} style={s.cancelBtn}>
                           <Text style={s.cancelBtnText}>Cancel</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => createPost.mutate()} disabled={(!content.trim() && !imageUrl) || createPost.isPending} style={[s.postBtn, (!content.trim() && !imageUrl) && { backgroundColor: c.primaryLt }]}>
+                        <TouchableOpacity onPress={() => createPost.mutate()} disabled={(!content.trim() && imageUrls.length === 0) || createPost.isPending} style={[s.postBtn, (!content.trim() && imageUrls.length === 0) && { backgroundColor: c.primaryLt }]}>
                           <Text style={s.postBtnText}>{createPost.isPending ? '…' : 'Post'}</Text>
                         </TouchableOpacity>
                       </View>

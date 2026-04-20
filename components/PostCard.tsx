@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, Dimensions, Linking, TextInput, PanResponder } from 'react-native'
+import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, Dimensions, Linking, TextInput, PanResponder, ScrollView } from 'react-native'
 import { Image } from 'expo-image'
 import ZoomableImage from './ZoomableImage'
 import { router } from 'expo-router'
@@ -303,23 +303,32 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const username = post.repost_of_id ? post.repost_author_username    : (post.author_username || post.username)
   const avatar   = imgUrl(post.repost_of_id ? post.repost_author_avatar_url  : (post.author_avatar_url || post.avatar_url))
   const content  = post.repost_of_id ? post.repost_content            : post.content
-  const imageUrl = imgUrl(post.repost_of_id ? post.repost_image_url   : post.image_url)
   const linkImage = imgUrl(post.link_image)
 
+  // Normalize image URLs: prefer image_urls array, fall back to single image_url
+  const rawImageUrls: string[] = post.repost_of_id
+    ? (post.repost_image_urls?.length ? post.repost_image_urls : post.repost_image_url ? [post.repost_image_url] : [])
+    : (post.image_urls?.length ? post.image_urls : post.image_url ? [post.image_url] : [])
+  const postImageUrls = rawImageUrls.map((u: string) => imgUrl(u)).filter(Boolean) as string[]
+  const imageUrl = postImageUrls[0]
+
+  const [lightboxIndex, setLightboxIndex] = useState(0)
   const [showLightbox, setShowLightbox] = useState(false)
   const screenWidth = Dimensions.get('window').width
   const screenHeight = Dimensions.get('window').height
 
-  const saveImageToLibrary = async () => {
+  const openLightbox = (index: number) => { setLightboxIndex(index); setShowLightbox(true) }
+
+  const saveImageToLibrary = async (url: string) => {
     const { status } = await MediaLibrary.requestPermissionsAsync()
     if (status !== 'granted') {
       Alert.alert('Permission required', 'Please allow access to your photo library to save images.')
       return
     }
     try {
-      const filename = imageUrl.split('/').pop() || 'image.jpg'
+      const filename = url.split('/').pop() || 'image.jpg'
       const localUri = FileSystem.cacheDirectory + filename
-      await FileSystem.downloadAsync(imageUrl, localUri)
+      await FileSystem.downloadAsync(url, localUri)
       await MediaLibrary.saveToLibraryAsync(localUri)
       Alert.alert('Saved', 'Image saved to your photo library.')
     } catch {
@@ -328,9 +337,10 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   }
 
   const onLightboxLongPress = () => {
+    const url = postImageUrls[lightboxIndex]
     Alert.alert('Save image', 'Save this image to your photo library?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Save', onPress: saveImageToLibrary },
+      { text: 'Save', onPress: () => saveImageToLibrary(url) },
     ])
   }
   const reactionCounts: Record<string, number> = post.reaction_counts || {}
@@ -417,20 +427,53 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
           </TouchableOpacity>
         ) : null}
 
-        {(!post.content_warning || twExpanded) && imageUrl ? (
+        {(!post.content_warning || twExpanded) && postImageUrls.length > 0 ? (
           <View style={s.imageWrapper}>
-            <TouchableOpacity onPress={() => setShowLightbox(true)} activeOpacity={0.9}>
-              <Image source={{ uri: imageUrl }} style={s.image} contentFit="cover" />
-            </TouchableOpacity>
+            {postImageUrls.length === 1 ? (
+              <TouchableOpacity onPress={() => openLightbox(0)} activeOpacity={0.9}>
+                <Image source={{ uri: postImageUrls[0] }} style={s.image} contentFit="cover" />
+              </TouchableOpacity>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 2 }}
+              >
+                {postImageUrls.map((url, i) => (
+                  <TouchableOpacity key={i} onPress={() => openLightbox(i)} activeOpacity={0.9}>
+                    <Image source={{ uri: url }} style={s.imageMulti} contentFit="cover" />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
             <Modal visible={showLightbox} transparent animationType="fade" onRequestClose={() => setShowLightbox(false)}>
               <View style={s.lightboxBg}>
                 <ZoomableImage
-                  uri={imageUrl}
+                  uri={postImageUrls[lightboxIndex]}
                   width={screenWidth}
                   height={screenHeight * 0.8}
                   onClose={() => setShowLightbox(false)}
                   onLongPress={onLightboxLongPress}
                 />
+                {postImageUrls.length > 1 && (
+                  <View style={s.lightboxNav}>
+                    <TouchableOpacity
+                      onPress={() => setLightboxIndex(i => Math.max(0, i - 1))}
+                      disabled={lightboxIndex === 0}
+                      style={[s.lightboxNavBtn, lightboxIndex === 0 && { opacity: 0.3 }]}
+                    >
+                      <Text style={s.lightboxNavText}>‹</Text>
+                    </TouchableOpacity>
+                    <Text style={s.lightboxCounter}>{lightboxIndex + 1} / {postImageUrls.length}</Text>
+                    <TouchableOpacity
+                      onPress={() => setLightboxIndex(i => Math.min(postImageUrls.length - 1, i + 1))}
+                      disabled={lightboxIndex === postImageUrls.length - 1}
+                      style={[s.lightboxNavBtn, lightboxIndex === postImageUrls.length - 1 && { opacity: 0.3 }]}
+                    >
+                      <Text style={s.lightboxNavText}>›</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
                 <Text style={s.lightboxClose}>✕ tap to close · pinch to zoom · hold to save</Text>
               </View>
             </Modal>
@@ -704,7 +747,11 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 <Text style={{ color: c.textMuted, fontWeight: '400' }}> @{post.author_username}</Text>
               </Text>
               {post.content ? <Text style={[s.sharePreviewContent, { color: c.textMd }]} numberOfLines={3}>{post.content}</Text> : null}
-              {post.image_url ? <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 4 }}>📷 Photo</Text> : null}
+              {(post.image_urls?.length > 1 ? true : post.image_url) ? (
+                <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 4 }}>
+                  📷 {post.image_urls?.length > 1 ? `${post.image_urls.length} photos` : 'Photo'}
+                </Text>
+              ) : null}
             </View>
             <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 8 }}>
               This will be shared with your friends.
@@ -765,6 +812,11 @@ const s = StyleSheet.create({
   content: { fontSize: 14, lineHeight: 21, marginBottom: 8 },
   imageWrapper: { marginHorizontal: -14, marginVertical: 8 },
   image: { width: '100%', aspectRatio: 1 },
+  imageMulti: { width: Dimensions.get('window').width * 0.72, aspectRatio: 1 },
+  lightboxNav: { flexDirection: 'row', alignItems: 'center', gap: 24, marginTop: 12 },
+  lightboxNavBtn: { padding: 8 },
+  lightboxNavText: { color: 'white', fontSize: 36, lineHeight: 40 },
+  lightboxCounter: { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
   linkPreview: { marginTop: 8, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
   linkDomain: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3 },
   linkTitle: { fontSize: 13, fontWeight: '600', marginTop: 2 },
