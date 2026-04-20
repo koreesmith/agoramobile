@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
-import { Screen, Header, Spinner, EmptyState } from '../../components/ui'
+import { Screen, Header, Spinner, EmptyState, UploadingModal } from '../../components/ui'
 import PostCard from '../../components/PostCard'
 import { feedApi, feedsApi, friendsApi, instanceApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
@@ -52,6 +52,7 @@ export default function FeedScreen() {
   const [content, setContent] = useState('')
   const [imageUrls, setImageUrls] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
   const [showCW, setShowCW] = useState(false)
   const [cwLabel, setCwLabel] = useState('')
   const [showPoll, setShowPoll] = useState(false)
@@ -170,6 +171,7 @@ export default function FeedScreen() {
     })
     if (result.canceled) return
     setUploading(true)
+    const slowTimer = setTimeout(() => setShowUploadModal(true), 1000)
     try {
       const uploaded: string[] = []
       for (const asset of result.assets) {
@@ -180,11 +182,12 @@ export default function FeedScreen() {
       }
       setImageUrls(prev => [...prev, ...uploaded].slice(0, MAX_IMAGES))
     } catch { Alert.alert('Upload failed') }
-    finally { setUploading(false) }
+    finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploading(false) }
   }
 
   return (
     <Screen>
+      <UploadingModal visible={showUploadModal} />
       <Header title="Feed" right={
         <TouchableOpacity onPress={() => setShowCompose(true)} style={s.postBtn}>
           <Text style={s.postBtnText}>Post</Text>

@@ -5,7 +5,7 @@ import { useQuery, useMutation, useInfiniteQuery, useQueryClient } from '@tansta
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
-import { Screen, Spinner, Avatar } from '../../components/ui'
+import { Screen, Spinner, Avatar, UploadingModal } from '../../components/ui'
 import PostCard from '../../components/PostCard'
 import { groupsApi, feedApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
@@ -25,6 +25,7 @@ export default function GroupScreen() {
 
   const resetCompose = () => { setContent(''); setImageUrls([]); setShowCW(false); setCwLabel(''); setShowCompose(false) }
   const [uploading, setUploading] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
   const [showCompose, setShowCompose] = useState(false)
 
   const { data: groupData, isLoading: gl, refetch: rg } = useQuery({ queryKey: ['group', slug], queryFn: () => groupsApi.get(slug!).then(r => r.data) })
@@ -61,6 +62,7 @@ export default function GroupScreen() {
     })
     if (result.canceled) return
     setUploading(true)
+    const slowTimer = setTimeout(() => setShowUploadModal(true), 1000)
     try {
       const uploaded: string[] = []
       for (const asset of result.assets) {
@@ -71,13 +73,14 @@ export default function GroupScreen() {
       }
       setImageUrls(prev => [...prev, ...uploaded].slice(0, MAX_IMAGES))
     } catch { Alert.alert('Upload failed') }
-    finally { setUploading(false) }
+    finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploading(false) }
   }
 
   if (gl || !group) return <Screen><Stack.Screen options={{ headerShown: true, headerTitle: 'Group', headerTintColor: c.primary }} /><Spinner /></Screen>
 
   return (
     <Screen>
+      <UploadingModal visible={showUploadModal} />
       <Stack.Screen options={{
         headerShown: true, headerTitle: group.name, headerBackTitle: 'Groups',
         headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
