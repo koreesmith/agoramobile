@@ -2,7 +2,7 @@
   "expo": {
     "name": "Agora",
     "slug": "agoramobile",
-    "version": "1.0.2",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
