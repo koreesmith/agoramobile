@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { Stack, router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { useColorScheme, StyleSheet, View } from 'react-native'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useColorScheme, StyleSheet, View, AppState, AppStateStatus } from 'react-native'
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
@@ -45,6 +45,10 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 1, staleTime: 30_000 },
   },
+})
+
+AppState.addEventListener('change', (status: AppStateStatus) => {
+  focusManager.setFocused(status === 'active')
 })
 
 function AppContent() {
