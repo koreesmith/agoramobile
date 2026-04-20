@@ -305,10 +305,10 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const content  = post.repost_of_id ? post.repost_content            : post.content
   const linkImage = imgUrl(post.link_image)
 
-  // Normalize image URLs: prefer image_urls array, fall back to single image_url
+  // Normalize image URLs: prefer photo_urls array (AGORA-93), fall back to single image_url
   const rawImageUrls: string[] = post.repost_of_id
-    ? (post.repost_image_urls?.length ? post.repost_image_urls : post.repost_image_url ? [post.repost_image_url] : [])
-    : (post.image_urls?.length ? post.image_urls : post.image_url ? [post.image_url] : [])
+    ? (post.repost_image_url ? [post.repost_image_url] : [])
+    : (post.photo_urls?.length ? post.photo_urls : post.image_url ? [post.image_url] : [])
   const postImageUrls = rawImageUrls.map((u: string) => imgUrl(u)).filter(Boolean) as string[]
   const imageUrl = postImageUrls[0]
 
@@ -747,9 +747,9 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 <Text style={{ color: c.textMuted, fontWeight: '400' }}> @{post.author_username}</Text>
               </Text>
               {post.content ? <Text style={[s.sharePreviewContent, { color: c.textMd }]} numberOfLines={3}>{post.content}</Text> : null}
-              {(post.image_urls?.length > 1 ? true : post.image_url) ? (
+              {(post.photo_urls?.length > 1 ? true : post.image_url) ? (
                 <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 4 }}>
-                  📷 {post.image_urls?.length > 1 ? `${post.image_urls.length} photos` : 'Photo'}
+                  📷 {post.photo_urls?.length > 1 ? `${post.photo_urls.length} photos` : 'Photo'}
                 </Text>
               ) : null}
             </View>
