@@ -48,8 +48,17 @@ export const authApi = {
 }
 
 // ── Feed ──────────────────────────────────────────────────────────────────────
+export const feedsApi = {
+  list:   ()                      => api.get('/feeds'),
+  create: (data: any)             => api.post('/feeds', data),
+  get:    (id: string)            => api.get(`/feeds/${id}`),
+  update: (id: string, data: any) => api.put(`/feeds/${id}`, data),
+  delete: (id: string)            => api.delete(`/feeds/${id}`),
+}
+
 export const feedApi = {
-  getFeed:      (offset = 0)          => api.get('/feed', { params: { offset } }),
+  getFeed:      (offset = 0, customFeedId?: string) =>
+    api.get('/feed', { params: { offset, ...(customFeedId ? { custom_feed_id: customFeedId } : {}) } }),
   getPost:      (id: string)         => api.get(`/posts/${id}`),
   createPost:   (data: any)          => api.post('/posts', data),
   deletePost:   (id: string)         => api.delete(`/posts/${id}`),
