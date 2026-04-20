@@ -70,6 +70,7 @@ export default function FeedScreen() {
   const { data: customFeedsData } = useQuery({
     queryKey: ['custom-feeds'],
     queryFn: () => feedsApi.list().then(r => r.data),
+    staleTime: 0,
   })
   const customFeeds: any[] = customFeedsData?.feeds || []
 
