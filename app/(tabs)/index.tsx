@@ -72,7 +72,7 @@ export default function FeedScreen() {
     queryFn: () => feedsApi.list().then(r => r.data),
     staleTime: 0,
   })
-  const customFeeds: any[] = customFeedsData?.feeds || []
+  const customFeeds: any[] = customFeedsData || []
 
   const { data: groupsData } = useQuery({
     queryKey: ['friend-lists'],
