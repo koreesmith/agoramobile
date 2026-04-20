@@ -13,7 +13,7 @@ import { useC } from '../constants/ColorContext'
 type FilterType = 'friend_group' | 'community_group' | 'exclude_friend' | 'exclude_group'
 
 interface FilterRule {
-  type: FilterType
+  filter_type: FilterType
   value: string
 }
 
@@ -35,7 +35,7 @@ export default function ManageFeedsScreen() {
     queryKey: ['custom-feeds'],
     queryFn: () => feedsApi.list().then(r => r.data),
   })
-  const feeds: CustomFeed[] = data?.feeds || []
+  const feeds: CustomFeed[] = data || []
 
   const { data: friendListsData } = useQuery({
     queryKey: ['friend-lists'],
@@ -68,21 +68,22 @@ export default function ManageFeedsScreen() {
   const openEdit = (feed: CustomFeed) => {
     setEditingId(feed.id)
     setFeedName(feed.name)
-    setSelectedFilters(feed.filters || [])
+    setSelectedFilters([])
     setShowEditor(true)
+    feedsApi.get(feed.id).then(r => setSelectedFilters(r.data.filters || []))
   }
 
   const toggleFilter = (rule: FilterRule) => {
     setSelectedFilters(prev => {
-      const exists = prev.find(r => r.type === rule.type && r.value === rule.value)
+      const exists = prev.find(r => r.filter_type === rule.filter_type && r.value === rule.value)
       return exists
-        ? prev.filter(r => !(r.type === rule.type && r.value === rule.value))
+        ? prev.filter(r => !(r.filter_type === rule.filter_type && r.value === rule.value))
         : [...prev, rule]
     })
   }
 
   const isSelected = (type: FilterType, value: string) =>
-    selectedFilters.some(r => r.type === type && r.value === value)
+    selectedFilters.some(r => r.filter_type === type && r.value === value)
 
   const saveFeed = useMutation({
     mutationFn: () => {
@@ -123,7 +124,7 @@ export default function ManageFeedsScreen() {
           return (
             <TouchableOpacity
               key={item.id}
-              onPress={() => toggleFilter({ type, value })}
+              onPress={() => toggleFilter({ filter_type: type, value })}
               style={[s.filterRow, { borderBottomColor: c.border }]}
             >
               <Ionicons
