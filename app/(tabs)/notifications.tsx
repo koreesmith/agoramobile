@@ -38,9 +38,9 @@ const TEXT: Record<string, string> = {
 }
 
 function formatActorLabel(n: any): string {
-  const count: number = n.actor_count ?? 1
+  const count: number = n.count ?? n.actor_count ?? 1
   const actors: any[] = n.actors ?? []
-  const primary = n.actor_display_name || n.actor_username || 'Someone'
+  const primary = actors[0]?.display_name || actors[0]?.username || n.actor_display_name || n.actor_username || 'Someone'
 
   if (count <= 1 || actors.length <= 1) return primary
 
@@ -97,11 +97,13 @@ export default function NotificationsScreen() {
         ) || [],
       }))
       qc.setQueryData(['unread-count'], (old: any) => ({ count: Math.max(0, (old?.count ?? 1) - 1) }))
-      const ids: string[] = n.notification_ids?.length ? n.notification_ids : [n.id]
-      Promise.all(ids.map((id: string) => notificationsApi.markRead(id))).then(invalidateNotifs)
+      const ids: string[] = n.ids?.length ? n.ids : n.notification_ids?.length ? n.notification_ids : [n.id]
+      const markDone = ids.length > 1 ? notificationsApi.markManyRead(ids) : notificationsApi.markRead(ids[0])
+      markDone.then(invalidateNotifs)
     }
     if (n.type === 'friend_request' || n.type === 'friend_accepted') {
-      if (n.actor_username) router.push(`/profile/${n.actor_username}`)
+      const username = n.actor_username || n.actors?.[0]?.username
+      if (username) router.push(`/profile/${username}`)
     } else if (n.type === 'waitlist_signup') {
       router.push('/admin?tab=waitlist' as any)
     } else if (n.post_id) router.push(`/post/${n.post_id}`)
