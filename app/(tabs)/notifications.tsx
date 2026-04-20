@@ -37,6 +37,22 @@ const TEXT: Record<string, string> = {
   waitlist_signup: 'joined the waitlist',
 }
 
+function formatActorLabel(n: any): string {
+  const count: number = n.actor_count ?? 1
+  const actors: any[] = n.actors ?? []
+  const primary = n.actor_display_name || n.actor_username || 'Someone'
+
+  if (count <= 1 || actors.length <= 1) return primary
+
+  const second = actors[1]?.display_name || actors[1]?.username
+  if (count === 2 && second) return `${primary} and ${second}`
+
+  const others = count - 1
+  return second
+    ? `${primary}, ${second}, and ${others - 1} other${others - 1 === 1 ? '' : 's'}`
+    : `${primary} and ${others} other${others === 1 ? '' : 's'}`
+}
+
 export default function NotificationsScreen() {
   const c = useC()
   const qc = useQueryClient()
@@ -46,7 +62,26 @@ export default function NotificationsScreen() {
     refetchInterval: 30_000,
   })
   const invalidateNotifs = () => { qc.invalidateQueries({ queryKey: ['notifications'] }); qc.invalidateQueries({ queryKey: ['unread-count'] }) }
-  const markAll = useMutation({ mutationFn: () => notificationsApi.markAllRead(), onSuccess: invalidateNotifs })
+  const markAll = useMutation({
+    mutationFn: () => notificationsApi.markAllRead(),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ['notifications'] })
+      await qc.cancelQueries({ queryKey: ['unread-count'] })
+      const prevNotifs = qc.getQueryData(['notifications'])
+      const prevUnread = qc.getQueryData(['unread-count'])
+      qc.setQueryData(['notifications'], (old: any) => ({
+        ...old,
+        notifications: old?.notifications?.map((n: any) => ({ ...n, read: true })) || [],
+      }))
+      qc.setQueryData(['unread-count'], { count: 0 })
+      return { prevNotifs, prevUnread }
+    },
+    onError: (_err: any, _vars: any, ctx: any) => {
+      if (ctx?.prevNotifs) qc.setQueryData(['notifications'], ctx.prevNotifs)
+      if (ctx?.prevUnread) qc.setQueryData(['unread-count'], ctx.prevUnread)
+    },
+    onSettled: invalidateNotifs,
+  })
   const accept = useMutation({ mutationFn: (id: string) => friendsApi.acceptRequest(id), onSuccess: invalidateNotifs })
   const decline = useMutation({ mutationFn: (id: string) => friendsApi.declineRequest(id), onSuccess: invalidateNotifs })
 
@@ -54,8 +89,17 @@ export default function NotificationsScreen() {
   const hasUnread = notifs.some((n: any) => !n.read)
 
   const handlePress = (n: any) => {
-    notificationsApi.markRead(n.id)
-    invalidateNotifs()
+    if (!n.read) {
+      qc.setQueryData(['notifications'], (old: any) => ({
+        ...old,
+        notifications: old?.notifications?.map((item: any) =>
+          item.id === n.id ? { ...item, read: true } : item
+        ) || [],
+      }))
+      qc.setQueryData(['unread-count'], (old: any) => ({ count: Math.max(0, (old?.count ?? 1) - 1) }))
+      const ids: string[] = n.notification_ids?.length ? n.notification_ids : [n.id]
+      Promise.all(ids.map((id: string) => notificationsApi.markRead(id))).then(invalidateNotifs)
+    }
     if (n.type === 'friend_request' || n.type === 'friend_accepted') {
       if (n.actor_username) router.push(`/profile/${n.actor_username}`)
     } else if (n.type === 'waitlist_signup') {
@@ -83,7 +127,7 @@ export default function NotificationsScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[s.notifText, { color: c.text }]}>
-                  <Text style={{ fontWeight: '600' }}>{n.actor_display_name || n.actor_username}</Text>
+                  <Text style={{ fontWeight: '600' }}>{formatActorLabel(n)}</Text>
                   {' '}{TEXT[n.type] || 'did something'}
                 </Text>
                 <Text style={[s.notifTime, { color: c.textLight }]}>{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</Text>
@@ -118,4 +162,3 @@ const s = StyleSheet.create({
   declineBtn: { backgroundColor: '#f3f4f6', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#486581', marginTop: 6, flexShrink: 0 },
 })
-
