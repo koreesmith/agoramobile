@@ -37,6 +37,22 @@ const TEXT: Record<string, string> = {
   waitlist_signup: 'joined the waitlist',
 }
 
+function formatActorLabel(n: any): string {
+  const count: number = n.actor_count ?? 1
+  const actors: any[] = n.actors ?? []
+  const primary = n.actor_display_name || n.actor_username || 'Someone'
+
+  if (count <= 1 || actors.length <= 1) return primary
+
+  const second = actors[1]?.display_name || actors[1]?.username
+  if (count === 2 && second) return `${primary} and ${second}`
+
+  const others = count - 1
+  return second
+    ? `${primary}, ${second}, and ${others - 1} other${others - 1 === 1 ? '' : 's'}`
+    : `${primary} and ${others} other${others === 1 ? '' : 's'}`
+}
+
 export default function NotificationsScreen() {
   const c = useC()
   const qc = useQueryClient()
@@ -81,7 +97,8 @@ export default function NotificationsScreen() {
         ) || [],
       }))
       qc.setQueryData(['unread-count'], (old: any) => ({ count: Math.max(0, (old?.count ?? 1) - 1) }))
-      notificationsApi.markRead(n.id).then(invalidateNotifs)
+      const ids: string[] = n.notification_ids?.length ? n.notification_ids : [n.id]
+      Promise.all(ids.map((id: string) => notificationsApi.markRead(id))).then(invalidateNotifs)
     }
     if (n.type === 'friend_request' || n.type === 'friend_accepted') {
       if (n.actor_username) router.push(`/profile/${n.actor_username}`)
@@ -110,7 +127,7 @@ export default function NotificationsScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[s.notifText, { color: c.text }]}>
-                  <Text style={{ fontWeight: '600' }}>{n.actor_display_name || n.actor_username}</Text>
+                  <Text style={{ fontWeight: '600' }}>{formatActorLabel(n)}</Text>
                   {' '}{TEXT[n.type] || 'did something'}
                 </Text>
                 <Text style={[s.notifTime, { color: c.textLight }]}>{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</Text>
