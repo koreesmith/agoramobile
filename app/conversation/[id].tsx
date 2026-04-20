@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
 import { formatDistanceToNow } from 'date-fns'
-import { Screen, Spinner, Avatar } from '../../components/ui'
+import { Screen, Spinner, Avatar, UploadingModal } from '../../components/ui'
 import { dmApi, feedApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { C } from '../../constants/colors'
@@ -23,6 +23,7 @@ export default function ConversationScreen() {
   const [text, setText] = useState('')
   const [imageUrl, setImageUrl] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
   const flatListRef = useRef<FlatList>(null)
 
   const { data: convData } = useQuery({ queryKey: ['conversation', id], queryFn: () => dmApi.getConversation(id!).then(r => r.data) })
@@ -47,17 +48,19 @@ export default function ConversationScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 })
     if (result.canceled) return
     setUploading(true)
+    const slowTimer = setTimeout(() => setShowUploadModal(true), 1000)
     try {
       const uri = await normalizeImageOrientation(result.assets[0].uri)
       const file = { uri, type: 'image/jpeg', name: 'photo.jpg' } as any
       const res = await feedApi.uploadMedia(file, 'posts')
       setImageUrl(res.data.url)
     } catch { Alert.alert('Upload failed') }
-    finally { setUploading(false) }
+    finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploading(false) }
   }
 
   return (
     <Screen>
+      <UploadingModal visible={showUploadModal} />
       <Stack.Screen options={{
         headerShown: true, headerTitle: other?.display_name || other?.username || 'Message',
         headerBackTitle: 'Messages', headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
