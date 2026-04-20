@@ -80,11 +80,33 @@ function AppContent() {
   useEffect(() => {
     const t = setTimeout(() => {
       Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,
-          shouldPlaySound: true,
-          shouldSetBadge: true,
-        }),
+        handleNotification: async (notification) => {
+          const data = notification.request.content.data as Record<string, string>
+          // Suppress the raw push for types where the backend sends placeholder text;
+          // a properly-labelled local notification is fired by notifListener instead.
+          const suppressRaw = data?.type === 'waitlist_signup'
+          return {
+            shouldShowAlert: !suppressRaw,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+          }
+        },
+      })
+
+      // Re-fire certain push notifications as local ones with correct actor labels.
+      notifListener.current = Notifications.addNotificationReceivedListener(notification => {
+        const data = notification.request.content.data as Record<string, string>
+        if (data?.type === 'waitlist_signup') {
+          const actor = data.actor_display_name || data.actor_username || 'Someone'
+          Notifications.scheduleNotificationAsync({
+            content: {
+              title: `${actor} joined the waitlist`,
+              body: 'Tap to review',
+              data,
+            },
+            trigger: null,
+          })
+        }
       })
 
       responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
@@ -107,9 +129,8 @@ function AppContent() {
 
     return () => {
       clearTimeout(t)
-      if (responseListener.current) {
-        responseListener.current.remove()
-      }
+      if (notifListener.current) notifListener.current.remove()
+      if (responseListener.current) responseListener.current.remove()
     }
   }, [])
 
