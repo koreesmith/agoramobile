@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, ScrollView,
   RefreshControl, Modal, Alert, ActivityIndicator, StyleSheet,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, Dimensions,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -50,7 +50,7 @@ export default function FeedScreen() {
   const qc = useQueryClient()
   const [showCompose, setShowCompose] = useState(false)
   const [content, setContent] = useState('')
-  const [imageUrl, setImageUrl] = useState('')
+  const [imageUrls, setImageUrls] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [showCW, setShowCW] = useState(false)
   const [cwLabel, setCwLabel] = useState('')
@@ -83,7 +83,7 @@ export default function FeedScreen() {
   const selectedFriendList = friendLists.find((g: any) => g.id === friendListId)
 
   const resetCompose = () => {
-    setContent(''); setImageUrl(''); setShowCW(false); setCwLabel('')
+    setContent(''); setImageUrls([]); setShowCW(false); setCwLabel('')
     setShowPoll(false); setPollOptions(['', '']); setPollMultiple(false)
     setPollAllowsNew(false); setPollExpiresHours(24)
     setVisibility('friends'); setFriendListId('')
@@ -91,9 +91,11 @@ export default function FeedScreen() {
     setShowCompose(false)
   }
 
+  const MAX_IMAGES = 4
+
   // Auto-detect URLs pasted into content: GIFs become inline images, others become link preview cards
   useEffect(() => {
-    if (imageUrl) return
+    if (imageUrls.length > 0) return
     const match = content.match(URL_RE)
     if (!match) return
     const url = match[0].replace(/[.,!?)]+$/, '')
@@ -103,10 +105,10 @@ export default function FeedScreen() {
       feedApi.previewUrl(url).then(res => {
         const preview = res.data
         const resolvedUrl = preview?.image || url
-        setImageUrl(resolvedUrl)
+        setImageUrls([resolvedUrl])
         setContent(c => c.replace(url, '').trim())
       }).catch(() => {
-        setImageUrl(url)
+        setImageUrls([url])
         setContent(c => c.replace(url, '').trim())
       })
       return
@@ -137,7 +139,8 @@ export default function FeedScreen() {
   const createPost = useMutation({
     mutationFn: () => feedApi.createPost({
       content,
-      image_url: imageUrl,
+      image_url: imageUrls[0] || '',
+      image_urls: imageUrls,
       visibility,
       group_id: visibility === 'group' ? friendListId : undefined,
       content_warning: showCW && cwLabel.trim() ? cwLabel.trim() : '',
@@ -156,14 +159,25 @@ export default function FeedScreen() {
   })
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 })
+    const remaining = MAX_IMAGES - imageUrls.length
+    if (remaining <= 0) return
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+    })
     if (result.canceled) return
     setUploading(true)
     try {
-      const uri = await normalizeImageOrientation(result.assets[0].uri)
-      const file = { uri, type: 'image/jpeg', name: 'photo.jpg' } as any
-      const res = await feedApi.uploadMedia(file, 'posts')
-      setImageUrl(res.data.url)
+      const uploaded: string[] = []
+      for (const asset of result.assets) {
+        const uri = await normalizeImageOrientation(asset.uri)
+        const file = { uri, type: 'image/jpeg', name: 'photo.jpg' } as any
+        const res = await feedApi.uploadMedia(file, 'posts')
+        uploaded.push(res.data.url)
+      }
+      setImageUrls(prev => [...prev, ...uploaded].slice(0, MAX_IMAGES))
     } catch { Alert.alert('Upload failed') }
     finally { setUploading(false) }
   }
@@ -252,15 +266,20 @@ export default function FeedScreen() {
                 style={[s.cwBtn, showPoll && { backgroundColor: c.primaryBg, borderColor: c.primaryLt }]}>
                 <Ionicons name="bar-chart-outline" size={16} color={showPoll ? c.primary : c.textMuted} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={pickImage} disabled={uploading || showPoll}>
+              <TouchableOpacity onPress={pickImage} disabled={uploading || showPoll || imageUrls.length >= MAX_IMAGES}>
                 {uploading
                   ? <ActivityIndicator size="small" color={c.primary} />
-                  : <Ionicons name="image-outline" size={22} color={showPoll ? c.border : c.primary} />}
+                  : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                      <Ionicons name="image-outline" size={22} color={(showPoll || imageUrls.length >= MAX_IMAGES) ? c.border : c.primary} />
+                      {imageUrls.length > 0 && !showPoll && (
+                        <Text style={{ fontSize: 11, color: c.primary, fontWeight: '600' }}>{imageUrls.length}/{MAX_IMAGES}</Text>
+                      )}
+                    </View>}
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => createPost.mutate()}
-                disabled={(!content.trim() && !imageUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || createPost.isPending}
-                style={[s.submitBtn, (!content.trim() && !imageUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) && s.submitBtnDisabled]}
+                disabled={(!content.trim() && imageUrls.length === 0 && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || createPost.isPending}
+                style={[s.submitBtn, (!content.trim() && imageUrls.length === 0 && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) && s.submitBtnDisabled]}
               >
                 <Text style={s.submitBtnText}>{createPost.isPending ? '…' : 'Post'}</Text>
               </TouchableOpacity>
@@ -418,22 +437,38 @@ export default function FeedScreen() {
               </View>
             )}
 
-            {!showPoll && imageUrl ? (
-              <View style={{ marginTop: 12 }}>
-                <Image source={{ uri: imgUrl(imageUrl) }} style={s.imagePreview} contentFit="cover" />
-                <TouchableOpacity onPress={() => setImageUrl('')} style={s.removeImage}>
-                  <Ionicons name="close" size={14} color="white" />
-                </TouchableOpacity>
-              </View>
+            {!showPoll && imageUrls.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ marginTop: 12 }}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                {imageUrls.map((url, i) => (
+                  <View key={i} style={{ position: 'relative' }}>
+                    <Image
+                      source={{ uri: imgUrl(url) }}
+                      style={[s.imagePreview, imageUrls.length > 1 && { width: Dimensions.get('window').width * 0.6 }]}
+                      contentFit="cover"
+                    />
+                    <TouchableOpacity
+                      onPress={() => setImageUrls(prev => prev.filter((_, j) => j !== i))}
+                      style={s.removeImage}
+                    >
+                      <Ionicons name="close" size={14} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
             ) : null}
 
-            {!showPoll && !imageUrl && linkFetching && (
+            {!showPoll && imageUrls.length === 0 && linkFetching && (
               <View style={[s.linkPreviewCard, { borderColor: c.border, backgroundColor: c.bg }]}>
                 <ActivityIndicator size="small" color={c.primary} />
               </View>
             )}
 
-            {!showPoll && !imageUrl && linkPreview && (
+            {!showPoll && imageUrls.length === 0 && linkPreview && (
               <View style={[s.linkPreviewCard, { borderColor: c.border, backgroundColor: c.bg }]}>
                 {linkPreview.image ? (
                   <Image source={{ uri: linkPreview.image }} style={s.linkPreviewImage} contentFit="cover" />
