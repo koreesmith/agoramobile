@@ -111,7 +111,12 @@ export const friendsApi = {
   acceptRequest:  (id: string)     => api.post(`/friends/accept/${id}`),
   declineRequest: (id: string)     => api.post(`/friends/decline/${id}`),
   unfriend:       (id: string)     => api.delete(`/friends/${id}`),
-  listFriendLists: ()               => api.get('/friend-groups'),
+  listFriendLists:    ()                                => api.get('/friend-groups'),
+  createFriendList:   (name: string)                    => api.post('/friend-groups', { name }),
+  deleteFriendList:   (groupId: string)                 => api.delete(`/friend-groups/${groupId}`),
+  getFriendListMembers: (groupId: string)               => api.get(`/friend-groups/${groupId}/members`),
+  addFriendToList:    (groupId: string, friendId: string) => api.post(`/friend-groups/${groupId}/members/${friendId}`),
+  removeFriendFromList: (groupId: string, friendId: string) => api.delete(`/friend-groups/${groupId}/members/${friendId}`),
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────
