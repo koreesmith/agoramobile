@@ -6,15 +6,21 @@ import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
 import { imgUrl } from '../api'
 
-export function Avatar({ url, name, size = 40 }: { url?: string; name?: string; size?: number }) {
+export function Avatar({ url, name, size = 40, online }: { url?: string; name?: string; size?: number; online?: boolean }) {
   const c = useC()
   const letter = (name || '?')[0].toUpperCase()
   const resolvedUrl = imgUrl(url)
+  const dotSize = Math.round(size * 0.28)
   return (
-    <View style={[lay.avatarWrap, { width: size, height: size, borderRadius: size / 2, backgroundColor: c.primaryBg }]}>
-      {resolvedUrl
-        ? <Image source={{ uri: resolvedUrl }} style={{ width: size, height: size }} />
-        : <Text style={[lay.avatarLetter, { fontSize: size * 0.4, color: c.primary }]}>{letter}</Text>}
+    <View style={{ width: size, height: size }}>
+      <View style={[lay.avatarWrap, { width: size, height: size, borderRadius: size / 2, backgroundColor: c.primaryBg }]}>
+        {resolvedUrl
+          ? <Image source={{ uri: resolvedUrl }} style={{ width: size, height: size }} />
+          : <Text style={[lay.avatarLetter, { fontSize: size * 0.4, color: c.primary }]}>{letter}</Text>}
+      </View>
+      {online && (
+        <View style={[lay.statusDot, { width: dotSize, height: dotSize, borderRadius: dotSize / 2 }]} />
+      )}
     </View>
   )
 }
@@ -98,6 +104,7 @@ export function Divider() {
 const lay = StyleSheet.create({
   avatarWrap: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
   avatarLetter: { fontWeight: 'bold' },
+  statusDot: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#22c55e', borderWidth: 2, borderColor: '#ffffff' },
   screen: { flex: 1 },
   header: { borderBottomWidth: 1, paddingHorizontal: 16, paddingTop: 56, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
