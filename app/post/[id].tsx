@@ -10,6 +10,7 @@ import { normalizeImageOrientation } from '../../utils/image'
 import { formatDistanceToNow } from 'date-fns'
 import { Screen, Spinner, Avatar } from '../../components/ui'
 import PostCard from '../../components/PostCard'
+import ReactorsModal from '../../components/ReactorsModal'
 import { feedApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { C } from '../../constants/colors'
@@ -38,6 +39,8 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
   const c = useC()
   const [showPicker, setShowPicker] = useState(false)
   const [pickerPosition, setPickerPosition] = useState<{ bottom: number; left: number } | null>(null)
+  const [showReactors, setShowReactors] = useState(false)
+  const [reactorsTab, setReactorsTab] = useState('all')
   const wrapperRef = useRef<View>(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showCommentLightbox, setShowCommentLightbox] = useState(false)
@@ -99,7 +102,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
                 const emoji = REACTIONS.find(r => r.type === type)?.emoji ?? '❤️'
                 const isActive = comment.my_reaction === type
                 return (
-                  <TouchableOpacity key={type} onPress={() => react.mutate({ type })}
+                  <TouchableOpacity key={type} onPress={() => { setReactorsTab(type); setShowReactors(true) }}
                     style={[s.reactionChip, { borderColor: isActive ? c.primaryLt : c.border, backgroundColor: isActive ? c.primaryBg : c.bg }]}>
                     <Text style={{ fontSize: 13 }}>{emoji}</Text>
                     <Text style={{ fontSize: 12, color: isActive ? c.primary : c.textMuted }}>{count as number}</Text>
@@ -180,6 +183,14 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
           ))}
         </View>
       ))}
+
+      {/* Reactors modal */}
+      <ReactorsModal
+        postId={comment.id}
+        visible={showReactors}
+        onClose={() => setShowReactors(false)}
+        initialTab={reactorsTab}
+      />
 
       {/* Comment menu modal */}
       <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
