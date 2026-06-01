@@ -153,7 +153,8 @@ export const dmApi = {
 
 // ── Search ────────────────────────────────────────────────────────────────────
 export const searchApi = {
-  search: (q: string) => api.get('/search', { params: { q } }),
+  searchUsers: (q: string) => api.get('/search/users', { params: { q } }),
+  searchPosts: (q: string) => api.get('/search/posts', { params: { q } }),
 }
 
 // ── Invites ───────────────────────────────────────────────────────────────────
