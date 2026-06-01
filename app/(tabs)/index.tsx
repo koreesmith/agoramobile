@@ -188,9 +188,14 @@ export default function FeedScreen() {
   return (
     <Screen>
       <Header title="Feed" right={
-        <TouchableOpacity onPress={() => setShowCompose(true)} style={s.postBtn}>
-          <Text style={s.postBtnText}>Post</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <TouchableOpacity onPress={() => router.push('/search')} style={s.searchBtn}>
+            <Ionicons name="search-outline" size={22} color={c.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowCompose(true)} style={s.postBtn}>
+            <Text style={s.postBtnText}>Post</Text>
+          </TouchableOpacity>
+        </View>
       } />
 
       <ScrollView
@@ -500,6 +505,7 @@ const s = StyleSheet.create({
   switcher: { flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth },
   feedTab: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
   feedTabText: { fontSize: 13, fontWeight: '500' },
+  searchBtn: { padding: 4 },
   postBtn: { backgroundColor: '#486581', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
   postBtnText: { color: 'white', fontWeight: '600', fontSize: 14 },
   fab: {
