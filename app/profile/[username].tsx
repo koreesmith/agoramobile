@@ -48,7 +48,7 @@ export default function ProfileViewScreen() {
 
   const blockUser = useMutation({
     mutationFn: async () => {
-      await blockApi.blockUser(profile!.id)
+      await blockApi.blockUser(username)
       // Notify developer automatically per Apple guideline 1.2
       await moderationApi.createReport({
         reported_user_id: profile!.id,
@@ -65,7 +65,7 @@ export default function ProfileViewScreen() {
   })
 
   const unblockUser = useMutation({
-    mutationFn: () => blockApi.unblockUser(profile!.id),
+    mutationFn: () => blockApi.unblockUser(username),
     onSuccess: () => {
       removeBlock(profile!.id)
       Alert.alert('Unblocked', `@${username} has been unblocked.`)

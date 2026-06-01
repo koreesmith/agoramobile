@@ -188,9 +188,9 @@ export const rulesApi = {
 
 // ── Blocking ──────────────────────────────────────────────────────────────────
 export const blockApi = {
-  blockUser:   (id: string) => api.post(`/users/${id}/block`),
-  unblockUser: (id: string) => api.delete(`/users/${id}/block`),
-  listBlocked: ()           => api.get('/users/blocked'),
+  blockUser:   (username: string) => api.post(`/blocks/${username}`),
+  unblockUser: (username: string) => api.delete(`/blocks/${username}`),
+  listBlocked: ()                 => api.get('/blocks'),
 }
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
