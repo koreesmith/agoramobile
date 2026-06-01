@@ -44,11 +44,19 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
   const wrapperRef = useRef<View>(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showCommentLightbox, setShowCommentLightbox] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editContent, setEditContent] = useState(comment.content)
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window')
 
   const del = useMutation({
     mutationFn: () => feedApi.deleteComment(postId, comment.id),
     onSuccess: onRefresh,
+  })
+
+  const edit = useMutation({
+    mutationFn: () => feedApi.editComment(postId, comment.id, editContent.trim()),
+    onSuccess: () => { setIsEditing(false); onRefresh() },
+    onError: (e: any) => Alert.alert('Error', e?.response?.data?.error || 'Could not edit comment'),
   })
   const react = useMutation({
     mutationFn: ({ type }: { type: string }) =>
@@ -75,7 +83,28 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
             {comment.pronouns ? <Text style={{ fontSize: 11, color: c.textLight }}>({comment.pronouns})</Text> : null}
             <Text style={[s.commentTime, { color: c.textLight }]}>{formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}</Text>
           </View>
-          <Text style={[s.commentText, { color: c.textMd }]}>{comment.content}</Text>
+          {isEditing ? (
+            <View style={{ marginTop: 4 }}>
+              <TextInput
+                value={editContent}
+                onChangeText={setEditContent}
+                multiline
+                autoFocus
+                style={[s.commentText, { color: c.text, borderWidth: 1, borderColor: c.border, borderRadius: 8, padding: 8, backgroundColor: c.bg }]}
+              />
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                <TouchableOpacity onPress={() => edit.mutate()} disabled={!editContent.trim() || edit.isPending}
+                  style={[s.actionBtn, { backgroundColor: c.primary, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6 }]}>
+                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>{edit.isPending ? 'Saving…' : 'Save'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setIsEditing(false); setEditContent(comment.content) }} style={[s.actionBtn, { paddingHorizontal: 12, paddingVertical: 5 }]}>
+                  <Text style={{ color: c.textMuted, fontSize: 13 }}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <Text style={[s.commentText, { color: c.textMd }]}>{comment.content}{comment.edited_at ? <Text style={{ color: c.textLight, fontSize: 11 }}> (edited)</Text> : null}</Text>
+          )}
           {comment.image_url ? (
             <>
               <TouchableOpacity onPress={() => setShowCommentLightbox(true)} activeOpacity={0.9}>
@@ -198,6 +227,14 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
           <View style={[s.menuSheet, { backgroundColor: c.card, borderColor: c.border }]}>
             {comment.author_id === userId ? (
               <>
+                <TouchableOpacity style={s.menuItem} onPress={() => {
+                  setShowMenu(false)
+                  setEditContent(comment.content)
+                  setIsEditing(true)
+                }}>
+                  <Ionicons name="pencil-outline" size={18} color={c.text} />
+                  <Text style={[s.menuItemText, { color: c.text }]}>Edit comment</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={s.menuItem} onPress={() => {
                   setShowMenu(false)
                   Alert.alert('Delete comment?', 'This cannot be undone.', [
