@@ -111,10 +111,9 @@ export default function EditProfileScreen() {
     try {
       const uri = await normalizeImageOrientation(result.assets[0].uri)
       const file = { uri, type: 'image/jpeg', name: 'cover.jpg' } as any
-      const res = await feedApi.uploadMedia(file, 'covers')
-      await usersApi.updateProfile({ cover_url: res.data.url })
-      setCoverUrl(res.data.url)
-      updateUser({ cover_url: res.data.url } as any)
+      const res = await usersApi.uploadCover(file)
+      setCoverUrl(res.data.cover_url)
+      updateUser({ cover_url: res.data.cover_url } as any)
     } catch { Alert.alert('Upload failed') }
     finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploadingCover(false) }
   }
