@@ -835,8 +835,8 @@ export default function AdminScreen() {
 }
 
 const s = StyleSheet.create({
-  tabBar:           { flexDirection: 'row', borderBottomWidth: 1 },
-  tabItem:          { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabBar:           { borderBottomWidth: 1 },
+  tabItem:          { paddingHorizontal: 14, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabText:          { fontSize: 13, fontWeight: '600' },
   statusChip:       { borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   card:             { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 10 },
