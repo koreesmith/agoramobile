@@ -149,6 +149,7 @@ export const dmApi = {
   markRead:           (id: string)          => api.post(`/conversations/${id}/read`),
   acceptRequest:      (id: string)          => api.post(`/conversations/${id}/accept`),
   leaveConversation:  (id: string)          => api.delete(`/conversations/${id}`),
+  friendSearch:       (q: string)           => api.get('/conversations/friend-search', { params: { q } }),
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
