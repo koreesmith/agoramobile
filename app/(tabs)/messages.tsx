@@ -56,7 +56,7 @@ export default function MessagesScreen() {
             return (
               <TouchableOpacity onPress={() => router.push(`/conversation/${conv.id}`)} style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
                 <View style={{ position: 'relative' }}>
-                  <Avatar url={o.avatar_url} name={o.display_name || o.username} size={48} />
+                  <Avatar url={o.avatar_url} name={o.display_name || o.username} size={48} online={o.is_online} />
                   {conv.unread_count > 0 && (
                     <View style={s.badge}><Text style={s.badgeText}>{conv.unread_count > 9 ? '9+' : conv.unread_count}</Text></View>
                   )}
