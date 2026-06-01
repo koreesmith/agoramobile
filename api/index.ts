@@ -207,3 +207,16 @@ export const waitlistApi = {
   approve: (id: string)  => api.post(`/admin/waitlist/${id}/approve`),
   reject:  (id: string)  => api.post(`/admin/waitlist/${id}/reject`),
 }
+
+// ── Albums ────────────────────────────────────────────────────────────────────
+export const albumsApi = {
+  list:         ()                               => api.get('/albums'),
+  create:       (data: { name: string; description?: string }) => api.post('/albums', data),
+  get:          (id: string)                     => api.get(`/albums/${id}`),
+  update:       (id: string, data: any)          => api.patch(`/albums/${id}`, data),
+  delete:       (id: string)                     => api.delete(`/albums/${id}`),
+  addPhoto:     (id: string, data: { url: string; caption?: string }) => api.post(`/albums/${id}/photos`, data),
+  updatePhoto:  (albumId: string, photoId: string, data: any) => api.patch(`/albums/${albumId}/photos/${photoId}`, data),
+  deletePhoto:  (albumId: string, photoId: string) => api.delete(`/albums/${albumId}/photos/${photoId}`),
+  getUserAlbums:(username: string)               => api.get(`/users/${username}/albums`),
+}
