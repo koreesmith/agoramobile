@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, TextInput, Modal, ScrollView,
   Alert, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform,
 } from 'react-native'
-import { Stack } from 'expo-router'
+import { Stack, router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Spinner, EmptyState } from '../components/ui'
@@ -156,6 +156,9 @@ export default function ManageFeedsScreen() {
                 <Text style={[s.feedMeta, { color: c.textMuted }]}>
                   {item.filters?.length || 0} filter{(item.filters?.length || 0) !== 1 ? 's' : ''}
                 </Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push(`/feed/${item.id}` as any)} style={s.deleteBtn}>
+                <Ionicons name="play-circle-outline" size={20} color={c.primary} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => confirmDelete(item)} style={s.deleteBtn}>
                 <Ionicons name="trash-outline" size={18} color="#ef4444" />
