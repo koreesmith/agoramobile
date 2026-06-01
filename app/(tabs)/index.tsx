@@ -452,7 +452,7 @@ export default function FeedScreen() {
                   <View key={i} style={{ position: 'relative' }}>
                     <Image
                       source={{ uri: imgUrl(url) }}
-                      style={[s.imagePreview, imageUrls.length > 1 && { width: Dimensions.get('window').width * 0.6 }]}
+                      style={[s.imagePreview, { width: imageUrls.length > 1 ? Dimensions.get('window').width * 0.6 : Dimensions.get('window').width - 32 }]}
                       contentFit="cover"
                     />
                     <TouchableOpacity
@@ -527,7 +527,7 @@ const s = StyleSheet.create({
   submitBtnDisabled: { backgroundColor: '#9fb3c8' },
   submitBtnText: { color: 'white', fontWeight: '600' },
   composeInput: { fontSize: 16, color: '#111827', flex: 1 },
-  imagePreview: { height: 180, width: '100%', borderRadius: 12, marginTop: 8 },
+  imagePreview: { height: 180, borderRadius: 12, marginTop: 8 },
   removeImage: { position: 'absolute', top: 10, right: 2, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   cwBtn: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   cwInputWrap: { borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 12 },
