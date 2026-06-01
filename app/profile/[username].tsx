@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Spinner, Avatar } from '../../components/ui'
 import PostCard from '../../components/PostCard'
-import { usersApi, friendsApi, feedApi, dmApi, imgUrl, blockApi, moderationApi } from '../../api'
+import { usersApi, friendsApi, feedApi, dmApi, imgUrl, blockApi, moderationApi, albumsApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
 import { useC } from '../../constants/ColorContext'
@@ -31,6 +31,17 @@ export default function ProfileViewScreen() {
     enabled: !!profile && canSeeTimeline,
   })
 
+  const { data: albumsData } = useQuery({
+    queryKey: ['user-albums', username],
+    queryFn: () => {
+      if (isSelf) return albumsApi.list().then(r => r.data)
+      return albumsApi.getUserAlbums(username!).then(r => r.data)
+    },
+    enabled: !!profile,
+  })
+  const albumCount: number = albumsData?.albums?.length ?? albumsData?.length ?? 0
+  const showAlbums = isSelf || albumCount > 0
+
   const inv = () => {
     qc.invalidateQueries({ queryKey: ['profile', username] })
     qc.invalidateQueries({ queryKey: ['friends'] })
@@ -48,7 +59,7 @@ export default function ProfileViewScreen() {
 
   const blockUser = useMutation({
     mutationFn: async () => {
-      await blockApi.blockUser(profile!.id)
+      await blockApi.blockUser(username)
       // Notify developer automatically per Apple guideline 1.2
       await moderationApi.createReport({
         reported_user_id: profile!.id,
@@ -65,7 +76,7 @@ export default function ProfileViewScreen() {
   })
 
   const unblockUser = useMutation({
-    mutationFn: () => blockApi.unblockUser(profile!.id),
+    mutationFn: () => blockApi.unblockUser(username),
     onSuccess: () => {
       removeBlock(profile!.id)
       Alert.alert('Unblocked', `@${username} has been unblocked.`)
@@ -190,6 +201,18 @@ export default function ProfileViewScreen() {
           <Text style={[s.friends, { color: c.textMuted }]}>
             <Text style={{ fontWeight: 'bold', color: c.text }}>{profile.friend_count || 0}</Text> friends
           </Text>
+          {showAlbums && (
+            <TouchableOpacity
+              onPress={() => router.push(`/albums/${username}`)}
+              style={[s.albumsRow, { borderTopColor: c.border }]}
+            >
+              <Ionicons name="images-outline" size={16} color={c.primary} />
+              <Text style={[s.albumsText, { color: c.primary }]}>
+                Albums{albumCount > 0 ? ` (${albumCount})` : ''}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={c.textLight} style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Timeline */}
@@ -241,6 +264,8 @@ const s = StyleSheet.create({
   username:      { fontSize: 14, marginTop: 2 },
   bio:           { fontSize: 14, marginTop: 6, lineHeight: 20 },
   friends:       { fontSize: 14, marginTop: 10 },
+  albumsRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  albumsText:    { fontSize: 14, fontWeight: '500' },
   private:       { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 32, marginHorizontal: 12, borderRadius: 16 },
   privateTitle:  { fontSize: 16, fontWeight: '600', marginTop: 12 },
   privateText:   { fontSize: 14, textAlign: 'center', marginTop: 4 },
