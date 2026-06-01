@@ -98,6 +98,8 @@ export const usersApi = {
     return api.post('/users/me/avatar', form, { headers: { 'Content-Type': 'multipart/form-data' } })
   },
   discover:        ()                 => api.get('/users/discover'),
+  followNotifications:   (username: string) => api.post(`/users/${username}/notify`),
+  unfollowNotifications: (username: string) => api.delete(`/users/${username}/notify`),
   exportData:      ()                 => api.get('/users/me/export', { responseType: 'blob' }),
   requestDeletion: ()                 => api.post('/users/me/request-deletion'),
   cancelDeletion:  ()                 => api.delete('/users/me/request-deletion'),
