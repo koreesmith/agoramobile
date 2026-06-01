@@ -67,6 +67,7 @@ export const feedApi = {
   unlikePost:   (id: string)         => api.delete(`/posts/${id}/like`),
   reactPost:    (id: string, type: string) => api.post(`/posts/${id}/react`, { type }),
   unreactPost:  (id: string)         => api.delete(`/posts/${id}/react`),
+  getReactions: (id: string)         => api.get(`/posts/${id}/reactions`),
   reactComment:   (_postId: string, commentId: string, type: string) => api.post(`/posts/${commentId}/react`, { type }),
   unreactComment: (_postId: string, commentId: string)               => api.delete(`/posts/${commentId}/react`),
   repostPost:   (id: string, data?: any) => api.post(`/posts/${id}/repost`, data || {}),

@@ -13,6 +13,7 @@ import { useAuthStore } from '../store/auth'
 import { useBlockStore } from '../store/blocks'
 import { Avatar } from './ui'
 import { useC } from '../constants/ColorContext'
+import ReactorsModal from './ReactorsModal'
 
 const REACTIONS = [
   { type: 'like', emoji: '❤️' }, { type: 'love', emoji: '😍' },
@@ -231,6 +232,8 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
       setHoveredReaction(null)
     },
   })).current
+  const [showReactors, setShowReactors] = useState(false)
+  const [reactorsTab, setReactorsTab] = useState('all')
   const [twExpanded, setTwExpanded] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showShare, setShowShare] = useState(false)
@@ -503,7 +506,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               const emoji = REACTIONS.find(r => r.type === type)?.emoji ?? '❤️'
               const isActive = post.my_reaction === type
               return (
-                <TouchableOpacity key={type} onPress={() => react.mutate({ type })}
+                <TouchableOpacity key={type} onPress={() => { setReactorsTab(type); setShowReactors(true) }}
                   style={[s.chip, { borderColor: isActive ? c.primaryLt : c.border, backgroundColor: isActive ? c.primaryBg : c.bg }]}>
                   <Text style={{ fontSize: 12 }}>{emoji}</Text>
                   <Text style={[s.chipCount, { color: isActive ? c.primary : c.textMuted }]}>{count}</Text>
@@ -759,6 +762,14 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
           </View>
         </View>
       </Modal>
+
+      {/* ── Reactors modal ───────────────────────────────────────── */}
+      <ReactorsModal
+        postId={post.id}
+        visible={showReactors}
+        onClose={() => setShowReactors(false)}
+        initialTab={reactorsTab}
+      />
 
       {/* ── Reaction picker modal ─────────────────────────────────── */}
       <Modal visible={showReactions} transparent animationType="none" onRequestClose={() => { setShowReactions(false); setHoveredReaction(null) }}>
