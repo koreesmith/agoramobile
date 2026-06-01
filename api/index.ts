@@ -224,9 +224,24 @@ export const blockApi = {
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 export const adminApi = {
-  getStats:  ()                             => api.get('/admin/stats'),
-  listUsers: (q?: string)                   => api.get('/admin/users', { params: { q } }),
-  setRole:   (userID: string, role: string) => api.patch(`/admin/users/${userID}/role`, { role }),
+  getStats:       ()                             => api.get('/admin/stats'),
+  listUsers:      (q?: string)                   => api.get('/admin/users', { params: { q } }),
+  setRole:        (userID: string, role: string) => api.patch(`/admin/users/${userID}/role`, { role }),
+  // Settings
+  getSettings:    ()                             => api.get('/admin/settings'),
+  updateSettings: (data: any)                    => api.patch('/admin/settings', data),
+  // Rules
+  listRules:      ()                             => api.get('/admin/rules'),
+  createRule:     (data: { title: string; description?: string }) => api.post('/admin/rules', data),
+  updateRule:     (id: string, data: any)        => api.patch(`/admin/rules/${id}`, data),
+  deleteRule:     (id: string)                   => api.delete(`/admin/rules/${id}`),
+  moveRule:       (id: string, direction: 'up' | 'down') => api.patch(`/admin/rules/${id}/move`, { direction }),
+  // Invites
+  listInvites:    ()                             => api.get('/admin/invites'),
+  createInvite:   ()                             => api.post('/admin/invites'),
+  deleteInvite:   (id: string)                   => api.delete(`/admin/invites/${id}`),
+  // Audit log
+  getAuditLog:    (page = 0)                     => api.get('/admin/audit-log', { params: { page } }),
 }
 
 // ── Waitlist ──────────────────────────────────────────────────────────────────
