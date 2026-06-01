@@ -3,3 +3,6 @@ ios/
 node_modules/
 .expo/
 .dev/
+
+# Google Play service account key — never commit this
+google-play-service-account.json
