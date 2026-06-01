@@ -4,6 +4,7 @@ import {
   RefreshControl, Modal, Alert, ActivityIndicator, StyleSheet,
   KeyboardAvoidingView, Platform, Dimensions,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -39,6 +40,7 @@ const URL_RE = /https?:\/\/[^\s]+/g
 
 export default function FeedScreen() {
   const c = useC()
+  const insets = useSafeAreaInsets()
   const { user } = useAuthStore()
   const { blockedIds } = useBlockStore()
   const { data: instanceData } = useQuery({
@@ -248,7 +250,7 @@ export default function FeedScreen() {
       </View>
 
       <Modal visible={showCompose} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: c.card }}>
+        <View style={{ flex: 1, backgroundColor: c.card, paddingTop: Platform.OS === 'android' ? insets.top : 0 }}>
           <UploadingModal visible={showUploadModal} />
           <KeyboardAvoidingView
             style={{ flex: 1 }}
