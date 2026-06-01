@@ -28,6 +28,27 @@ export default function SettingsScreen() {
     onSuccess: () => updateUser({ profile_private: !user?.profile_private }),
   })
 
+  const toggleHideTimeline = useMutation({
+    mutationFn: () => usersApi.updateProfile({ hide_timeline: !(user as any)?.hide_timeline }),
+    onSuccess: () => updateUser({ hide_timeline: !(user as any)?.hide_timeline } as any),
+  })
+
+  const toggleApproveWallPosts = useMutation({
+    mutationFn: () => usersApi.updateProfile({ approve_wall_posts: !(user as any)?.approve_wall_posts }),
+    onSuccess: () => updateUser({ approve_wall_posts: !(user as any)?.approve_wall_posts } as any),
+  })
+
+  const MESSAGE_PERM_OPTIONS = [
+    { label: 'Everyone', value: 'everyone' },
+    { label: 'Friends only', value: 'friends' },
+    { label: 'Nobody', value: 'nobody' },
+  ]
+  const currentMsgPerm = (user as any)?.message_permissions ?? 'everyone'
+  const setMsgPerm = useMutation({
+    mutationFn: (value: string) => usersApi.updateProfile({ message_permissions: value }),
+    onSuccess: (_, value) => updateUser({ message_permissions: value } as any),
+  })
+
   const { data: instanceData } = useQuery({
     queryKey: ['instance-info'],
     queryFn: () => instanceApi.getInfo().then(r => r.data),
@@ -187,6 +208,26 @@ export default function SettingsScreen() {
         <Text style={[s.section, { color: c.textMuted }]}>Privacy</Text>
         <Row icon="lock-closed-outline" label="Private profile"
           right={<Switch value={user?.profile_private ?? false} onValueChange={() => togglePrivacy.mutate()} trackColor={{ false: c.border, true: c.primary }} />} />
+        <Row icon="eye-off-outline" label="Hide timeline"
+          right={<Switch value={!!(user as any)?.hide_timeline} onValueChange={() => toggleHideTimeline.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleHideTimeline.isPending} />} />
+        <Row icon="checkmark-circle-outline" label="Approve wall posts"
+          right={<Switch value={!!(user as any)?.approve_wall_posts} onValueChange={() => toggleApproveWallPosts.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleApproveWallPosts.isPending} />} />
+        <View style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
+          <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
+            <Ionicons name="chatbubble-ellipses-outline" size={18} color={c.primary} />
+          </View>
+          <Text style={[s.rowLabel, { color: c.text }]}>Messages from</Text>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {MESSAGE_PERM_OPTIONS.map(opt => (
+              <TouchableOpacity key={opt.value} onPress={() => setMsgPerm.mutate(opt.value)}
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1,
+                  borderColor: currentMsgPerm === opt.value ? c.primary : c.border,
+                  backgroundColor: currentMsgPerm === opt.value ? c.primaryBg : 'transparent' }}>
+                <Text style={{ fontSize: 12, fontWeight: '500', color: currentMsgPerm === opt.value ? c.primary : c.textMuted }}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
         <Text style={[s.section, { color: c.textMuted }]}>Data</Text>
         <Row icon="download-outline" label={exportLoading ? 'Exporting…' : 'Export my data'} onPress={exportData} />
         {deletionScheduledAt ? (
