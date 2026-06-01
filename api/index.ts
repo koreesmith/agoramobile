@@ -77,6 +77,7 @@ export const feedApi = {
   getComments:  (id: string)         => api.get(`/posts/${id}/comments`),
   createComment:(id: string, data: any) => api.post(`/posts/${id}/comments`, data),
   deleteComment:(postId: string, commentId: string) => api.delete(`/posts/${postId}/comments/${commentId}`),
+  editComment:  (postId: string, commentId: string, content: string) => api.patch(`/posts/${postId}/comments/${commentId}`, { content }),
   getUserPosts: (username: string)   => api.get(`/users/${username}/posts`),
   uploadMedia:  (file: any, category = 'posts') => {
     const form = new FormData()
