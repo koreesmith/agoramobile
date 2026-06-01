@@ -156,6 +156,7 @@ export default function SettingsScreen() {
       <ScrollView>
         <Text style={[s.section, { color: c.textMuted }]}>Account</Text>
         <Row icon="person-outline" label="Edit profile" onPress={() => router.push('/edit-profile')} />
+        <Row icon="people-outline" label="Friend lists" onPress={() => router.push('/friend-lists')} />
         <Row icon="mail-outline" label="Change email" onPress={() => setSection('email')} />
         <Row icon="key-outline" label="Change password" onPress={() => setSection('password')} />
         {invitesEnabled && (
