@@ -9,13 +9,17 @@ import { notificationsApi, friendsApi } from '../../api'
 import { C } from '../../constants/colors'
 import { useC } from '../../constants/ColorContext'
 
+// All type strings the API may send for a waitlist signup notification
+const WAITLIST_TYPES = ['waitlist_signup', 'waitlist_join', 'waitlist_joined', 'waitlist']
+
 const ICONS: Record<string, any> = {
   friend_request: 'person-add', friend_accepted: 'checkmark-circle',
   post_like: 'heart', comment_like: 'heart', post_reaction: 'happy',
   comment_reaction: 'happy', post_comment: 'chatbubble', post_repost: 'repeat',
   post_mention: 'at', comment_reply: 'return-down-forward', wall_post: 'pencil',
   wall_post_pending: 'time', wall_post_approved: 'checkmark-circle', user_post: 'notifications',
-  waitlist_signup: 'person-add-outline',
+  waitlist_signup: 'person-add-outline', waitlist_join: 'person-add-outline',
+  waitlist_joined: 'person-add-outline', waitlist: 'person-add-outline',
 }
 
 const COLORS: Record<string, string> = {
@@ -23,7 +27,8 @@ const COLORS: Record<string, string> = {
   comment_like: '#ef4444', post_reaction: '#f59e0b', comment_reaction: '#f59e0b',
   post_comment: '#486581', post_repost: '#22c55e', post_mention: '#3b82f6',
   wall_post: '#486581', wall_post_pending: '#f59e0b', wall_post_approved: '#22c55e', user_post: '#486581',
-  waitlist_signup: '#8b5cf6',
+  waitlist_signup: '#8b5cf6', waitlist_join: '#8b5cf6',
+  waitlist_joined: '#8b5cf6', waitlist: '#8b5cf6',
 }
 
 const TEXT: Record<string, string> = {
@@ -34,7 +39,8 @@ const TEXT: Record<string, string> = {
   post_mention: 'mentioned you in a post', comment_reply: 'replied to your comment',
   wall_post: 'posted on your wall', wall_post_pending: 'wants to post on your wall',
   wall_post_approved: 'approved your wall post', user_post: 'made a new post',
-  waitlist_signup: 'joined the waitlist',
+  waitlist_signup: 'joined the waitlist', waitlist_join: 'joined the waitlist',
+  waitlist_joined: 'joined the waitlist', waitlist: 'joined the waitlist',
 }
 
 function formatActorLabel(n: any): string {
@@ -104,8 +110,8 @@ export default function NotificationsScreen() {
     if (n.type === 'friend_request' || n.type === 'friend_accepted') {
       const username = n.actor_username || n.actors?.[0]?.username
       if (username) router.push(`/profile/${username}`)
-    } else if (n.type === 'waitlist_signup') {
-      router.push('/admin?tab=waitlist' as any)
+    } else if (WAITLIST_TYPES.includes(n.type)) {
+      router.push({ pathname: '/admin', params: { tab: 'waitlist' } } as any)
     } else if (n.post_id) router.push(`/post/${n.post_id}`)
   }
 
