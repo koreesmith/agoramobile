@@ -138,14 +138,28 @@ export const notificationsApi = {
 
 // ── Groups ────────────────────────────────────────────────────────────────────
 export const groupsApi = {
-  list:        ()               => api.get('/groups'),
-  listFilter:  (filter: string) => api.get('/groups', { params: { filter } }),
-  get:         (slug: string)   => api.get(`/groups/${slug}`),
-  getFeed:     (slug: string, page = 0) => api.get(`/groups/${slug}/feed`, { params: { page } }),
-  join:        (slug: string)   => api.post(`/groups/${slug}/join`),
-  leave:       (slug: string)   => api.delete(`/groups/${slug}/leave`),
-  createPost:  (slug: string, data: any) => api.post(`/groups/${slug}/posts`, data),
-  create:      (data: any)      => api.post('/groups', data),
+  list:           ()               => api.get('/groups'),
+  listFilter:     (filter: string) => api.get('/groups', { params: { filter } }),
+  get:            (slug: string)   => api.get(`/groups/${slug}`),
+  getFeed:        (slug: string, page = 0) => api.get(`/groups/${slug}/feed`, { params: { page } }),
+  join:           (slug: string)   => api.post(`/groups/${slug}/join`),
+  leave:          (slug: string)   => api.delete(`/groups/${slug}/leave`),
+  createPost:     (slug: string, data: any) => api.post(`/groups/${slug}/posts`, data),
+  create:         (data: any)      => api.post('/groups', data),
+  update:         (slug: string, data: any)          => api.patch(`/groups/${slug}`, data),
+  delete:         (slug: string)                     => api.delete(`/groups/${slug}`),
+  getMembers:     (slug: string)                     => api.get(`/groups/${slug}/members`),
+  searchMembers:  (slug: string, q: string)          => api.get(`/groups/${slug}/member-search`, { params: { q } }),
+  setMemberRole:  (slug: string, userId: string, role: string) => api.patch(`/groups/${slug}/members/${userId}/role`, { role }),
+  removeMember:   (slug: string, userId: string)     => api.delete(`/groups/${slug}/members/${userId}`),
+  addMember:      (slug: string, username: string)   => api.post(`/groups/${slug}/members/add`, { username }),
+  getInvites:     (slug: string)                     => api.get(`/groups/${slug}/invites`),
+  createInvite:   (slug: string)                     => api.post(`/groups/${slug}/invites`),
+  deleteInvite:   (slug: string, token: string)      => api.delete(`/groups/${slug}/invites/${token}`),
+  requestJoin:    (slug: string)                     => api.post(`/groups/${slug}/request`),
+  getRequests:    (slug: string)                     => api.get(`/groups/${slug}/requests`),
+  approveRequest: (slug: string, requestId: string)  => api.post(`/groups/${slug}/requests/${requestId}/approve`),
+  rejectRequest:  (slug: string, requestId: string)  => api.post(`/groups/${slug}/requests/${requestId}/reject`),
 }
 
 // ── DMs ───────────────────────────────────────────────────────────────────────
