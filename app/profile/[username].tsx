@@ -44,6 +44,15 @@ export default function ProfileViewScreen() {
     onSuccess: (res) => router.push(`/conversation/${res.data.id}`)
   })
 
+  const notifying = !!(profile as any)?.notify
+  const followNotif = useMutation({
+    mutationFn: () => notifying
+      ? usersApi.unfollowNotifications(username!)
+      : usersApi.followNotifications(username!),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['profile', username] }),
+    onError: () => Alert.alert('Error', 'Could not update notification settings'),
+  })
+
   const blocked = profile ? isBlocked(profile.id) : false
 
   const blockUser = useMutation({
@@ -114,6 +123,14 @@ export default function ProfileViewScreen() {
                     <Text style={[s.actionBtnText, { color: c.textMd }]}>Message</Text>
                   </TouchableOpacity>
                 )}
+                <TouchableOpacity
+                  onPress={() => followNotif.mutate()}
+                  disabled={followNotif.isPending}
+                  style={[s.actionBtn, { borderColor: notifying ? c.primary : c.border, backgroundColor: notifying ? c.primaryBg : 'transparent' }]}
+                >
+                  <Ionicons name={notifying ? 'notifications' : 'notifications-outline'} size={15} color={notifying ? c.primary : c.textMuted} />
+                  <Text style={[s.actionBtnText, { color: notifying ? c.primary : c.textMuted }]}>{notifying ? 'Notifying' : 'Notify'}</Text>
+                </TouchableOpacity>
                 {!status && (
                   <TouchableOpacity onPress={() => sendReq.mutate()} disabled={sendReq.isPending}
                     style={[s.primaryBtn, { backgroundColor: c.primary }]}>
