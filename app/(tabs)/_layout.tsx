@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Tabs, router } from 'expo-router'
 import { Platform, useColorScheme } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useQuery } from '@tanstack/react-query'
 import * as Notifications from 'expo-notifications'
@@ -16,6 +17,7 @@ export default function TabsLayout() {
   const isDark = preference === 'dark' || (preference === 'system' && systemScheme === 'dark')
   const c = isDark ? dark : light
   const [notificationsReady, setNotificationsReady] = useState(false)
+  const insets = useSafeAreaInsets()
 
   useEffect(() => {
     if (!isAuthenticated) router.replace('/(auth)')
@@ -45,9 +47,9 @@ export default function TabsLayout() {
       tabBarStyle: {
         backgroundColor: c.card,
         borderTopColor: c.border,
-        paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+        paddingBottom: Platform.OS === 'ios' ? 20 : insets.bottom + 8,
         paddingTop: 8,
-        height: Platform.OS === 'ios' ? 84 : 64,
+        height: Platform.OS === 'ios' ? 84 : 64 + insets.bottom,
       },
       tabBarActiveTintColor: c.primary,
       tabBarInactiveTintColor: c.textLight,
