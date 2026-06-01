@@ -85,10 +85,17 @@ export default function GroupScreen() {
         headerShown: true, headerTitle: group.name, headerBackTitle: 'Groups',
         headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
         headerRight: () => group.is_member ? (
-          <TouchableOpacity onPress={() => Alert.alert('Leave group?', undefined, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Leave', style: 'destructive', onPress: () => leave.mutate() },
-          ])}><Ionicons name="exit-outline" size={22} color={c.red} /></TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+            {(group.my_role === 'admin' || group.is_admin) && (
+              <TouchableOpacity onPress={() => router.push(`/group/manage/${slug}`)}>
+                <Ionicons name="settings-outline" size={22} color={c.primary} />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => Alert.alert('Leave group?', undefined, [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Leave', style: 'destructive', onPress: () => leave.mutate() },
+            ])}><Ionicons name="exit-outline" size={22} color={c.red} /></TouchableOpacity>
+          </View>
         ) : null,
       }} />
       <FlatList
