@@ -32,7 +32,7 @@ export default function ReactorsModal({ postId, visible, onClose, initialTab = '
     enabled: visible,
   })
 
-  const reactors: Array<{ user: any; type: string }> = data?.reactions ?? []
+  const reactors: Array<{ user_id: string; username: string; display_name: string; avatar_url: string; type: string }> = data?.reactions ?? []
 
   const tabs = [
     { key: 'all', label: 'All' },
@@ -77,20 +77,19 @@ export default function ReactorsModal({ postId, visible, onClose, initialTab = '
           ) : (
             <FlatList
               data={filtered}
-              keyExtractor={(item, i) => `${item.user?.id ?? i}-${item.type}`}
+              keyExtractor={(item, i) => `${item.user_id ?? i}-${item.type}`}
               renderItem={({ item }) => {
                 const emoji = REACTIONS.find(r => r.type === item.type)?.emoji ?? '❤️'
-                const user = item.user ?? {}
                 return (
                   <TouchableOpacity
                     style={s.row}
-                    onPress={() => { onClose(); router.push(`/profile/${user.username}`) }}
+                    onPress={() => { onClose(); router.push(`/profile/${item.username}`) }}
                   >
-                    <Avatar url={user.avatar_url} name={user.display_name || user.username} size={38} />
+                    <Avatar url={item.avatar_url} name={item.display_name || item.username} size={38} />
                     <View style={s.userInfo}>
-                      <Text style={[s.displayName, { color: c.text }]}>{user.display_name || user.username}</Text>
-                      {user.username && (
-                        <Text style={[s.username, { color: c.textMuted }]}>@{user.username}</Text>
+                      <Text style={[s.displayName, { color: c.text }]}>{item.display_name || item.username}</Text>
+                      {item.username && (
+                        <Text style={[s.username, { color: c.textMuted }]}>@{item.username}</Text>
                       )}
                     </View>
                     <Text style={s.emoji}>{emoji}</Text>
