@@ -105,6 +105,8 @@ export const usersApi = {
   },
   discover:        ()                 => api.get('/users/discover'),
   mentionSearch:   (q: string)        => api.get('/users/mention-search', { params: { q } }),
+  followNotifications:   (username: string) => api.post(`/users/${username}/notify`),
+  unfollowNotifications: (username: string) => api.delete(`/users/${username}/notify`),
   exportData:      ()                 => api.get('/users/me/export', { responseType: 'blob' }),
   requestDeletion: ()                 => api.post('/users/me/request-deletion'),
   cancelDeletion:  ()                 => api.delete('/users/me/request-deletion'),
