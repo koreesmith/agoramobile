@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, StyleSheet, Switch, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, StyleSheet, Switch, ActivityIndicator, Share } from 'react-native'
 import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -8,7 +8,7 @@ import { moderationApi, adminApi, waitlistApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
 
-type Tab = 'reports' | 'moderation' | 'users' | 'waitlist' | 'instances'
+type Tab = 'reports' | 'moderation' | 'users' | 'waitlist' | 'instances' | 'invites' | 'rules' | 'settings' | 'audit'
 
 export default function AdminScreen() {
   const c = useC()
@@ -25,6 +25,10 @@ export default function AdminScreen() {
   const [userSuspendForms, setUserSuspendForms] = useState<Record<string,{days:string,reason:string,notes:string}>>({})
   const [userBanForms, setUserBanForms] = useState<Record<string,{reason:string,notes:string}>>({})
   const [instanceBanForm, setInstanceBanForm] = useState({ domain: '', reason: '' })
+  const [newRuleForm, setNewRuleForm] = useState({ title: '', description: '' })
+  const [editingRule, setEditingRule] = useState<{ id: string; title: string; description: string } | null>(null)
+  const [newInviteCreated, setNewInviteCreated] = useState<string | null>(null)
+  const [auditPage, setAuditPage] = useState(0)
 
   if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
     return (
@@ -65,6 +69,30 @@ export default function AdminScreen() {
     queryKey: ['instance-bans'],
     queryFn: () => moderationApi.listInstanceBans().then(r => r.data),
     enabled: tab === 'instances',
+  })
+
+  const { data: settingsData, isLoading: settingsLoading } = useQuery({
+    queryKey: ['admin-settings'],
+    queryFn: () => adminApi.getSettings().then(r => r.data),
+    enabled: tab === 'settings',
+  })
+
+  const { data: rulesData, isLoading: rulesLoading } = useQuery({
+    queryKey: ['admin-rules'],
+    queryFn: () => adminApi.listRules().then(r => r.data),
+    enabled: tab === 'rules',
+  })
+
+  const { data: invitesData, isLoading: invitesLoading } = useQuery({
+    queryKey: ['admin-invites'],
+    queryFn: () => adminApi.listInvites().then(r => r.data),
+    enabled: tab === 'invites',
+  })
+
+  const { data: auditData, isLoading: auditLoading } = useQuery({
+    queryKey: ['admin-audit', auditPage],
+    queryFn: () => adminApi.getAuditLog(auditPage).then(r => r.data),
+    enabled: tab === 'audit',
   })
 
   const reviewRep = useMutation({
@@ -129,6 +157,47 @@ export default function AdminScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['instance-bans'] }),
   })
 
+  const updateSettings = useMutation({
+    mutationFn: (data: any) => adminApi.updateSettings(data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-settings'] }); Alert.alert('Saved') },
+    onError: () => Alert.alert('Error', 'Could not save settings'),
+  })
+
+  const createRule = useMutation({
+    mutationFn: () => adminApi.createRule({ title: newRuleForm.title.trim(), description: newRuleForm.description.trim() || undefined }),
+    onSuccess: () => { setNewRuleForm({ title: '', description: '' }); qc.invalidateQueries({ queryKey: ['admin-rules'] }) },
+    onError: () => Alert.alert('Error', 'Could not create rule'),
+  })
+
+  const updateRule = useMutation({
+    mutationFn: () => editingRule ? adminApi.updateRule(editingRule.id, { title: editingRule.title, description: editingRule.description }) : Promise.resolve(),
+    onSuccess: () => { setEditingRule(null); qc.invalidateQueries({ queryKey: ['admin-rules'] }) },
+    onError: () => Alert.alert('Error', 'Could not update rule'),
+  })
+
+  const deleteRule = useMutation({
+    mutationFn: (id: string) => adminApi.deleteRule(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-rules'] }),
+    onError: () => Alert.alert('Error', 'Could not delete rule'),
+  })
+
+  const moveRule = useMutation({
+    mutationFn: ({ id, direction }: { id: string; direction: 'up' | 'down' }) => adminApi.moveRule(id, direction),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-rules'] }),
+  })
+
+  const createInvite = useMutation({
+    mutationFn: () => adminApi.createInvite(),
+    onSuccess: (res) => { setNewInviteCreated(res.data.code || res.data.token || res.data.invite?.code); qc.invalidateQueries({ queryKey: ['admin-invites'] }) },
+    onError: () => Alert.alert('Error', 'Could not create invite'),
+  })
+
+  const revokeInvite = useMutation({
+    mutationFn: (id: string) => adminApi.deleteInvite(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-invites'] }),
+    onError: () => Alert.alert('Error', 'Could not revoke invite'),
+  })
+
   const suspendUserDirect = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => moderationApi.suspendUser(id, data),
     onSuccess: () => {
@@ -168,6 +237,11 @@ export default function AdminScreen() {
   const users: any[] = usersData?.users || []
   const waitlistUsers: any[] = waitlistData?.users || []
   const instanceBans: any[] = instanceBansData?.instance_bans || []
+  const rules: any[] = rulesData?.rules || []
+  const invites: any[] = invitesData?.invites || []
+  const auditEntries: any[] = auditData?.entries || auditData?.logs || []
+  const auditHasMore: boolean = auditData?.has_more ?? false
+  const settings: any = settingsData || {}
 
   return (
     <Screen>
@@ -177,9 +251,11 @@ export default function AdminScreen() {
         headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
       }} />
 
-      {/* Tab bar */}
-      <View style={[s.tabBar, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-        {(['reports', 'moderation', 'users', 'waitlist', 'instances'] as Tab[]).map(t => (
+      {/* Tab bar — scrollable to fit all tabs */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={[s.tabBar, { backgroundColor: c.card, borderBottomColor: c.border }]}
+        contentContainerStyle={{ flexDirection: 'row' }}>
+        {(['reports', 'moderation', 'users', 'waitlist', 'instances', 'invites', 'rules', 'settings', 'audit'] as Tab[]).map(t => (
           <TouchableOpacity key={t} onPress={() => setTab(t)}
             style={[s.tabItem, tab === t && { borderBottomColor: c.primary }]}>
             <Text style={[s.tabText, { color: tab === t ? c.primary : c.textMuted }]}>
@@ -187,7 +263,7 @@ export default function AdminScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {/* Reports tab */}
       {tab === 'reports' && (
@@ -546,6 +622,214 @@ export default function AdminScreen() {
           ))}
         </ScrollView>
       )}
+      {/* Invites tab (AMOBILE-69) */}
+      {tab === 'invites' && (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+          <TouchableOpacity onPress={() => createInvite.mutate()} disabled={createInvite.isPending}
+            style={[s.actionBtn, { backgroundColor: c.primary, marginBottom: 16 }]}>
+            <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>
+              {createInvite.isPending ? 'Creating…' : '+ Create Invite Code'}
+            </Text>
+          </TouchableOpacity>
+          {newInviteCreated && (
+            <View style={[s.actionSection, { borderColor: '#22c55e', backgroundColor: '#f0fdf4', marginBottom: 12 }]}>
+              <Text style={[s.actionSectionTitle, { color: '#15803d' }]}>New invite code created</Text>
+              <Text style={{ fontFamily: 'monospace', fontSize: 15, color: '#15803d', marginTop: 4 }}>{newInviteCreated}</Text>
+              <TouchableOpacity onPress={() => Share.share({ message: newInviteCreated })} style={{ marginTop: 8 }}>
+                <Text style={{ color: c.primary, fontSize: 13 }}>Share code →</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          <Text style={[s.sectionTitle, { color: c.textMuted }]}>Active Invites</Text>
+          {invitesLoading ? <Spinner /> : invites.length === 0 ? (
+            <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>No active invite codes.</Text>
+          ) : invites.map((inv: any) => (
+            <View key={inv.id} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: '600', color: c.text }}>{inv.code || inv.token || inv.id}</Text>
+                  {inv.created_by_username && <Text style={{ fontSize: 12, color: c.textMuted }}>By @{inv.created_by_username}</Text>}
+                  {inv.uses !== undefined && <Text style={{ fontSize: 12, color: c.textMuted }}>Uses: {inv.uses}</Text>}
+                  {inv.created_at && <Text style={{ fontSize: 11, color: c.textMuted }}>{new Date(inv.created_at).toLocaleDateString()}</Text>}
+                </View>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <TouchableOpacity onPress={() => Share.share({ message: inv.code || inv.token })}
+                    style={[s.smallBtn, { borderColor: c.primary, backgroundColor: c.primaryBg }]}>
+                    <Ionicons name="share-outline" size={14} color={c.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => Alert.alert('Revoke invite?', undefined, [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Revoke', style: 'destructive', onPress: () => revokeInvite.mutate(inv.id) },
+                  ])} style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
+                    <Text style={{ fontSize: 12, color: c.red }}>Revoke</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      )}
+
+      {/* Rules tab (AMOBILE-68) */}
+      {tab === 'rules' && (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+          {/* New rule form */}
+          <View style={[s.actionSection, { borderColor: c.border, marginBottom: 16 }]}>
+            <Text style={[s.actionSectionTitle, { color: c.textMuted }]}>New Rule</Text>
+            <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
+              placeholder="Rule title" placeholderTextColor={c.textLight}
+              value={newRuleForm.title} onChangeText={t => setNewRuleForm(f => ({ ...f, title: t }))} />
+            <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
+              placeholder="Description (optional)" placeholderTextColor={c.textLight}
+              value={newRuleForm.description} onChangeText={t => setNewRuleForm(f => ({ ...f, description: t }))}
+              multiline />
+            <TouchableOpacity disabled={!newRuleForm.title.trim() || createRule.isPending}
+              onPress={() => createRule.mutate()}
+              style={[s.actionBtn, { backgroundColor: c.primary, opacity: !newRuleForm.title.trim() ? 0.5 : 1 }]}>
+              <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>Add rule</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[s.sectionTitle, { color: c.textMuted }]}>Instance Rules</Text>
+          {rulesLoading ? <Spinner /> : rules.length === 0 ? (
+            <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>No rules yet.</Text>
+          ) : rules.map((rule: any, idx: number) => (
+            <View key={rule.id} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+              {editingRule?.id === rule.id ? (
+                <View style={{ gap: 8 }}>
+                  <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
+                    value={editingRule.title} onChangeText={t => setEditingRule(e => e ? { ...e, title: t } : null)} />
+                  <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
+                    value={editingRule.description} onChangeText={t => setEditingRule(e => e ? { ...e, description: t } : null)}
+                    placeholder="Description" placeholderTextColor={c.textLight} multiline />
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity onPress={() => updateRule.mutate()} disabled={updateRule.isPending}
+                      style={[s.actionBtn, { backgroundColor: c.primary, flex: 1 }]}>
+                      <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>Save</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setEditingRule(null)}
+                      style={[s.actionBtn, { borderWidth: 1, borderColor: c.border, flex: 1 }]}>
+                      <Text style={{ color: c.textMd, fontSize: 13 }}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>{idx + 1}. {rule.title}</Text>
+                    {rule.description ? <Text style={{ fontSize: 13, color: c.textMd, marginTop: 3 }}>{rule.description}</Text> : null}
+                  </View>
+                  <View style={{ gap: 4 }}>
+                    <View style={{ flexDirection: 'row', gap: 4 }}>
+                      <TouchableOpacity onPress={() => moveRule.mutate({ id: rule.id, direction: 'up' })} disabled={idx === 0}
+                        style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg, opacity: idx === 0 ? 0.4 : 1 }]}>
+                        <Ionicons name="chevron-up" size={14} color={c.textMd} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => moveRule.mutate({ id: rule.id, direction: 'down' })} disabled={idx === rules.length - 1}
+                        style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg, opacity: idx === rules.length - 1 ? 0.4 : 1 }]}>
+                        <Ionicons name="chevron-down" size={14} color={c.textMd} />
+                      </TouchableOpacity>
+                    </View>
+                    <TouchableOpacity onPress={() => setEditingRule({ id: rule.id, title: rule.title, description: rule.description || '' })}
+                      style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
+                      <Ionicons name="pencil-outline" size={14} color={c.textMd} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => Alert.alert('Delete rule?', rule.title, [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Delete', style: 'destructive', onPress: () => deleteRule.mutate(rule.id) },
+                    ])} style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
+                      <Ionicons name="trash-outline" size={14} color={c.red} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+          ))}
+        </ScrollView>
+      )}
+
+      {/* Settings tab (AMOBILE-68) */}
+      {tab === 'settings' && (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+          {settingsLoading ? <Spinner /> : (
+            <View style={{ gap: 12 }}>
+              <Text style={[s.sectionTitle, { color: c.textMuted }]}>Instance Settings</Text>
+              {Object.entries(settings).map(([key, value]: [string, any]) => (
+                <View key={key} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                  <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>{key.replace(/_/g, ' ')}</Text>
+                  {typeof value === 'boolean' ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text style={{ color: c.text, fontSize: 14 }}>{value ? 'Enabled' : 'Disabled'}</Text>
+                      <Switch value={value}
+                        onValueChange={v => updateSettings.mutate({ [key]: v })}
+                        trackColor={{ false: c.border, true: c.primary }} />
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <TextInput
+                        style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg, flex: 1 }]}
+                        defaultValue={String(value ?? '')}
+                        onEndEditing={e => updateSettings.mutate({ [key]: e.nativeEvent.text })}
+                        returnKeyType="done"
+                      />
+                    </View>
+                  )}
+                </View>
+              ))}
+              {Object.keys(settings).length === 0 && (
+                <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>No settings available.</Text>
+              )}
+            </View>
+          )}
+        </ScrollView>
+      )}
+
+      {/* Audit log tab (AMOBILE-70) */}
+      {tab === 'audit' && (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+          <Text style={[s.sectionTitle, { color: c.textMuted }]}>Audit Log</Text>
+          {auditLoading ? <Spinner /> : auditEntries.length === 0 ? (
+            <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>No audit log entries.</Text>
+          ) : (
+            <>
+              {auditEntries.map((entry: any, i: number) => (
+                <View key={entry.id || i} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>
+                        {entry.action?.replace(/_/g, ' ') || 'Unknown action'}
+                      </Text>
+                      {entry.admin_username && <Text style={{ fontSize: 12, color: c.textMuted }}>By @{entry.admin_username}</Text>}
+                      {entry.target_username && <Text style={{ fontSize: 12, color: c.textMuted }}>Target: @{entry.target_username}</Text>}
+                      {entry.details && <Text style={{ fontSize: 12, color: c.textMd, marginTop: 3 }}>{entry.details}</Text>}
+                    </View>
+                    {entry.created_at && (
+                      <Text style={{ fontSize: 11, color: c.textMuted, flexShrink: 0 }}>
+                        {new Date(entry.created_at).toLocaleDateString()}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                {auditPage > 0 && (
+                  <TouchableOpacity onPress={() => setAuditPage(p => Math.max(0, p - 1))}
+                    style={[s.actionBtn, { borderWidth: 1, borderColor: c.border, flex: 1 }]}>
+                    <Text style={{ color: c.textMd, fontSize: 13 }}>← Previous</Text>
+                  </TouchableOpacity>
+                )}
+                {auditHasMore && (
+                  <TouchableOpacity onPress={() => setAuditPage(p => p + 1)}
+                    style={[s.actionBtn, { borderWidth: 1, borderColor: c.border, flex: 1 }]}>
+                    <Text style={{ color: c.textMd, fontSize: 13 }}>Next →</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </>
+          )}
+        </ScrollView>
+      )}
+
     </Screen>
   )
 }
