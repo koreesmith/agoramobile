@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native'
 import { router, Stack } from 'expo-router'
 import { useQuery, useMutation } from '@tanstack/react-query'
@@ -11,9 +11,29 @@ import { useC } from '../constants/ColorContext'
 export default function NewConversationScreen() {
   const c = useC()
   const [search, setSearch] = useState('')
-  const { data: friendsData, isLoading } = useQuery({ queryKey: ['friends'], queryFn: () => friendsApi.listFriends().then(r => r.data) })
-  const friends = friendsData?.friends || []
-  const filtered = friends.filter((f: any) => !search || f.username.toLowerCase().includes(search.toLowerCase()) || (f.display_name || '').toLowerCase().includes(search.toLowerCase()))
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  // Server-side friend search when querying; full list when blank
+  const { data: searchData, isLoading: sl } = useQuery({
+    queryKey: ['dm-friend-search', debouncedSearch],
+    queryFn: () => dmApi.friendSearch(debouncedSearch).then(r => r.data),
+    enabled: debouncedSearch.length >= 1,
+  })
+  const { data: friendsData, isLoading: fl } = useQuery({
+    queryKey: ['friends'],
+    queryFn: () => friendsApi.listFriends().then(r => r.data),
+    enabled: debouncedSearch.length === 0,
+  })
+
+  const isLoading = debouncedSearch.length >= 1 ? sl : fl
+  const results = debouncedSearch.length >= 1
+    ? (searchData?.users || searchData?.friends || [])
+    : (friendsData?.friends || [])
 
   const start = useMutation({
     mutationFn: (username: string) => dmApi.startConversation(username),
@@ -29,7 +49,7 @@ export default function NewConversationScreen() {
           <TextInput style={s.searchInput} placeholder="Search friends…" placeholderTextColor={c.textLight} value={search} onChangeText={setSearch} autoFocus />
         </View>
         {isLoading ? <Spinner /> : (
-          <FlatList data={filtered} keyExtractor={(f: any) => f.id}
+          <FlatList data={results} keyExtractor={(f: any) => f.id}
             ListEmptyComponent={<View style={s.empty}><Text style={{ color: c.textLight }}>{search ? 'No friends match' : 'No friends yet'}</Text></View>}
             renderItem={({ item: f }) => (
               <TouchableOpacity onPress={() => start.mutate(f.username)} disabled={start.isPending} style={s.row}>
