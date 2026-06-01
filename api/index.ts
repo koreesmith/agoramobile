@@ -98,6 +98,11 @@ export const usersApi = {
     form.append('file', file)
     return api.post('/users/me/avatar', form, { headers: { 'Content-Type': 'multipart/form-data' } })
   },
+  uploadCover:     (file: any)        => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post('/users/me/cover', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
   discover:        ()                 => api.get('/users/discover'),
   exportData:      ()                 => api.get('/users/me/export', { responseType: 'blob' }),
   requestDeletion: ()                 => api.post('/users/me/request-deletion'),
