@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useQuery } from '@tanstack/react-query'
 import * as Notifications from 'expo-notifications'
 import { useAuthStore } from '../../store/auth'
-import { notificationsApi } from '../../api'
+import { notificationsApi, dmApi } from '../../api'
 import { light, dark } from '../../constants/colors'
 import { useThemeStore } from '../../store/theme'
 
@@ -36,6 +36,14 @@ export default function TabsLayout() {
   })
   const unread: number = unreadData?.count ?? 0
 
+  const { data: convsData } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: () => dmApi.listConversations().then(r => r.data),
+    refetchInterval: 30_000,
+    enabled: isAuthenticated,
+  })
+  const unreadMessages: number = (convsData?.conversations ?? []).reduce((sum: number, c: any) => sum + (c.unread_count ?? 0), 0)
+
   useEffect(() => {
     if (!notificationsReady || (unread === 0 && !unreadData)) return
     Notifications.setBadgeCountAsync(unread).catch(() => {})
@@ -59,7 +67,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="notifications" options={{ title: 'Alerts', tabBarIcon: ({ color, size }) => <Ionicons name="notifications-outline" size={size} color={color} />, tabBarBadge: unread > 0 ? (unread > 9 ? '9+' : unread) : undefined }} />
       <Tabs.Screen name="groups" options={{ title: 'Groups', tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" size={size} color={color} /> }} />
       <Tabs.Screen name="friends" options={{ title: 'Friends', tabBarIcon: ({ color, size }) => <Ionicons name="person-add-outline" size={size} color={color} /> }} />
-      <Tabs.Screen name="messages" options={{ title: 'Messages', tabBarIcon: ({ color, size }) => <Ionicons name="chatbubble-outline" size={size} color={color} /> }} />
+      <Tabs.Screen name="messages" options={{ title: 'Messages', tabBarIcon: ({ color, size }) => <Ionicons name="chatbubble-outline" size={size} color={color} />, tabBarBadge: unreadMessages > 0 ? (unreadMessages > 9 ? '9+' : unreadMessages) : undefined }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} /> }} />
     </Tabs>
   )
