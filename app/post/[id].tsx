@@ -350,7 +350,7 @@ export default function PostScreen() {
         </ScrollView>
 
         {/* Composer */}
-        <View style={[s.composerWrap, { borderTopColor: c.border, backgroundColor: c.card }]}>
+        <View style={[s.composerWrap, { borderTopColor: c.border, backgroundColor: c.card, paddingBottom: insets.bottom }]}>
           {/* Reply banner */}
           {replyTo && (
             <View style={[s.replyBanner, { backgroundColor: c.primaryBg, borderBottomColor: c.border }]}>
