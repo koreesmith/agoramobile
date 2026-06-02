@@ -320,6 +320,8 @@ export default function PostScreen() {
 
   const post = postData?.post
   const comments = commentsData?.comments || []
+  const nestedReplyIds = new Set(comments.flatMap((c: any) => c.replies?.map((r: any) => r.id) ?? []))
+  const rootComments = comments.filter((c: any) => !nestedReplyIds.has(c.id))
   const canSend = (comment.trim() || commentImage) && !createComment.isPending
 
   return (
@@ -333,9 +335,9 @@ export default function PostScreen() {
           {pl ? <Spinner /> : post ? <PostCard post={post} queryKey={['post', id]} /> : null}
           <View style={{ paddingHorizontal: 16, paddingBottom: 24 }}>
             <Text style={[s.commentsHeader, { color: c.textMuted }]}>
-              {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
+              {rootComments.length} {rootComments.length === 1 ? 'comment' : 'comments'}
             </Text>
-            {cl ? <Spinner /> : comments.map((comment: any) => (
+            {cl ? <Spinner /> : rootComments.map((comment: any) => (
               <CommentRow
                 key={comment.id}
                 comment={comment}
