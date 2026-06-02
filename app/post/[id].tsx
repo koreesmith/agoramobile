@@ -328,7 +328,7 @@ export default function PostScreen() {
         headerShown: true, headerTitle: 'Post', headerBackTitle: 'Back',
         headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
       }} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={insets.top + 44}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={insets.top + 44}>
         <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={pl || cl} onRefresh={() => { refetch(); rc() }} tintColor={c.primary} />}>
           {pl ? <Spinner /> : post ? <PostCard post={post} queryKey={['post', id]} /> : null}
           <View style={{ paddingHorizontal: 16, paddingBottom: 24 }}>
