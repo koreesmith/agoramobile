@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator, StyleSheet } from 'react-native'
+import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator, Modal, StyleSheet } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -24,7 +24,10 @@ export default function ConversationScreen() {
   const [imageUrl, setImageUrl] = useState('')
   const [uploading, setUploading] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [reactionTarget, setReactionTarget] = useState<string | null>(null)
   const flatListRef = useRef<FlatList>(null)
+
+  const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '😡', '👍']
 
   const { data: convData } = useQuery({ queryKey: ['conversation', id], queryFn: () => dmApi.getConversation(id!).then(r => r.data) })
   const { data: msgData, refetch } = useQuery({ queryKey: ['messages', id], queryFn: () => dmApi.getMessages(id!).then(r => r.data), refetchInterval: 5_000 })
@@ -41,7 +44,9 @@ export default function ConversationScreen() {
     mutationFn: () => dmApi.sendMessage(id!, text, imageUrl || undefined),
     onSuccess: () => { setText(''); setImageUrl(''); refetch(); qc.invalidateQueries({ queryKey: ['conversations'] }) },
   })
-  const del    = useMutation({ mutationFn: (msgId: string) => dmApi.deleteMessage(msgId), onSuccess: refetch })
+  const del      = useMutation({ mutationFn: (msgId: string) => dmApi.deleteMessage(msgId), onSuccess: refetch })
+  const react    = useMutation({ mutationFn: ({ msgId, emoji }: { msgId: string; emoji: string }) => dmApi.reactMessage(msgId, emoji), onSuccess: () => { setReactionTarget(null); refetch() } })
+  const unreact  = useMutation({ mutationFn: (msgId: string) => dmApi.unreactMessage(msgId), onSuccess: refetch })
   const accept = useMutation({ mutationFn: () => dmApi.acceptRequest(id!), onSuccess: () => qc.invalidateQueries({ queryKey: ['conversation', id] }) })
 
   const pickImage = async () => {
@@ -97,19 +102,33 @@ export default function ConversationScreen() {
             return (
               <View style={[s.bubbleRow, isOwn && { justifyContent: 'flex-end' }]}>
                 {!isOwn && <Avatar url={msg.author_avatar_url} name={msg.author_display_name} size={28} />}
-                <TouchableOpacity
-                  onLongPress={() => isOwn && Alert.alert('Delete message?', undefined, [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', style: 'destructive', onPress: () => del.mutate(msg.id) },
-                  ])}
-                  style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}
-                >
-                  {msg.content ? <Text style={[s.bubbleText, isOwn && { color: 'white' }]}>{msg.content}</Text> : null}
-                  {msg.image_url ? <Image source={{ uri: msg.image_url }} style={s.bubbleImage} resizeMode="cover" /> : null}
-                  <Text style={[s.bubbleTime, isOwn && { color: 'rgba(255,255,255,0.7)' }]}>
-                    {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
-                  </Text>
-                </TouchableOpacity>
+                <View style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
+                  <TouchableOpacity
+                    onLongPress={() => {
+                      if (isOwn) {
+                        Alert.alert('Message', undefined, [
+                          { text: 'React', onPress: () => setReactionTarget(msg.id) },
+                          { text: 'Delete', style: 'destructive', onPress: () => del.mutate(msg.id) },
+                          { text: 'Cancel', style: 'cancel' },
+                        ])
+                      } else {
+                        setReactionTarget(msg.id)
+                      }
+                    }}
+                    style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}
+                  >
+                    {msg.content ? <Text style={[s.bubbleText, isOwn && { color: 'white' }]}>{msg.content}</Text> : null}
+                    {msg.image_url ? <Image source={{ uri: msg.image_url }} style={s.bubbleImage} resizeMode="cover" /> : null}
+                    <Text style={[s.bubbleTime, isOwn && { color: 'rgba(255,255,255,0.7)' }]}>
+                      {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
+                    </Text>
+                  </TouchableOpacity>
+                  {msg.reaction && (
+                    <TouchableOpacity onPress={() => unreact.mutate(msg.id)} style={s.msgReaction}>
+                      <Text style={{ fontSize: 14 }}>{msg.reaction}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             )
           }}
@@ -122,6 +141,20 @@ export default function ConversationScreen() {
             </TouchableOpacity>
           </View>
         ) : null}
+        {/* Reaction picker modal */}
+        <Modal visible={!!reactionTarget} transparent animationType="fade" onRequestClose={() => setReactionTarget(null)}>
+          <TouchableOpacity style={s.reactionOverlay} activeOpacity={1} onPress={() => setReactionTarget(null)}>
+            <View style={[s.reactionPicker, { backgroundColor: c.card, borderColor: c.border }]}>
+              {QUICK_REACTIONS.map(emoji => (
+                <TouchableOpacity key={emoji} onPress={() => reactionTarget && react.mutate({ msgId: reactionTarget, emoji })}
+                  style={s.reactionBtn}>
+                  <Text style={{ fontSize: 26 }}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
         {(conv?.is_accepted !== false) && (
           <View style={[s.composer, { backgroundColor: c.card, borderTopColor: c.border, paddingBottom: Math.max(insets.bottom, 10) }]}>
             <TouchableOpacity onPress={pickImage} disabled={uploading}>
@@ -140,6 +173,10 @@ export default function ConversationScreen() {
 }
 
 const s = StyleSheet.create({
+  reactionOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.35)' },
+  reactionPicker:  { flexDirection: 'row', gap: 6, padding: 14, borderRadius: 20, borderWidth: 1 },
+  reactionBtn:     { padding: 6 },
+  msgReaction:     { marginTop: 3, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: 'rgba(0,0,0,0.07)', borderRadius: 12 },
   requestBanner: { margin: 12, padding: 12, backgroundColor: '#fefce8', borderWidth: 1, borderColor: '#fde68a', borderRadius: 12 },
   requestTitle: { fontSize: 14, fontWeight: '600', color: '#92400e' },
   requestSub: { fontSize: 12, color: '#b45309', marginBottom: 8 },

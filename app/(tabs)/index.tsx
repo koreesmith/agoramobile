@@ -4,15 +4,16 @@ import {
   RefreshControl, Modal, Alert, ActivityIndicator, StyleSheet,
   KeyboardAvoidingView, Platform, Dimensions,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
-import { Screen, Header, Spinner, EmptyState, UploadingModal } from '../../components/ui'
+import { Screen, Header, Spinner, EmptyState, UploadingModal, Avatar } from '../../components/ui'
 import PostCard from '../../components/PostCard'
-import { feedApi, feedsApi, friendsApi, instanceApi, imgUrl } from '../../api'
+import { feedApi, feedsApi, friendsApi, instanceApi, usersApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
 
@@ -39,6 +40,7 @@ const URL_RE = /https?:\/\/[^\s]+/g
 
 export default function FeedScreen() {
   const c = useC()
+  const insets = useSafeAreaInsets()
   const { user } = useAuthStore()
   const { blockedIds } = useBlockStore()
   const { data: instanceData } = useQuery({
@@ -67,6 +69,7 @@ export default function FeedScreen() {
   const [linkPreview, setLinkPreview] = useState<{url:string,title:string,description:string,image:string,domain:string}|null>(null)
   const [linkFetching, setLinkFetching] = useState(false)
   const [activeFeedId, setActiveFeedId] = useState<string | null>(null)
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
 
   const { data: customFeedsData } = useQuery({
     queryKey: ['custom-feeds'],
@@ -128,6 +131,25 @@ export default function FeedScreen() {
     }).finally(() => setLinkFetching(false))
   }, [content])
 
+  // Detect @mention being typed and extract the query
+  const handleContentChange = (text: string) => {
+    setContent(text)
+    const match = text.match(/@(\w*)$/)
+    setMentionQuery(match ? match[1] : null)
+  }
+
+  const { data: mentionData } = useQuery({
+    queryKey: ['mention-search', mentionQuery],
+    queryFn: () => usersApi.mentionSearch(mentionQuery!).then(r => r.data),
+    enabled: mentionQuery !== null && mentionQuery.length >= 1,
+  })
+  const mentionSuggestions: any[] = mentionData?.users || []
+
+  const insertMention = (username: string) => {
+    setContent(prev => prev.replace(/@\w*$/, `@${username} `))
+    setMentionQuery(null)
+  }
+
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch, isRefetching } = useInfiniteQuery({
     queryKey: ['feed', activeFeedId],
     queryFn: ({ pageParam = 0 }) => feedApi.getFeed(pageParam, activeFeedId ?? undefined).then(r => r.data),
@@ -188,9 +210,14 @@ export default function FeedScreen() {
   return (
     <Screen>
       <Header title="Feed" right={
-        <TouchableOpacity onPress={() => setShowCompose(true)} style={s.postBtn}>
-          <Text style={s.postBtnText}>Post</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <TouchableOpacity onPress={() => router.push('/search')} style={s.searchBtn}>
+            <Ionicons name="search-outline" size={22} color={c.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowCompose(true)} style={s.postBtn}>
+            <Text style={s.postBtnText}>Post</Text>
+          </TouchableOpacity>
+        </View>
       } />
 
       <ScrollView
@@ -248,7 +275,7 @@ export default function FeedScreen() {
       </View>
 
       <Modal visible={showCompose} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: c.card }}>
+        <View style={{ flex: 1, backgroundColor: c.card, paddingTop: Platform.OS === 'android' ? insets.top : 0 }}>
           <UploadingModal visible={showUploadModal} />
           <KeyboardAvoidingView
             style={{ flex: 1 }}
@@ -381,8 +408,22 @@ export default function FeedScreen() {
               style={[s.composeInput, { color: c.text }]}
               placeholder={showPoll ? 'Ask a question…' : 'What\'s on your mind?'}
               placeholderTextColor={c.textLight}
-              value={content} onChangeText={setContent} multiline autoFocus={!showCW}
+              value={content} onChangeText={handleContentChange} multiline autoFocus={!showCW}
             />
+            {mentionSuggestions.length > 0 && mentionQuery !== null && (
+              <View style={[s.mentionList, { backgroundColor: c.card, borderColor: c.border }]}>
+                {mentionSuggestions.slice(0, 5).map((u: any) => (
+                  <TouchableOpacity key={u.id} onPress={() => insertMention(u.username)}
+                    style={[s.mentionRow, { borderBottomColor: c.border }]}>
+                    <Avatar url={u.avatar_url} name={u.display_name || u.username} size={28} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>{u.display_name || u.username}</Text>
+                      <Text style={{ fontSize: 11, color: c.textMuted }}>@{u.username}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             {/* Poll editor */}
             {showPoll && (
@@ -500,6 +541,7 @@ const s = StyleSheet.create({
   switcher: { flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth },
   feedTab: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
   feedTabText: { fontSize: 13, fontWeight: '500' },
+  searchBtn: { padding: 4 },
   postBtn: { backgroundColor: '#486581', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
   postBtnText: { color: 'white', fontWeight: '600', fontSize: 14 },
   fab: {
@@ -549,5 +591,7 @@ const s = StyleSheet.create({
   audienceLabel: { fontSize: 13, fontWeight: '600' },
   inlinePicker: { borderBottomWidth: 1 },
   inlineOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  mentionList: { borderWidth: 1, borderRadius: 10, marginTop: 4, overflow: 'hidden' },
+  mentionRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },
 })
 
