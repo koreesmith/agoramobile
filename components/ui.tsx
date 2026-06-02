@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -22,6 +22,40 @@ export function Avatar({ url, name, size = 40, online }: { url?: string; name?: 
         <View style={[lay.statusDot, { width: dotSize, height: dotSize, borderRadius: dotSize / 2 }]} />
       )}
     </View>
+  )
+}
+
+const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi
+
+/** Renders a string with any http/https URLs as tappable links. */
+export function LinkedText({ text, style, linkStyle }: { text: string; style?: object; linkStyle?: object }) {
+  const parts: { text: string; isUrl: boolean }[] = []
+  let last = 0
+  let match: RegExpExecArray | null
+  URL_REGEX.lastIndex = 0
+  while ((match = URL_REGEX.exec(text)) !== null) {
+    if (match.index > last) parts.push({ text: text.slice(last, match.index), isUrl: false })
+    parts.push({ text: match[0], isUrl: true })
+    last = match.index + match[0].length
+  }
+  if (last < text.length) parts.push({ text: text.slice(last), isUrl: false })
+
+  return (
+    <Text style={style}>
+      {parts.map((part, i) =>
+        part.isUrl ? (
+          <Text
+            key={i}
+            style={[{ color: '#3b82f6', textDecorationLine: 'underline' }, linkStyle]}
+            onPress={() => Linking.openURL(part.text)}
+          >
+            {part.text}
+          </Text>
+        ) : (
+          <Text key={i}>{part.text}</Text>
+        )
+      )}
+    </Text>
   )
 }
 
