@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Image, TextInput, StyleSheet } from 'react-native'
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Image, TextInput, StyleSheet, Modal, Switch, Alert } from 'react-native'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -13,6 +13,10 @@ export default function GroupsScreen() {
   const c = useC()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newDesc, setNewDesc] = useState('')
+  const [newPrivate, setNewPrivate] = useState(false)
 
   const { data: joinedData, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['groups', 'joined'],
@@ -24,6 +28,20 @@ export default function GroupsScreen() {
   })
 
   const join = useMutation({ mutationFn: (slug: string) => groupsApi.join(slug), onSuccess: () => { qc.invalidateQueries({ queryKey: ['groups'] }) } })
+
+  const createGroup = useMutation({
+    mutationFn: () => groupsApi.create({ name: newName.trim(), description: newDesc.trim() || undefined, privacy: newPrivate ? 'private' : 'public' }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['groups'] })
+      setShowCreate(false)
+      setNewName('')
+      setNewDesc('')
+      setNewPrivate(false)
+      const slug = res.data?.group?.slug || res.data?.slug
+      if (slug) router.push(`/group/${slug}`)
+    },
+    onError: () => Alert.alert('Error', 'Failed to create group.'),
+  })
 
   const myGroups = joinedData?.groups || []
   const allDiscover = (discoverData?.groups || []).filter((g: any) => !myGroups.find((m: any) => m.id === g.id))
@@ -52,7 +70,14 @@ export default function GroupsScreen() {
 
   return (
     <Screen>
-      <Header title="Groups" />
+      <Header
+        title="Groups"
+        right={
+          <TouchableOpacity onPress={() => setShowCreate(true)} style={{ padding: 4 }}>
+            <Ionicons name="add" size={24} color={c.primary} />
+          </TouchableOpacity>
+        }
+      />
       <View style={[s.searchWrap, { backgroundColor: c.card, borderBottomColor: c.border }]}>
         <Ionicons name="search" size={16} color={c.textMuted} style={{ marginRight: 6 }} />
         <TextInput
@@ -90,6 +115,65 @@ export default function GroupsScreen() {
         ) : discover.length > 0 ? <Text style={[s.sectionHeader, { color: c.textMuted }]}>Discover</Text> : null}
         renderItem={({ item }) => filteredMyGroups.includes(item) ? null : <GroupRow group={item} />}
       />
+
+      <Modal visible={showCreate} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <View style={[s.modalCard, { backgroundColor: c.card }]}>
+            <Text style={[s.modalTitle, { color: c.text }]}>Create Group</Text>
+
+            <Text style={[s.fieldLabel, { color: c.textMuted }]}>Name *</Text>
+            <TextInput
+              style={[s.fieldInput, { backgroundColor: c.bg, color: c.text, borderColor: c.border }]}
+              placeholder="Group name"
+              placeholderTextColor={c.textLight}
+              value={newName}
+              onChangeText={setNewName}
+            />
+
+            <Text style={[s.fieldLabel, { color: c.textMuted }]}>Description</Text>
+            <TextInput
+              style={[s.fieldInput, s.fieldMultiline, { backgroundColor: c.bg, color: c.text, borderColor: c.border }]}
+              placeholder="Optional description"
+              placeholderTextColor={c.textLight}
+              value={newDesc}
+              onChangeText={setNewDesc}
+              multiline
+              numberOfLines={2}
+            />
+
+            <View style={[s.privacyRow, { borderColor: c.border }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[{ fontSize: 14, fontWeight: '600', color: c.text }]}>Private</Text>
+                <Text style={[{ fontSize: 12, color: c.textMuted, marginTop: 2 }]}>
+                  {newPrivate ? 'Invite-only / approval required' : 'Anyone can join'}
+                </Text>
+              </View>
+              <Switch
+                value={newPrivate}
+                onValueChange={setNewPrivate}
+                trackColor={{ false: c.border, true: c.primary }}
+                thumbColor={c.white}
+              />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+              <TouchableOpacity
+                onPress={() => { setShowCreate(false); setNewName(''); setNewDesc(''); setNewPrivate(false) }}
+                style={[s.modalBtn, { borderColor: c.border }]}
+              >
+                <Text style={{ color: c.textMd }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => createGroup.mutate()}
+                disabled={!newName.trim() || createGroup.isPending}
+                style={[s.modalBtn, { backgroundColor: (!newName.trim() || createGroup.isPending) ? c.primaryLt : c.primary, borderColor: 'transparent' }]}
+              >
+                <Text style={{ color: 'white', fontWeight: '600' }}>{createGroup.isPending ? 'Creating…' : 'Create'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   )
 }
@@ -105,5 +189,13 @@ const s = StyleSheet.create({
   joinBtn: { backgroundColor: '#486581', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   joinBtnText: { color: 'white', fontSize: 12, fontWeight: '600' },
   sectionHeader: { fontSize: 11, fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modalCard: { width: '100%', borderRadius: 16, padding: 20, gap: 6 },
+  modalTitle: { fontSize: 17, fontWeight: '700', marginBottom: 6 },
+  fieldLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 8, marginBottom: 4 },
+  fieldInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
+  fieldMultiline: { minHeight: 60, textAlignVertical: 'top' },
+  privacyRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, padding: 12, marginTop: 8 },
+  modalBtn: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
 })
 

@@ -77,6 +77,7 @@ export const feedApi = {
   getComments:  (id: string)         => api.get(`/posts/${id}/comments`),
   createComment:(id: string, data: any) => api.post(`/posts/${id}/comments`, data),
   deleteComment:(postId: string, commentId: string) => api.delete(`/posts/${postId}/comments/${commentId}`),
+  editComment:  (postId: string, commentId: string, content: string) => api.patch(`/posts/${postId}/comments/${commentId}`, { content }),
   getUserPosts: (username: string)   => api.get(`/users/${username}/posts`),
   uploadMedia:  (file: any, category = 'posts') => {
     const form = new FormData()
@@ -97,7 +98,15 @@ export const usersApi = {
     form.append('file', file)
     return api.post('/users/me/avatar', form, { headers: { 'Content-Type': 'multipart/form-data' } })
   },
+  uploadCover:     (file: any)        => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post('/users/me/cover', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
   discover:        ()                 => api.get('/users/discover'),
+  mentionSearch:   (q: string)        => api.get('/users/mention-search', { params: { q } }),
+  followNotifications:   (username: string) => api.post(`/users/${username}/notify`),
+  unfollowNotifications: (username: string) => api.delete(`/users/${username}/notify`),
   exportData:      ()                 => api.get('/users/me/export', { responseType: 'blob' }),
   requestDeletion: ()                 => api.post('/users/me/request-deletion'),
   cancelDeletion:  ()                 => api.delete('/users/me/request-deletion'),
@@ -111,7 +120,12 @@ export const friendsApi = {
   acceptRequest:  (id: string)     => api.post(`/friends/accept/${id}`),
   declineRequest: (id: string)     => api.post(`/friends/decline/${id}`),
   unfriend:       (id: string)     => api.delete(`/friends/${id}`),
-  listFriendLists: ()               => api.get('/friend-groups'),
+  listFriendLists:    ()                                => api.get('/friend-groups'),
+  createFriendList:   (name: string)                    => api.post('/friend-groups', { name }),
+  deleteFriendList:   (groupId: string)                 => api.delete(`/friend-groups/${groupId}`),
+  getFriendListMembers: (groupId: string)               => api.get(`/friend-groups/${groupId}/members`),
+  addFriendToList:    (groupId: string, friendId: string) => api.post(`/friend-groups/${groupId}/members/${friendId}`),
+  removeFriendFromList: (groupId: string, friendId: string) => api.delete(`/friend-groups/${groupId}/members/${friendId}`),
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────
@@ -127,14 +141,28 @@ export const notificationsApi = {
 
 // ── Groups ────────────────────────────────────────────────────────────────────
 export const groupsApi = {
-  list:        ()               => api.get('/groups'),
-  listFilter:  (filter: string) => api.get('/groups', { params: { filter } }),
-  get:         (slug: string)   => api.get(`/groups/${slug}`),
-  getFeed:     (slug: string, page = 0) => api.get(`/groups/${slug}/feed`, { params: { page } }),
-  join:        (slug: string)   => api.post(`/groups/${slug}/join`),
-  leave:       (slug: string)   => api.delete(`/groups/${slug}/leave`),
-  createPost:  (slug: string, data: any) => api.post(`/groups/${slug}/posts`, data),
-  create:      (data: any)      => api.post('/groups', data),
+  list:           ()               => api.get('/groups'),
+  listFilter:     (filter: string) => api.get('/groups', { params: { filter } }),
+  get:            (slug: string)   => api.get(`/groups/${slug}`),
+  getFeed:        (slug: string, page = 0) => api.get(`/groups/${slug}/feed`, { params: { page } }),
+  join:           (slug: string)   => api.post(`/groups/${slug}/join`),
+  leave:          (slug: string)   => api.delete(`/groups/${slug}/leave`),
+  createPost:     (slug: string, data: any) => api.post(`/groups/${slug}/posts`, data),
+  create:         (data: any)      => api.post('/groups', data),
+  update:         (slug: string, data: any)          => api.patch(`/groups/${slug}`, data),
+  delete:         (slug: string)                     => api.delete(`/groups/${slug}`),
+  getMembers:     (slug: string)                     => api.get(`/groups/${slug}/members`),
+  searchMembers:  (slug: string, q: string)          => api.get(`/groups/${slug}/member-search`, { params: { q } }),
+  setMemberRole:  (slug: string, userId: string, role: string) => api.patch(`/groups/${slug}/members/${userId}/role`, { role }),
+  removeMember:   (slug: string, userId: string)     => api.delete(`/groups/${slug}/members/${userId}`),
+  addMember:      (slug: string, username: string)   => api.post(`/groups/${slug}/members/add`, { username }),
+  getInvites:     (slug: string)                     => api.get(`/groups/${slug}/invites`),
+  createInvite:   (slug: string)                     => api.post(`/groups/${slug}/invites`),
+  deleteInvite:   (slug: string, token: string)      => api.delete(`/groups/${slug}/invites/${token}`),
+  requestJoin:    (slug: string)                     => api.post(`/groups/${slug}/request`),
+  getRequests:    (slug: string)                     => api.get(`/groups/${slug}/requests`),
+  approveRequest: (slug: string, requestId: string)  => api.post(`/groups/${slug}/requests/${requestId}/approve`),
+  rejectRequest:  (slug: string, requestId: string)  => api.post(`/groups/${slug}/requests/${requestId}/reject`),
 }
 
 // ── DMs ───────────────────────────────────────────────────────────────────────
@@ -149,11 +177,15 @@ export const dmApi = {
   markRead:           (id: string)          => api.post(`/conversations/${id}/read`),
   acceptRequest:      (id: string)          => api.post(`/conversations/${id}/accept`),
   leaveConversation:  (id: string)          => api.delete(`/conversations/${id}`),
+  friendSearch:       (q: string)           => api.get('/conversations/friend-search', { params: { q } }),
+  reactMessage:       (msgId: string, emoji: string) => api.post(`/messages/${msgId}/react`, { emoji }),
+  unreactMessage:     (msgId: string)       => api.delete(`/messages/${msgId}/react`),
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
 export const searchApi = {
-  search: (q: string) => api.get('/search', { params: { q } }),
+  searchUsers: (q: string) => api.get('/search/users', { params: { q } }),
+  searchPosts: (q: string) => api.get('/search/posts', { params: { q } }),
 }
 
 // ── Invites ───────────────────────────────────────────────────────────────────
@@ -188,16 +220,31 @@ export const rulesApi = {
 
 // ── Blocking ──────────────────────────────────────────────────────────────────
 export const blockApi = {
-  blockUser:   (id: string) => api.post(`/users/${id}/block`),
-  unblockUser: (id: string) => api.delete(`/users/${id}/block`),
-  listBlocked: ()           => api.get('/users/blocked'),
+  blockUser:   (username: string) => api.post(`/blocks/${username}`),
+  unblockUser: (username: string) => api.delete(`/blocks/${username}`),
+  listBlocked: ()                 => api.get('/blocks'),
 }
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 export const adminApi = {
-  getStats:  ()                             => api.get('/admin/stats'),
-  listUsers: (q?: string)                   => api.get('/admin/users', { params: { q } }),
-  setRole:   (userID: string, role: string) => api.patch(`/admin/users/${userID}/role`, { role }),
+  getStats:       ()                             => api.get('/admin/stats'),
+  listUsers:      (q?: string)                   => api.get('/admin/users', { params: { q } }),
+  setRole:        (userID: string, role: string) => api.patch(`/admin/users/${userID}/role`, { role }),
+  // Settings
+  getSettings:    ()                             => api.get('/admin/settings'),
+  updateSettings: (data: any)                    => api.patch('/admin/settings', data),
+  // Rules
+  listRules:      ()                             => api.get('/admin/rules'),
+  createRule:     (data: { title: string; description?: string }) => api.post('/admin/rules', data),
+  updateRule:     (id: string, data: any)        => api.patch(`/admin/rules/${id}`, data),
+  deleteRule:     (id: string)                   => api.delete(`/admin/rules/${id}`),
+  moveRule:       (id: string, direction: 'up' | 'down') => api.patch(`/admin/rules/${id}/move`, { direction }),
+  // Invites
+  listInvites:    ()                             => api.get('/admin/invites'),
+  createInvite:   ()                             => api.post('/admin/invites'),
+  deleteInvite:   (id: string)                   => api.delete(`/admin/invites/${id}`),
+  // Audit log
+  getAuditLog:    (page = 0)                     => api.get('/admin/audit-log', { params: { page } }),
 }
 
 // ── Waitlist ──────────────────────────────────────────────────────────────────
@@ -205,4 +252,17 @@ export const waitlistApi = {
   list:    ()            => api.get('/admin/waitlist'),
   approve: (id: string)  => api.post(`/admin/waitlist/${id}/approve`),
   reject:  (id: string)  => api.post(`/admin/waitlist/${id}/reject`),
+}
+
+// ── Albums ────────────────────────────────────────────────────────────────────
+export const albumsApi = {
+  list:         ()                               => api.get('/albums'),
+  create:       (data: { name: string; description?: string }) => api.post('/albums', data),
+  get:          (id: string)                     => api.get(`/albums/${id}`),
+  update:       (id: string, data: any)          => api.patch(`/albums/${id}`, data),
+  delete:       (id: string)                     => api.delete(`/albums/${id}`),
+  addPhoto:     (id: string, data: { url: string; caption?: string }) => api.post(`/albums/${id}/photos`, data),
+  updatePhoto:  (albumId: string, photoId: string, data: any) => api.patch(`/albums/${albumId}/photos/${photoId}`, data),
+  deletePhoto:  (albumId: string, photoId: string) => api.delete(`/albums/${albumId}/photos/${photoId}`),
+  getUserAlbums:(username: string)               => api.get(`/users/${username}/albums`),
 }
