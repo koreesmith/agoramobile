@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
 import { formatDistanceToNow } from 'date-fns'
-import { Screen, Spinner, Avatar, UploadingModal } from '../../components/ui'
+import { Screen, Spinner, Avatar, UploadingModal, LinkedText } from '../../components/ui'
 import { dmApi, feedApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { C } from '../../constants/colors'
@@ -117,7 +117,7 @@ export default function ConversationScreen() {
                     }}
                     style={[s.bubble, isOwn ? s.bubbleOwn : s.bubbleOther]}
                   >
-                    {msg.content ? <Text style={[s.bubbleText, isOwn && { color: 'white' }]}>{msg.content}</Text> : null}
+                    {msg.content ? <LinkedText text={msg.content} style={[s.bubbleText, isOwn && { color: 'white' }]} linkStyle={isOwn ? { color: 'rgba(255,255,255,0.9)' } : undefined} /> : null}
                     {msg.image_url ? <Image source={{ uri: msg.image_url }} style={s.bubbleImage} resizeMode="cover" /> : null}
                     <Text style={[s.bubbleTime, isOwn && { color: 'rgba(255,255,255,0.7)' }]}>
                       {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
@@ -143,7 +143,9 @@ export default function ConversationScreen() {
         ) : null}
         {/* Reaction picker modal */}
         <Modal visible={!!reactionTarget} transparent animationType="fade" onRequestClose={() => setReactionTarget(null)}>
-          <TouchableOpacity style={s.reactionOverlay} activeOpacity={1} onPress={() => setReactionTarget(null)}>
+          <View style={s.reactionOverlay}>
+            {/* Full-screen backdrop — dismiss only; rendered beneath picker so it doesn't intercept emoji taps */}
+            <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setReactionTarget(null)} />
             <View style={[s.reactionPicker, { backgroundColor: c.card, borderColor: c.border }]}>
               {QUICK_REACTIONS.map(emoji => (
                 <TouchableOpacity key={emoji} onPress={() => reactionTarget && react.mutate({ msgId: reactionTarget, emoji })}
@@ -152,7 +154,7 @@ export default function ConversationScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-          </TouchableOpacity>
+          </View>
         </Modal>
 
         {(conv?.is_accepted !== false) && (

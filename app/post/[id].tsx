@@ -320,6 +320,8 @@ export default function PostScreen() {
 
   const post = postData?.post
   const comments = commentsData?.comments || []
+  const nestedReplyIds = new Set(comments.flatMap((c: any) => c.replies?.map((r: any) => r.id) ?? []))
+  const rootComments = comments.filter((c: any) => !nestedReplyIds.has(c.id))
   const canSend = (comment.trim() || commentImage) && !createComment.isPending
 
   return (
@@ -328,14 +330,14 @@ export default function PostScreen() {
         headerShown: true, headerTitle: 'Post', headerBackTitle: 'Back',
         headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
       }} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={insets.top + 44}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={insets.top + 44}>
         <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={pl || cl} onRefresh={() => { refetch(); rc() }} tintColor={c.primary} />}>
           {pl ? <Spinner /> : post ? <PostCard post={post} queryKey={['post', id]} /> : null}
           <View style={{ paddingHorizontal: 16, paddingBottom: 24 }}>
             <Text style={[s.commentsHeader, { color: c.textMuted }]}>
-              {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
+              {rootComments.length} {rootComments.length === 1 ? 'comment' : 'comments'}
             </Text>
-            {cl ? <Spinner /> : comments.map((comment: any) => (
+            {cl ? <Spinner /> : rootComments.map((comment: any) => (
               <CommentRow
                 key={comment.id}
                 comment={comment}
@@ -350,7 +352,7 @@ export default function PostScreen() {
         </ScrollView>
 
         {/* Composer */}
-        <View style={[s.composerWrap, { borderTopColor: c.border, backgroundColor: c.card }]}>
+        <View style={[s.composerWrap, { borderTopColor: c.border, backgroundColor: c.card, paddingBottom: insets.bottom }]}>
           {/* Reply banner */}
           {replyTo && (
             <View style={[s.replyBanner, { backgroundColor: c.primaryBg, borderBottomColor: c.border }]}>
