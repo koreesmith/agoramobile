@@ -13,7 +13,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Header, Spinner, EmptyState, UploadingModal, Avatar } from '../../components/ui'
 import PostCard from '../../components/PostCard'
-import { feedApi, feedsApi, friendsApi, instanceApi, usersApi, imgUrl } from '../../api'
+import { feedApi, feedsApi, friendsApi, instanceApi, usersApi, pagesApi, imgUrl } from '../../api'
 import { trackInteraction } from '../../utils/interactions'
 import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
@@ -73,6 +73,7 @@ export default function FeedScreen() {
   const [linkFetching, setLinkFetching] = useState(false)
   const [activeFeedId, setActiveFeedId] = useState<string | null>(null)
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [postAsPageSlug, setPostAsPageSlug] = useState<string | null>(null)
 
   const { data: customFeedsData } = useQuery({
     queryKey: ['custom-feeds'],
@@ -88,6 +89,13 @@ export default function FeedScreen() {
   })
   const friendLists: any[] = groupsData?.groups || []
 
+  const { data: myPagesData } = useQuery({
+    queryKey: ['my-pages'],
+    queryFn: () => pagesApi.mine().then(r => r.data),
+    enabled: showCompose,
+  })
+  const myPages: any[] = myPagesData?.pages || []
+
   const selectedFriendList = friendLists.find((g: any) => g.id === friendListId)
 
   const resetCompose = () => {
@@ -97,6 +105,7 @@ export default function FeedScreen() {
     setPollAllowsNew(false); setPollExpiresHours(24)
     setVisibility('friends'); setFriendListId('')
     setLinkPreview(null); setLinkFetching(false)
+    setPostAsPageSlug(null)
     setShowCompose(false)
   }
 
@@ -164,26 +173,30 @@ export default function FeedScreen() {
   const posts = (data?.pages.flatMap(p => p.posts) ?? [])
     .filter((p: any) => !blockedIds.includes(p.author_id))
 
+  const postData = {
+    content,
+    image_url: imageUrls[0] || '',
+    image_urls: imageUrls,
+    video_url: videoUrl ?? '',
+    video_thumb_url: videoThumbUrl ?? '',
+    visibility: postAsPageSlug ? 'public' : visibility,
+    group_id: !postAsPageSlug && visibility === 'group' ? friendListId : undefined,
+    content_warning: showCW && cwLabel.trim() ? cwLabel.trim() : '',
+    poll_options: showPoll ? pollOptions.filter(o => o.trim()) : [],
+    poll_multiple_choice: showPoll ? pollMultiple : false,
+    poll_allows_new_options: showPoll ? pollAllowsNew : false,
+    poll_expires_hours: showPoll ? pollExpiresHours : 0,
+    link_url: linkPreview?.url ?? '',
+    link_title: linkPreview?.title ?? '',
+    link_description: linkPreview?.description ?? '',
+    link_image: linkPreview?.image ?? '',
+    link_domain: linkPreview?.domain ?? '',
+  }
+
   const createPost = useMutation({
-    mutationFn: () => feedApi.createPost({
-      content,
-      image_url: imageUrls[0] || '',
-      image_urls: imageUrls,
-      video_url: videoUrl ?? '',
-      video_thumb_url: videoThumbUrl ?? '',
-      visibility,
-      group_id: visibility === 'group' ? friendListId : undefined,
-      content_warning: showCW && cwLabel.trim() ? cwLabel.trim() : '',
-      poll_options: showPoll ? pollOptions.filter(o => o.trim()) : [],
-      poll_multiple_choice: showPoll ? pollMultiple : false,
-      poll_allows_new_options: showPoll ? pollAllowsNew : false,
-      poll_expires_hours: showPoll ? pollExpiresHours : 0,
-      link_url: linkPreview?.url ?? '',
-      link_title: linkPreview?.title ?? '',
-      link_description: linkPreview?.description ?? '',
-      link_image: linkPreview?.image ?? '',
-      link_domain: linkPreview?.domain ?? '',
-    }),
+    mutationFn: () => postAsPageSlug
+      ? pagesApi.createPost(postAsPageSlug, postData)
+      : feedApi.createPost(postData),
     onSuccess: () => { resetCompose(); qc.invalidateQueries({ queryKey: ['feed'] }) },
     onError: () => Alert.alert('Error', 'Could not create post'),
   })
@@ -358,80 +371,116 @@ export default function FeedScreen() {
             </View>
           </View>
 
-          {/* Audience row — tapping expands inline picker */}
-          <TouchableOpacity
-            onPress={() => setShowVisibilitySheet(v => !v)}
-            style={[s.audienceRow, { borderBottomColor: c.border, backgroundColor: c.card }]}
-          >
-            <Ionicons
-              name={visibility === 'public' ? 'globe-outline' : visibility === 'group' ? 'people-outline' : 'person-outline'}
-              size={15}
-              color={c.primary}
-            />
-            <Text style={[s.audienceLabel, { color: c.primary }]}>
-              {visibility === 'public' ? 'Public' : visibility === 'group' ? (selectedFriendList?.name || 'Select a list…') : 'Friends'}
-            </Text>
-            <Ionicons name={showVisibilitySheet ? 'chevron-up' : 'chevron-down'} size={13} color={c.textMuted} style={{ marginLeft: 'auto' }} />
-          </TouchableOpacity>
-
-          {/* Inline visibility picker */}
-          {showVisibilitySheet && (
-            <View style={[s.inlinePicker, { backgroundColor: c.bg, borderBottomColor: c.border }]}>
-              {[
-                { value: 'public',  icon: 'globe-outline',  label: 'Public',      desc: 'Anyone on Agora' },
-                { value: 'friends', icon: 'person-outline', label: 'Friends',     desc: 'Only your friends' },
-                { value: 'group',   icon: 'people-outline', label: 'Friend List', desc: 'Pick a specific list' },
-              ].map(opt => (
-                <TouchableOpacity
-                  key={opt.value}
-                  onPress={() => {
-                    setVisibility(opt.value as any)
-                    if (opt.value !== 'group') setFriendListId('')
-                    setShowVisibilitySheet(false)
-                    if (opt.value === 'group') setShowListSheet(true)
-                  }}
-                  style={[s.inlineOption, { borderBottomColor: c.border, backgroundColor: visibility === opt.value ? c.primaryBg : 'transparent' }]}
-                >
-                  <Ionicons name={opt.icon as any} size={18} color={visibility === opt.value ? c.primary : c.textMuted} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '500', color: visibility === opt.value ? c.primary : c.text }}>{opt.label}</Text>
-                    <Text style={{ fontSize: 12, color: c.textMuted }}>{opt.desc}</Text>
-                  </View>
-                  {visibility === opt.value && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
-                </TouchableOpacity>
-              ))}
-            </View>
+          {/* Identity switcher */}
+          {myPages.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                const options = [
+                  { label: `${user?.display_name || user?.username} (personal)`, value: null },
+                  ...myPages.map((p: any) => ({ label: p.display_name, value: p.slug })),
+                ]
+                Alert.alert(
+                  'Posting as…',
+                  undefined,
+                  [
+                    ...options.map(opt => ({
+                      text: opt.label + (postAsPageSlug === opt.value ? ' ✓' : ''),
+                      onPress: () => setPostAsPageSlug(opt.value),
+                    })),
+                    { text: 'Cancel', style: 'cancel' as const },
+                  ]
+                )
+              }}
+              style={[s.identityRow, { borderBottomColor: c.border, backgroundColor: c.card }]}
+            >
+              <Ionicons name="person-circle-outline" size={16} color={c.primary} />
+              <Text style={[s.identityLabel, { color: c.text }]}>
+                Posting as: <Text style={{ color: c.primary, fontWeight: '700' }}>
+                  {postAsPageSlug ? (myPages.find((p: any) => p.slug === postAsPageSlug)?.display_name ?? postAsPageSlug) : (user?.display_name || user?.username)}
+                </Text>
+              </Text>
+              <Ionicons name="chevron-down" size={13} color={c.textMuted} style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
           )}
 
-          {/* Inline group list picker */}
-          {showListSheet && visibility === 'group' && (
-            <View style={[s.inlinePicker, { backgroundColor: c.bg, borderBottomColor: c.border }]}>
-              <TouchableOpacity onPress={() => setShowListSheet(false)} style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
-                <Text style={{ fontSize: 12, color: c.textMuted }}>← Back to audience</Text>
+          {/* Audience row — tapping expands inline picker (hidden when posting as page) */}
+          {!postAsPageSlug && (
+            <>
+              <TouchableOpacity
+                onPress={() => setShowVisibilitySheet(v => !v)}
+                style={[s.audienceRow, { borderBottomColor: c.border, backgroundColor: c.card }]}
+              >
+                <Ionicons
+                  name={visibility === 'public' ? 'globe-outline' : visibility === 'group' ? 'people-outline' : 'person-outline'}
+                  size={15}
+                  color={c.primary}
+                />
+                <Text style={[s.audienceLabel, { color: c.primary }]}>
+                  {visibility === 'public' ? 'Public' : visibility === 'group' ? (selectedFriendList?.name || 'Select a list…') : 'Friends'}
+                </Text>
+                <Ionicons name={showVisibilitySheet ? 'chevron-up' : 'chevron-down'} size={13} color={c.textMuted} style={{ marginLeft: 'auto' }} />
               </TouchableOpacity>
-              {friendLists.length === 0 ? (
-                <View style={{ padding: 16, alignItems: 'center' }}>
-                  <Text style={{ color: c.textMuted, fontSize: 13, textAlign: 'center' }}>
-                    No friend lists yet. Create one in the Friends tab.
-                  </Text>
+
+              {/* Inline visibility picker */}
+              {showVisibilitySheet && (
+                <View style={[s.inlinePicker, { backgroundColor: c.bg, borderBottomColor: c.border }]}>
+                  {[
+                    { value: 'public',  icon: 'globe-outline',  label: 'Public',      desc: 'Anyone on Agora' },
+                    { value: 'friends', icon: 'person-outline', label: 'Friends',     desc: 'Only your friends' },
+                    { value: 'group',   icon: 'people-outline', label: 'Friend List', desc: 'Pick a specific list' },
+                  ].map(opt => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      onPress={() => {
+                        setVisibility(opt.value as any)
+                        if (opt.value !== 'group') setFriendListId('')
+                        setShowVisibilitySheet(false)
+                        if (opt.value === 'group') setShowListSheet(true)
+                      }}
+                      style={[s.inlineOption, { borderBottomColor: c.border, backgroundColor: visibility === opt.value ? c.primaryBg : 'transparent' }]}
+                    >
+                      <Ionicons name={opt.icon as any} size={18} color={visibility === opt.value ? c.primary : c.textMuted} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '500', color: visibility === opt.value ? c.primary : c.text }}>{opt.label}</Text>
+                        <Text style={{ fontSize: 12, color: c.textMuted }}>{opt.desc}</Text>
+                      </View>
+                      {visibility === opt.value && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              ) : (
-                friendLists.map((g: any) => (
-                  <TouchableOpacity
-                    key={g.id}
-                    onPress={() => { setFriendListId(g.id); setShowListSheet(false) }}
-                    style={[s.inlineOption, { borderBottomColor: c.border, backgroundColor: friendListId === g.id ? c.primaryBg : 'transparent' }]}
-                  >
-                    <Ionicons name="people-outline" size={18} color={friendListId === g.id ? c.primary : c.textMuted} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '500', color: friendListId === g.id ? c.primary : c.text }}>{g.name}</Text>
-                      <Text style={{ fontSize: 12, color: c.textMuted }}>{g.member_count ?? 0} friends</Text>
-                    </View>
-                    {friendListId === g.id && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
-                  </TouchableOpacity>
-                ))
               )}
-            </View>
+
+              {/* Inline group list picker */}
+              {showListSheet && visibility === 'group' && (
+                <View style={[s.inlinePicker, { backgroundColor: c.bg, borderBottomColor: c.border }]}>
+                  <TouchableOpacity onPress={() => setShowListSheet(false)} style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+                    <Text style={{ fontSize: 12, color: c.textMuted }}>← Back to audience</Text>
+                  </TouchableOpacity>
+                  {friendLists.length === 0 ? (
+                    <View style={{ padding: 16, alignItems: 'center' }}>
+                      <Text style={{ color: c.textMuted, fontSize: 13, textAlign: 'center' }}>
+                        No friend lists yet. Create one in the Friends tab.
+                      </Text>
+                    </View>
+                  ) : (
+                    friendLists.map((g: any) => (
+                      <TouchableOpacity
+                        key={g.id}
+                        onPress={() => { setFriendListId(g.id); setShowListSheet(false) }}
+                        style={[s.inlineOption, { borderBottomColor: c.border, backgroundColor: friendListId === g.id ? c.primaryBg : 'transparent' }]}
+                      >
+                        <Ionicons name="people-outline" size={18} color={friendListId === g.id ? c.primary : c.textMuted} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '500', color: friendListId === g.id ? c.primary : c.text }}>{g.name}</Text>
+                          <Text style={{ fontSize: 12, color: c.textMuted }}>{g.member_count ?? 0} friends</Text>
+                        </View>
+                        {friendListId === g.id && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </View>
+              )}
+            </>
           )}
 
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
@@ -656,5 +705,7 @@ const s = StyleSheet.create({
   mentionRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },
   videoPreview: { height: 180, borderRadius: 12, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   videoPreviewOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' },
+  identityRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 1 },
+  identityLabel: { fontSize: 13 },
 })
 
