@@ -53,6 +53,8 @@ export default function FeedScreen() {
   const [showCompose, setShowCompose] = useState(false)
   const [content, setContent] = useState('')
   const [imageUrls, setImageUrls] = useState<string[]>([])
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [videoThumbUrl, setVideoThumbUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showCW, setShowCW] = useState(false)
@@ -88,7 +90,8 @@ export default function FeedScreen() {
   const selectedFriendList = friendLists.find((g: any) => g.id === friendListId)
 
   const resetCompose = () => {
-    setContent(''); setImageUrls([]); setShowCW(false); setCwLabel('')
+    setContent(''); setImageUrls([]); setVideoUrl(null); setVideoThumbUrl(null)
+    setShowCW(false); setCwLabel('')
     setShowPoll(false); setPollOptions(['', '']); setPollMultiple(false)
     setPollAllowsNew(false); setPollExpiresHours(24)
     setVisibility('friends'); setFriendListId('')
@@ -96,7 +99,7 @@ export default function FeedScreen() {
     setShowCompose(false)
   }
 
-  const MAX_IMAGES = 4
+  const MAX_IMAGES = 10
 
   // Auto-detect URLs pasted into content: GIFs become inline images, others become link preview cards
   useEffect(() => {
@@ -165,6 +168,8 @@ export default function FeedScreen() {
       content,
       image_url: imageUrls[0] || '',
       image_urls: imageUrls,
+      video_url: videoUrl ?? '',
+      video_thumb_url: videoThumbUrl ?? '',
       visibility,
       group_id: visibility === 'group' ? friendListId : undefined,
       content_warning: showCW && cwLabel.trim() ? cwLabel.trim() : '',
@@ -204,6 +209,29 @@ export default function FeedScreen() {
       }
       setImageUrls(prev => [...prev, ...uploaded].slice(0, MAX_IMAGES))
     } catch { Alert.alert('Upload failed') }
+    finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploading(false) }
+  }
+
+  const pickVideo = async () => {
+    if (videoUrl) return
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      allowsEditing: false,
+    })
+    if (result.canceled) return
+    const asset = result.assets[0]
+    if (asset.duration && asset.duration > 120) {
+      Alert.alert('Video too long', 'Please select a video that is 2 minutes or less.')
+      return
+    }
+    setUploading(true)
+    const slowTimer = setTimeout(() => setShowUploadModal(true), 1000)
+    try {
+      const file = { uri: asset.uri, type: 'video/mp4', name: 'video.mp4' } as any
+      const res = await feedApi.uploadMedia(file, 'videos')
+      setVideoUrl(res.data.url)
+      setVideoThumbUrl(res.data.thumb_url || null)
+    } catch { Alert.alert('Upload failed', 'Could not upload video') }
     finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploading(false) }
   }
 
@@ -297,20 +325,23 @@ export default function FeedScreen() {
                 style={[s.cwBtn, showPoll && { backgroundColor: c.primaryBg, borderColor: c.primaryLt }]}>
                 <Ionicons name="bar-chart-outline" size={16} color={showPoll ? c.primary : c.textMuted} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={pickImage} disabled={uploading || showPoll || imageUrls.length >= MAX_IMAGES}>
+              <TouchableOpacity onPress={pickImage} disabled={uploading || showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl}>
                 {uploading
                   ? <ActivityIndicator size="small" color={c.primary} />
                   : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                      <Ionicons name="image-outline" size={22} color={(showPoll || imageUrls.length >= MAX_IMAGES) ? c.border : c.primary} />
+                      <Ionicons name="image-outline" size={22} color={(showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl) ? c.border : c.primary} />
                       {imageUrls.length > 0 && !showPoll && (
                         <Text style={{ fontSize: 11, color: c.primary, fontWeight: '600' }}>{imageUrls.length}/{MAX_IMAGES}</Text>
                       )}
                     </View>}
               </TouchableOpacity>
+              <TouchableOpacity onPress={pickVideo} disabled={uploading || showPoll || imageUrls.length > 0 || !!videoUrl}>
+                <Ionicons name="videocam-outline" size={22} color={(showPoll || imageUrls.length > 0 || !!videoUrl) ? c.border : c.primary} />
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => createPost.mutate()}
-                disabled={(!content.trim() && imageUrls.length === 0 && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || createPost.isPending}
-                style={[s.submitBtn, (!content.trim() && imageUrls.length === 0 && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) && s.submitBtnDisabled]}
+                disabled={(!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || createPost.isPending}
+                style={[s.submitBtn, (!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) && s.submitBtnDisabled]}
               >
                 <Text style={s.submitBtnText}>{createPost.isPending ? '…' : 'Post'}</Text>
               </TouchableOpacity>
@@ -507,6 +538,26 @@ export default function FeedScreen() {
               </ScrollView>
             ) : null}
 
+            {!showPoll && videoUrl ? (
+              <View style={{ marginTop: 12, position: 'relative' }}>
+                <View style={[s.videoPreview, { backgroundColor: '#000', borderColor: c.border }]}>
+                  {videoThumbUrl ? (
+                    <Image source={{ uri: imgUrl(videoThumbUrl) }} style={{ width: '100%', height: '100%', borderRadius: 12 }} contentFit="cover" />
+                  ) : null}
+                  <View style={s.videoPreviewOverlay}>
+                    <Ionicons name="videocam" size={32} color="rgba(255,255,255,0.9)" />
+                    <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12, marginTop: 4 }}>Video attached</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={() => { setVideoUrl(null); setVideoThumbUrl(null) }}
+                  style={s.removeImage}
+                >
+                  <Ionicons name="close" size={14} color="white" />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
             {!showPoll && imageUrls.length === 0 && linkFetching && (
               <View style={[s.linkPreviewCard, { borderColor: c.border, backgroundColor: c.bg }]}>
                 <ActivityIndicator size="small" color={c.primary} />
@@ -593,5 +644,7 @@ const s = StyleSheet.create({
   inlineOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   mentionList: { borderWidth: 1, borderRadius: 10, marginTop: 4, overflow: 'hidden' },
   mentionRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },
+  videoPreview: { height: 180, borderRadius: 12, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  videoPreviewOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' },
 })
 
