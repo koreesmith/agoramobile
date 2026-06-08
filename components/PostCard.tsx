@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { formatDistanceToNow } from 'date-fns'
 import { feedApi, imgUrl, blockApi, moderationApi, friendsApi, pagesApi } from '../api'
+import { trackInteraction } from '../utils/interactions'
 import { useAuthStore } from '../store/auth'
 import { useBlockStore } from '../store/blocks'
 import { Avatar } from './ui'
@@ -264,13 +265,16 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const react = useMutation({
     mutationFn: ({ type }: { type: string }) =>
       post.my_reaction === type ? feedApi.unreactPost(post.id) : feedApi.reactPost(post.id, type),
-    onSuccess: invalidate,
+    onSuccess: (_data, vars) => {
+      if (post.my_reaction !== vars.type) trackInteraction('like', post.id)
+      invalidate()
+    },
   })
   reactMutateRef.current = (vars) => react.mutate(vars)
 
   const repost = useMutation({
     mutationFn: () => feedApi.repostPost(post.id, { content: shareContent, visibility: 'friends' }),
-    onSuccess: () => { setShowShare(false); setShareContent(''); invalidate() },
+    onSuccess: () => { setShowShare(false); setShareContent(''); trackInteraction('repost', post.id); invalidate() },
     onError: (e: any) => Alert.alert('Cannot share', e.response?.data?.error || 'Could not share post'),
   })
   const del    = useMutation({ mutationFn: () => feedApi.deletePost(post.id), onSuccess: invalidate })
