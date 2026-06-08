@@ -8,6 +8,7 @@ import * as Sharing from 'expo-sharing'
 import Constants from 'expo-constants'
 import { Screen } from '../components/ui'
 import { usersApi, authApi, instanceApi, interactionsApi } from '../api'
+import { resetWhatsNew } from '../components/WhatsNewModal'
 import { useAuthStore } from '../store/auth'
 import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
@@ -249,6 +250,10 @@ export default function SettingsScreen() {
               { text: 'Delete account', style: 'destructive', onPress: () => requestDeletion.mutate() },
             ])} right={<View />} />
         )}
+        <Text style={[s.section, { color: c.textMuted }]}>Help</Text>
+        <Row icon="sparkles-outline" label="What's New" onPress={() => {
+          resetWhatsNew().then(() => Alert.alert("What's New", "Reopen the app to see What's New again."))
+        }} />
         <Text style={[s.section, { color: c.textMuted }]}>About</Text>
         <Row icon="person-circle-outline" label={`Signed in as @${user?.username}`} onPress={() => {}} right={<View />} />
         <Row icon="server-outline" label={`Instance: ${useAuthStore.getState().instanceUrl?.replace(/^https?:\/\//, '')}`} onPress={() => {}} right={<View />} />
