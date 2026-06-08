@@ -8,7 +8,7 @@ import * as FileSystem from 'expo-file-system'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { formatDistanceToNow } from 'date-fns'
-import { feedApi, imgUrl, blockApi, moderationApi, friendsApi } from '../api'
+import { feedApi, imgUrl, blockApi, moderationApi, friendsApi, pagesApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useBlockStore } from '../store/blocks'
 import { Avatar } from './ui'
@@ -301,11 +301,20 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   })
 
   const isOwn    = user?.id === post.author_id
-  const author   = post.repost_of_id ? post.repost_author_display_name : (post.author_display_name || post.display_name)
-  const pronouns = post.repost_of_id ? post.repost_author_pronouns     : post.author_pronouns
-  const username = post.repost_of_id ? post.repost_author_username    : (post.author_username || post.username)
-  const avatar   = imgUrl(post.repost_of_id ? post.repost_author_avatar_url  : (post.author_avatar_url || post.avatar_url))
+  // Page posts: use page identity for author display
+  const isPagePost = !!post.page_id && !post.repost_of_id
+  const author   = post.repost_of_id ? post.repost_author_display_name : isPagePost ? post.page_display_name : (post.author_display_name || post.display_name)
+  const pronouns = post.repost_of_id ? post.repost_author_pronouns     : isPagePost ? undefined : post.author_pronouns
+  const username = post.repost_of_id ? post.repost_author_username    : isPagePost ? post.page_slug : (post.author_username || post.username)
+  const avatar   = imgUrl(post.repost_of_id ? post.repost_author_avatar_url  : isPagePost ? post.page_avatar_url : (post.author_avatar_url || post.avatar_url))
   const content  = post.repost_of_id ? post.repost_content            : post.content
+
+  const subscribePageMutation = useMutation({
+    mutationFn: () => post.page_is_subscribed
+      ? pagesApi.unsubscribe(post.page_slug)
+      : pagesApi.subscribe(post.page_slug),
+    onSuccess: invalidate,
+  })
   const linkImage = imgUrl(post.link_image)
 
   // Normalize image URLs: prefer photo_urls array (AGORA-93), fall back to single image_url
@@ -353,6 +362,20 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   return (
     <View style={[s.card, { backgroundColor: c.card }, post.group_slug && { borderLeftWidth: 3, borderLeftColor: c.primaryLt }]}>
       {/* Group badge */}
+      {/* Page badge */}
+      {isPagePost && (
+        <TouchableOpacity
+          onPress={() => router.push(`/pages/${post.page_slug}` as any)}
+          style={[s.groupBadge, { backgroundColor: c.primaryBg }]}
+        >
+          <Ionicons name="bookmark" size={11} color={c.primary} />
+          <Text style={[s.groupBadgeText, { color: c.primary }]}>{post.page_display_name}</Text>
+          {post.page_is_verified && <Ionicons name="checkmark-circle" size={12} color={c.primary} />}
+          <Text style={[s.groupBadgeArrow, { color: c.textLight }]}>
+            · {post.page_type ? post.page_type.charAt(0).toUpperCase() + post.page_type.slice(1) : 'Page'}
+          </Text>
+        </TouchableOpacity>
+      )}
       {post.group_slug && (
         <TouchableOpacity
           onPress={() => router.push(`/group/${post.group_slug}`)}
@@ -377,15 +400,26 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
       )}
 
       <View style={s.body}>
-        <TouchableOpacity style={s.authorRow} onPress={() => router.push(`/profile/${username}`)}>
+        <TouchableOpacity
+          style={s.authorRow}
+          onPress={() => isPagePost
+            ? router.push(`/pages/${post.page_slug}` as any)
+            : router.push(`/profile/${username}`)
+          }
+        >
           <Avatar url={avatar} name={author} size={40} />
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 }}>
               <Text style={[s.authorName, { color: c.text }]}>{author}</Text>
+              {post.page_is_verified && isPagePost && (
+                <Ionicons name="checkmark-circle" size={14} color={c.primary} />
+              )}
               {pronouns ? <Text style={[s.pronouns, { color: c.textLight }]}>({pronouns})</Text> : null}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={[s.authorMeta, { color: c.textMuted }]}>@{username} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</Text>
+              <Text style={[s.authorMeta, { color: c.textMuted }]}>
+                {isPagePost ? post.page_type || 'Page' : `@${username}`} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+              </Text>
               <Ionicons
                 name={
                   post.visibility === 'public'  ? 'globe-outline' :
@@ -544,6 +578,20 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
       <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
         <TouchableOpacity style={s.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
           <View style={[s.menuSheet, { backgroundColor: c.card, borderColor: c.border }]}>
+            {isPagePost && (
+              <>
+                <TouchableOpacity style={s.menuItem} onPress={() => {
+                  setShowMenu(false)
+                  subscribePageMutation.mutate()
+                }}>
+                  <Ionicons name={post.page_is_subscribed ? 'bookmark' : 'bookmark-outline'} size={18} color={c.primary} />
+                  <Text style={[s.menuItemText, { color: c.primary }]}>
+                    {post.page_is_subscribed ? 'Unsubscribe from page' : 'Subscribe to page'}
+                  </Text>
+                </TouchableOpacity>
+                <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+              </>
+            )}
             {isOwn ? (
               <>
                 <TouchableOpacity style={s.menuItem} onPress={() => { setShowMenu(false); setEditContent(post.content || ''); setEditCW(post.content_warning || ''); setShowEditCW(!!post.content_warning); setEditVisibility(post.visibility === 'locked' ? 'group' : (post.visibility || 'friends')); setEditFriendListId(post.group_id || ''); setShowEditVisibilitySheet(false); setShowEditListSheet(false); setShowEdit(true) }}>
