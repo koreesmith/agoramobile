@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, Dimensions, Linking, TextInput, PanResponder, ScrollView } from 'react-native'
+import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, Dimensions, Linking, TextInput, PanResponder, ScrollView, KeyboardAvoidingView } from 'react-native'
 import { Image } from 'expo-image'
 import { Video, ResizeMode } from 'expo-av'
 import ZoomableImage from './ZoomableImage'
@@ -289,6 +289,16 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
     onError: () => Alert.alert('Error', 'Could not save changes'),
   })
 
+  const commentMutation = useMutation({
+    mutationFn: () => feedApi.createComment(post.id, { content: inlineComment.trim() }),
+    onSuccess: () => { setInlineComment(''); trackInteraction('comment', post.id); invalidate() },
+    onError: () => Alert.alert('Error', 'Could not post comment'),
+  })
+  const submitInlineComment = () => {
+    if (!inlineComment.trim() || commentMutation.isPending) return
+    commentMutation.mutate()
+  }
+
   const blockUser = useMutation({
     mutationFn: async () => {
       await blockApi.blockUser(post.author_id)
@@ -330,6 +340,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const imageUrl = postImageUrls[0]
 
   const [videoPlaying, setVideoPlaying] = useState(false)
+  const [inlineComment, setInlineComment] = useState('')
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [showLightbox, setShowLightbox] = useState(false)
   const screenWidth = Dimensions.get('window').width
@@ -602,6 +613,27 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             {post.repost_count > 0 && <Text style={[s.actionCount, { color: post.reposted ? c.primary : c.textMuted }]}>{post.repost_count}</Text>}
           </TouchableOpacity>
 
+        </View>
+
+        {/* Inline comment box */}
+        <View style={[s.inlineComment, { borderTopColor: c.border }]}>
+          <Avatar url={imgUrl(user?.avatar_url)} name={user?.display_name} size={28} />
+          <TextInput
+            style={[s.inlineCommentInput, { color: c.text, borderColor: c.border }]}
+            placeholder="Write a comment…"
+            placeholderTextColor={c.textLight}
+            value={inlineComment}
+            onChangeText={setInlineComment}
+            multiline
+            returnKeyType="send"
+            blurOnSubmit
+            onSubmitEditing={submitInlineComment}
+          />
+          {inlineComment.trim().length > 0 && (
+            <TouchableOpacity onPress={submitInlineComment} disabled={commentMutation.isPending}>
+              <Ionicons name="send" size={18} color={commentMutation.isPending ? c.textLight : c.primary} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -943,4 +975,6 @@ const s = StyleSheet.create({
   sharePreviewAuthor:  { fontSize: 13, fontWeight: '600', marginBottom: 4 },
   sharePreviewContent: { fontSize: 13, lineHeight: 19 },
   playBtn: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  inlineComment: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10, paddingHorizontal: 14, paddingBottom: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  inlineCommentInput: { flex: 1, borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, fontSize: 13, maxHeight: 80 },
 })
