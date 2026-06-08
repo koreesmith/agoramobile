@@ -15,6 +15,7 @@ import { Screen, Header, Spinner, EmptyState, UploadingModal, Avatar } from '../
 import PostCard from '../../components/PostCard'
 import { feedApi, feedsApi, friendsApi, instanceApi, usersApi, pagesApi, imgUrl } from '../../api'
 import { trackInteraction } from '../../utils/interactions'
+import WhatsNewModal, { shouldShowWhatsNew } from '../../components/WhatsNewModal'
 import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
 
@@ -74,6 +75,7 @@ export default function FeedScreen() {
   const [activeFeedId, setActiveFeedId] = useState<string | null>(null)
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [postAsPageSlug, setPostAsPageSlug] = useState<string | null>(null)
+  const [showWhatsNew, setShowWhatsNew] = useState(false)
 
   const { data: customFeedsData } = useQuery({
     queryKey: ['custom-feeds'],
@@ -110,6 +112,10 @@ export default function FeedScreen() {
   }
 
   const MAX_IMAGES = 10
+
+  useEffect(() => {
+    shouldShowWhatsNew().then(should => { if (should) setShowWhatsNew(true) })
+  }, [])
 
   // Auto-detect URLs pasted into content: GIFs become inline images, others become link preview cards
   useEffect(() => {
@@ -324,6 +330,8 @@ export default function FeedScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      <WhatsNewModal visible={showWhatsNew} onDismiss={() => setShowWhatsNew(false)} />
 
       <Modal visible={showCompose} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: c.card, paddingTop: Platform.OS === 'android' ? insets.top : 0 }}>
