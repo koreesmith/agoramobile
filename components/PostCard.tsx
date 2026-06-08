@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, Dimensions, Linking, TextInput, PanResponder, ScrollView } from 'react-native'
 import { Image } from 'expo-image'
+import { Video, ResizeMode } from 'expo-av'
 import ZoomableImage from './ZoomableImage'
 import { router } from 'expo-router'
 import * as MediaLibrary from 'expo-media-library'
@@ -324,6 +325,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const postImageUrls = rawImageUrls.map((u: string) => imgUrl(u)).filter(Boolean) as string[]
   const imageUrl = postImageUrls[0]
 
+  const [videoPlaying, setVideoPlaying] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [showLightbox, setShowLightbox] = useState(false)
   const screenWidth = Dimensions.get('window').width
@@ -462,6 +464,31 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
           <TouchableOpacity onPress={() => router.push(`/post/${post.id}`)}>
             <Text style={[s.content, { color: c.textMd }]}>{content}</Text>
           </TouchableOpacity>
+        ) : null}
+
+        {(!post.content_warning || twExpanded) && post.video_url && postImageUrls.length === 0 ? (
+          <View style={[s.imageWrapper, { position: 'relative' }]}>
+            <Video
+              source={{ uri: imgUrl(post.video_url) || '' }}
+              posterSource={post.video_thumb_url ? { uri: imgUrl(post.video_thumb_url) } : undefined}
+              posterStyle={{ resizeMode: 'cover' }}
+              usePoster={!videoPlaying}
+              style={[s.image, { backgroundColor: '#000' }]}
+              resizeMode={ResizeMode.CONTAIN}
+              shouldPlay={videoPlaying}
+              isLooping={false}
+              isMuted={!videoPlaying}
+              useNativeControls={videoPlaying}
+            />
+            {!videoPlaying && (
+              <TouchableOpacity
+                onPress={() => setVideoPlaying(true)}
+                style={s.playBtn}
+              >
+                <Ionicons name="play-circle" size={52} color="rgba(255,255,255,0.9)" />
+              </TouchableOpacity>
+            )}
+          </View>
         ) : null}
 
         {(!post.content_warning || twExpanded) && postImageUrls.length > 0 ? (
@@ -911,4 +938,5 @@ const s = StyleSheet.create({
   sharePreview:        { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12 },
   sharePreviewAuthor:  { fontSize: 13, fontWeight: '600', marginBottom: 4 },
   sharePreviewContent: { fontSize: 13, lineHeight: 19 },
+  playBtn: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
 })
