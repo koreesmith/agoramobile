@@ -7,7 +7,7 @@ import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
 import Constants from 'expo-constants'
 import { Screen } from '../components/ui'
-import { usersApi, authApi, instanceApi } from '../api'
+import { usersApi, authApi, instanceApi, interactionsApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
@@ -231,6 +231,11 @@ export default function SettingsScreen() {
         </View>
         <Text style={[s.section, { color: c.textMuted }]}>Data</Text>
         <Row icon="download-outline" label={exportLoading ? 'Exporting…' : 'Export my data'} onPress={exportData} />
+        <Row icon="refresh-circle-outline" label="Reset feed history" onPress={() =>
+          Alert.alert('Reset feed history?', 'This will clear your interaction history and your feed will return to the default ranking.', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Reset', style: 'destructive', onPress: () => interactionsApi.reset().catch(() => {}) },
+          ])} />
         {deletionScheduledAt ? (
           <Row icon="refresh-outline" label="Cancel account deletion" onPress={() =>
             Alert.alert('Cancel deletion?', `Your account is scheduled for deletion on ${new Date(deletionScheduledAt).toLocaleDateString()}. Cancel this?`, [

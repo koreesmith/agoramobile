@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, ScrollView,
   RefreshControl, Modal, Alert, ActivityIndicator, StyleSheet,
@@ -14,6 +14,7 @@ import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Header, Spinner, EmptyState, UploadingModal, Avatar } from '../../components/ui'
 import PostCard from '../../components/PostCard'
 import { feedApi, feedsApi, friendsApi, instanceApi, usersApi, imgUrl } from '../../api'
+import { trackInteraction } from '../../utils/interactions'
 import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
 
@@ -235,6 +236,13 @@ export default function FeedScreen() {
     finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploading(false) }
   }
 
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50, minimumViewTime: 1000 }).current
+  const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
+    for (const vi of viewableItems) {
+      if (vi.item?.id) trackInteraction('post_view', vi.item.id)
+    }
+  }, [])
+
   return (
     <Screen>
       <Header title="Feed" right={
@@ -285,6 +293,8 @@ export default function FeedScreen() {
             refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={c.primary} />}
             onEndReached={() => hasNextPage && fetchNextPage()}
             onEndReachedThreshold={0.3}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
             ListEmptyComponent={<EmptyState icon="📭" title="Nothing here yet" subtitle="Follow some friends to see their posts" />}
             ListFooterComponent={isFetchingNextPage ? <ActivityIndicator style={{ padding: 16 }} color={c.primary} /> : null}
           />
