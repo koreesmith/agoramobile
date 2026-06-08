@@ -247,6 +247,44 @@ export const adminApi = {
   getAuditLog:    (page = 0)                     => api.get('/admin/audit-log', { params: { page } }),
 }
 
+// ── Pages ─────────────────────────────────────────────────────────────────────
+export const pagesApi = {
+  list:         (featured?: boolean)           => api.get('/pages', { params: featured ? { featured: true } : {} }),
+  mine:         ()                             => api.get('/pages/mine'),
+  get:          (slug: string)                 => api.get(`/pages/${slug}`),
+  create:       (data: any)                    => api.post('/pages', data),
+  update:       (slug: string, data: any)      => api.patch(`/pages/${slug}`, data),
+  delete:       (slug: string)                 => api.delete(`/pages/${slug}`),
+  subscribe:    (slug: string)                 => api.post(`/pages/${slug}/subscribe`),
+  unsubscribe:  (slug: string)                 => api.delete(`/pages/${slug}/subscribe`),
+  getFeed:      (slug: string, page = 0)       => api.get(`/pages/${slug}/feed`, { params: { page } }),
+  getMembers:   (slug: string)                 => api.get(`/pages/${slug}/members`),
+  inviteMember: (slug: string, data: any)      => api.post(`/pages/${slug}/members`, data),
+  acceptInvite: (slug: string)                 => api.post(`/pages/${slug}/members/accept`),
+  setMemberRole:(slug: string, userId: string, role: string) =>
+                                                  api.patch(`/pages/${slug}/members/${userId}/role`, { role }),
+  removeMember: (slug: string, userId: string) => api.delete(`/pages/${slug}/members/${userId}`),
+  getAnalytics: (slug: string)                 => api.get(`/pages/${slug}/analytics`),
+  createPost:   (slug: string, data: any)      => api.post(`/pages/${slug}/posts`, data),
+  search:       (q: string, page = 0)          => api.get('/search/pages', { params: { q, page } }),
+}
+
+// ── Feed Interactions ─────────────────────────────────────────────────────────
+export const interactionsApi = {
+  track: (data: any) => api.post('/feed/interactions', data),
+  reset: ()          => api.delete('/feed/interactions'),
+}
+
+// ── Group mention search ──────────────────────────────────────────────────────
+export const groupMentionApi = {
+  search: (q: string) => api.get('/groups/mention-search', { params: { q } }),
+}
+
+// ── Poll voters ───────────────────────────────────────────────────────────────
+export const pollApi = {
+  getVoters: (postId: string) => api.get(`/posts/${postId}/poll/voters`),
+}
+
 // ── Waitlist ──────────────────────────────────────────────────────────────────
 export const waitlistApi = {
   list:    ()            => api.get('/admin/waitlist'),
