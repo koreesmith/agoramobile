@@ -98,6 +98,11 @@ export default function ConversationScreen() {
           ListEmptyComponent={<View style={{ alignItems: 'center', paddingVertical: 48 }}><Text style={{ color: c.textLight }}>No messages yet. Say hello!</Text></View>}
           renderItem={({ item: msg }) => {
             const isOwn = msg.author_id === user?.id
+            // GetMessages returns a `reactions` array (one entry per reacting
+            // user), not a singular `reaction` field -- the badge shows only
+            // the current viewer's own reaction, since tapping it unreacts
+            // on their behalf specifically (DELETE is scoped to that user).
+            const myReaction = msg.reactions?.find((r: any) => r.user_id === user?.id)?.reaction
             if (msg.deleted_at) return (
               <View style={[s.bubbleRow, isOwn && { justifyContent: 'flex-end' }]}>
                 <Text style={s.deleted}>Message deleted</Text>
@@ -127,9 +132,9 @@ export default function ConversationScreen() {
                       {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
                     </Text>
                   </TouchableOpacity>
-                  {msg.reaction && (
+                  {myReaction && (
                     <TouchableOpacity onPress={() => unreact.mutate(msg.id)} style={s.msgReaction}>
-                      <Text style={{ fontSize: 14 }}>{msg.reaction}</Text>
+                      <Text style={{ fontSize: 14 }}>{myReaction}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
