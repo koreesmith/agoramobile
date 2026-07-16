@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Switch, StyleSheet } from 'react-native'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Avatar } from '../components/ui'
 import { federationApi, usersApi } from '../api'
@@ -16,12 +16,31 @@ interface FediversePreview {
   instance: string
 }
 
+interface FollowingEntry {
+  id: string
+  actor_url: string
+  accepted: boolean
+  notify: boolean
+  username?: string
+  display_name?: string
+  avatar_url?: string
+  instance?: string
+}
+
 export default function FediverseScreen() {
   const c = useC()
+  const qc = useQueryClient()
   const { user, updateUser } = useAuthStore()
   const [handle, setHandle] = useState('')
   const [preview, setPreview] = useState<FediversePreview | null>(null)
   const [searchError, setSearchError] = useState('')
+
+  const { data: followingData } = useQuery({
+    queryKey: ['fediverse-following'],
+    queryFn: () => federationApi.listFollowing().then(r => r.data),
+  })
+  const following: FollowingEntry[] = followingData?.following ?? []
+  const notificationsEnabled = (user as any)?.fediverse_notifications_enabled ?? true
 
   const toggleActivityPub = useMutation({
     mutationFn: () => usersApi.updateProfile({ activitypub_enabled: !(user as any)?.activitypub_enabled }),
@@ -34,10 +53,25 @@ export default function FediverseScreen() {
     onError: (e: any) => { setPreview(null); setSearchError(e.response?.data?.error || 'Could not resolve that handle.') },
   })
 
+  const alreadyFollowing = preview && following.some(f => f.actor_url === preview.actor_url)
+
   const follow = useMutation({
     mutationFn: (actorUrl: string) => federationApi.followFediverseAccount(actorUrl),
-    onSuccess: () => { setPreview(null); setHandle('') },
+    onSuccess: () => {
+      setPreview(null); setHandle('')
+      qc.invalidateQueries({ queryKey: ['fediverse-following'] })
+    },
     onError: (e: any) => setSearchError(e.response?.data?.error || 'Could not follow that account.'),
+  })
+
+  const unfollow = useMutation({
+    mutationFn: (id: string) => federationApi.unfollowFediverseAccount(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['fediverse-following'] }),
+  })
+
+  const toggleNotify = useMutation({
+    mutationFn: ({ id, notify }: { id: string; notify: boolean }) => federationApi.toggleFollowNotify(id, notify),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['fediverse-following'] }),
   })
 
   const handleSearch = () => {
@@ -114,12 +148,72 @@ export default function FediverseScreen() {
               </View>
               <TouchableOpacity
                 onPress={() => follow.mutate(preview.actor_url)}
-                disabled={follow.isPending}
-                style={[s.followBtn, { backgroundColor: c.primary }]}
+                disabled={follow.isPending || !!alreadyFollowing}
+                style={[s.followBtn, { backgroundColor: alreadyFollowing ? c.border : c.primary }]}
               >
-                <Text style={s.followBtnText}>{follow.isPending ? 'Following…' : 'Follow'}</Text>
+                <Text style={[s.followBtnText, alreadyFollowing && { color: c.textMuted }]}>
+                  {alreadyFollowing ? 'Following' : follow.isPending ? 'Following…' : 'Follow'}
+                </Text>
               </TouchableOpacity>
             </View>
+          )}
+        </View>
+
+        <View style={[s.card, { backgroundColor: c.card }]}>
+          <Text style={[s.cardTitle, { color: c.text }]}>Your follows</Text>
+          {following.length === 0 ? (
+            <Text style={[s.emptyText, { color: c.textMuted, borderColor: c.border }]}>
+              You're not following anyone on the fediverse yet.
+            </Text>
+          ) : (
+            <View style={{ marginTop: 8 }}>
+              {following.map(f => (
+                <View key={f.id} style={[s.followRow, { borderBottomColor: c.border }]}>
+                  <Avatar url={f.avatar_url} name={f.display_name || f.username} size={38} />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={[s.previewName, { color: c.text }]} numberOfLines={1}>
+                      {f.display_name || f.username || f.actor_url}
+                    </Text>
+                    {!!f.username && (
+                      <Text style={[s.previewHandle, { color: c.textMuted }]} numberOfLines={1}>
+                        @{f.username}{f.instance ? `@${f.instance}` : ''}
+                      </Text>
+                    )}
+                  </View>
+                  {!f.accepted && (
+                    <View style={s.pendingTag}>
+                      <Ionicons name="time-outline" size={13} color={c.textMuted} />
+                      <Text style={[s.pendingText, { color: c.textMuted }]}>Requested</Text>
+                    </View>
+                  )}
+                  {f.accepted && (
+                    <TouchableOpacity
+                      onPress={() => toggleNotify.mutate({ id: f.id, notify: !f.notify })}
+                      disabled={toggleNotify.isPending || !notificationsEnabled}
+                      style={s.iconBtn}
+                    >
+                      <Ionicons
+                        name={f.notify ? 'notifications' : 'notifications-off-outline'}
+                        size={18}
+                        color={f.notify && notificationsEnabled ? c.primary : c.textLight}
+                      />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => unfollow.mutate(f.id)}
+                    disabled={unfollow.isPending}
+                    style={s.iconBtn}
+                  >
+                    <Ionicons name="person-remove-outline" size={18} color={c.red} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+          {!notificationsEnabled && following.length > 0 && (
+            <Text style={[s.hintText, { color: c.textMuted }]}>
+              Fediverse post notifications are off globally — turn them on above to use per-account notify toggles.
+            </Text>
           )}
         </View>
       </ScrollView>
@@ -142,4 +236,10 @@ const s = StyleSheet.create({
   previewSummary: { fontSize: 12, marginTop: 4 },
   followBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, marginLeft: 8 },
   followBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },
+  emptyText: { fontSize: 13, fontStyle: 'italic', textAlign: 'center', paddingVertical: 20, marginTop: 10, borderWidth: 1, borderStyle: 'dashed', borderRadius: 10 },
+  followRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  pendingTag: { flexDirection: 'row', alignItems: 'center', gap: 3, marginRight: 4 },
+  pendingText: { fontSize: 11 },
+  iconBtn: { padding: 6, marginLeft: 2 },
+  hintText: { fontSize: 11, marginTop: 10, lineHeight: 15 },
 })
