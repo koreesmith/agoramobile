@@ -18,7 +18,7 @@ const FEATURES: { icon: string; title: string; desc: string; link?: string; link
   },
   { icon: 'bookmark', title: 'Pages', desc: 'Follow bands, businesses, and creators. Their posts now appear in your feed.' },
   { icon: 'videocam', title: 'Video Posts', desc: 'Share videos up to 2 minutes directly in your posts.' },
-  { icon: 'sparkles', title: 'Smart Ranking', desc: 'Your feed now learns what you love and surfaces it first.' },
+  { icon: 'sparkles', title: 'Smart Ranking', desc: "The algorithm is always your call, never ours. Your main feed stays chronological by default — create a custom feed with Smart Ranking on if you want one that learns what you love." },
   { icon: 'images', title: 'Up to 10 Photos', desc: 'Share more moments — attach up to 10 photos in a single post.' },
   { icon: 'people', title: 'Group Tagging', desc: 'Use +group-name in posts and comments to tag a group.' },
   { icon: 'chatbubble-ellipses', title: 'Quick Comments', desc: 'Comment on any post directly from your feed — no tap required.' },
