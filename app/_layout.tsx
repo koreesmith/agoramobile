@@ -12,6 +12,7 @@ import { ColorProvider } from '../constants/ColorContext'
 import { useThemeStore } from '../store/theme'
 import { useBlockStore } from '../store/blocks'
 import SplashScreen from '../components/SplashScreen'
+import Toast from '../components/Toast'
 
 // Map notification type to the route to navigate to
 function getRouteForNotification(data: Record<string, string>): string | null {
@@ -159,6 +160,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AppContent />
         </QueryClientProvider>
+        <Toast />
         {showSplash && (
           <View style={StyleSheet.absoluteFill}>
             <SplashScreen onFinish={() => setShowSplash(false)} />
