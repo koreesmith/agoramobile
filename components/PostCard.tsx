@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, Dimensions, Linking, TextInput, PanResponder, ScrollView, KeyboardAvoidingView } from 'react-native'
 import { Image } from 'expo-image'
-import { Video, ResizeMode } from 'expo-av'
+import { VideoView, useVideoPlayer } from 'expo-video'
 import ZoomableImage from './ZoomableImage'
 import { router } from 'expo-router'
 import * as MediaLibrary from 'expo-media-library'
@@ -341,6 +341,13 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const imageUrl = postImageUrls[0]
 
   const [videoPlaying, setVideoPlaying] = useState(false)
+  const videoSource = post.video_url ? imgUrl(post.video_url) ?? null : null
+  const videoPlayer = useVideoPlayer(videoSource, p => { p.loop = false })
+  useEffect(() => {
+    videoPlayer.muted = !videoPlaying
+    if (videoPlaying) videoPlayer.play()
+    else videoPlayer.pause()
+  }, [videoPlaying, videoPlayer])
   const [inlineComment, setInlineComment] = useState('')
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [showLightbox, setShowLightbox] = useState(false)
@@ -484,25 +491,28 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
 
         {(!post.content_warning || twExpanded) && post.video_url && postImageUrls.length === 0 ? (
           <View style={[s.imageWrapper, { position: 'relative' }]}>
-            <Video
-              source={{ uri: imgUrl(post.video_url) || '' }}
-              posterSource={post.video_thumb_url ? { uri: imgUrl(post.video_thumb_url) } : undefined}
-              posterStyle={{ resizeMode: 'cover' }}
-              usePoster={!videoPlaying}
+            <VideoView
+              player={videoPlayer}
               style={[s.image, { backgroundColor: '#000' }]}
-              resizeMode={ResizeMode.CONTAIN}
-              shouldPlay={videoPlaying}
-              isLooping={false}
-              isMuted={!videoPlaying}
-              useNativeControls={videoPlaying}
+              contentFit="contain"
+              nativeControls={videoPlaying}
             />
             {!videoPlaying && (
-              <TouchableOpacity
-                onPress={() => setVideoPlaying(true)}
-                style={s.playBtn}
-              >
-                <Ionicons name="play-circle" size={52} color="rgba(255,255,255,0.9)" />
-              </TouchableOpacity>
+              <>
+                {post.video_thumb_url ? (
+                  <Image
+                    source={{ uri: imgUrl(post.video_thumb_url) }}
+                    style={[s.image, StyleSheet.absoluteFill]}
+                    contentFit="cover"
+                  />
+                ) : null}
+                <TouchableOpacity
+                  onPress={() => setVideoPlaying(true)}
+                  style={s.playBtn}
+                >
+                  <Ionicons name="play-circle" size={52} color="rgba(255,255,255,0.9)" />
+                </TouchableOpacity>
+              </>
             )}
           </View>
         ) : null}
