@@ -2,7 +2,7 @@
   "expo": {
     "name": "Agora",
     "slug": "agoramobile",
-    "version": "1.2.2",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -44,7 +44,9 @@
       "./plugins/withIOS26ClassPrewarm",
       "expo-router",
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-video",
+      "expo-web-browser"
     ],
     "scheme": "agoramobile",
     "extra": {

@@ -1,20 +1,26 @@
 import { useState } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Switch, Alert, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native'
 import { router, Stack } from 'expo-router'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
 import Constants from 'expo-constants'
+import * as WebBrowser from 'expo-web-browser'
 import { Screen } from '../components/ui'
-import { usersApi, authApi, instanceApi } from '../api'
+import { usersApi, authApi, instanceApi, interactionsApi } from '../api'
+import { resetWhatsNew } from '../components/WhatsNewModal'
 import { useAuthStore } from '../store/auth'
+import { useWhatsNewStore } from '../store/whatsNew'
+import { useToastStore } from '../store/toast'
 import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
 import { useThemeStore, ThemePreference } from '../store/theme'
 
 export default function SettingsScreen() {
   const c = useC()
+  const qc = useQueryClient()
+  const showToast = useToastStore(s => s.show)
   const { user, updateUser, logout } = useAuthStore()
   const { preference, setPreference } = useThemeStore()
   const [currentPassword, setCurrentPassword] = useState('')
@@ -36,6 +42,16 @@ export default function SettingsScreen() {
   const toggleApproveWallPosts = useMutation({
     mutationFn: () => usersApi.updateProfile({ approve_wall_posts: !(user as any)?.approve_wall_posts }),
     onSuccess: () => updateUser({ approve_wall_posts: !(user as any)?.approve_wall_posts } as any),
+  })
+
+  const toggleActivityPub = useMutation({
+    mutationFn: () => usersApi.updateProfile({ activitypub_enabled: !(user as any)?.activitypub_enabled }),
+    onSuccess: () => updateUser({ activitypub_enabled: !(user as any)?.activitypub_enabled } as any),
+  })
+
+  const toggleFediverseNotifications = useMutation({
+    mutationFn: () => usersApi.updateProfile({ fediverse_notifications_enabled: !(user as any)?.fediverse_notifications_enabled }),
+    onSuccess: () => updateUser({ fediverse_notifications_enabled: !(user as any)?.fediverse_notifications_enabled } as any),
   })
 
   const MESSAGE_PERM_OPTIONS = [
@@ -98,6 +114,15 @@ export default function SettingsScreen() {
       setExportLoading(false)
     }
   }
+
+  const resetFeedHistory = useMutation({
+    mutationFn: () => interactionsApi.reset(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['feed'] })
+      showToast('Your feed history has been reset')
+    },
+    onError: (e: any) => showToast(e.response?.data?.error || 'Could not reset feed history', 'error'),
+  })
 
   const requestDeletion = useMutation({
     mutationFn: () => usersApi.requestDeletion(),
@@ -178,6 +203,7 @@ export default function SettingsScreen() {
         <Text style={[s.section, { color: c.textMuted }]}>Account</Text>
         <Row icon="person-outline" label="Edit profile" onPress={() => router.push('/edit-profile')} />
         <Row icon="people-outline" label="Friend lists" onPress={() => router.push('/friend-lists')} />
+        <Row icon="planet-outline" label="Fediverse" onPress={() => router.push('/fediverse')} />
         <Row icon="mail-outline" label="Change email" onPress={() => setSection('email')} />
         <Row icon="key-outline" label="Change password" onPress={() => setSection('password')} />
         {invitesEnabled && (
@@ -213,6 +239,10 @@ export default function SettingsScreen() {
           right={<Switch value={!!(user as any)?.hide_timeline} onValueChange={() => toggleHideTimeline.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleHideTimeline.isPending} />} />
         <Row icon="checkmark-circle-outline" label="Approve wall posts"
           right={<Switch value={!!(user as any)?.approve_wall_posts} onValueChange={() => toggleApproveWallPosts.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleApproveWallPosts.isPending} />} />
+        <Row icon="planet-outline" label="Fediverse (ActivityPub)"
+          right={<Switch value={(user as any)?.activitypub_enabled ?? true} onValueChange={() => toggleActivityPub.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleActivityPub.isPending} />} />
+        <Row icon="notifications-outline" label="Fediverse post notifications"
+          right={<Switch value={(user as any)?.fediverse_notifications_enabled ?? true} onValueChange={() => toggleFediverseNotifications.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleFediverseNotifications.isPending} />} />
         <View style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
           <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
             <Ionicons name="chatbubble-ellipses-outline" size={18} color={c.primary} />
@@ -231,6 +261,11 @@ export default function SettingsScreen() {
         </View>
         <Text style={[s.section, { color: c.textMuted }]}>Data</Text>
         <Row icon="download-outline" label={exportLoading ? 'Exporting…' : 'Export my data'} onPress={exportData} />
+        <Row icon="refresh-circle-outline" label="Reset feed history" onPress={() =>
+          Alert.alert('Reset feed history?', 'This will clear your interaction history and your feed will return to the default ranking.', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Reset', style: 'destructive', onPress: () => resetFeedHistory.mutate() },
+          ])} />
         {deletionScheduledAt ? (
           <Row icon="refresh-outline" label="Cancel account deletion" onPress={() =>
             Alert.alert('Cancel deletion?', `Your account is scheduled for deletion on ${new Date(deletionScheduledAt).toLocaleDateString()}. Cancel this?`, [
@@ -244,6 +279,17 @@ export default function SettingsScreen() {
               { text: 'Delete account', style: 'destructive', onPress: () => requestDeletion.mutate() },
             ])} right={<View />} />
         )}
+        <Text style={[s.section, { color: c.textMuted }]}>Help</Text>
+        <Row icon="help-circle-outline" label="Help & Documentation" onPress={() => {
+          const instanceUrl = useAuthStore.getState().instanceUrl
+          if (instanceUrl) WebBrowser.openBrowserAsync(`${instanceUrl}/docs#user/index`)
+        }} />
+        <Row icon="sparkles-outline" label="What's New" onPress={() => {
+          resetWhatsNew().then(() => {
+            useWhatsNewStore.getState().trigger()
+            router.back()
+          })
+        }} />
         <Text style={[s.section, { color: c.textMuted }]}>About</Text>
         <Row icon="person-circle-outline" label={`Signed in as @${user?.username}`} onPress={() => {}} right={<View />} />
         <Row icon="server-outline" label={`Instance: ${useAuthStore.getState().instanceUrl?.replace(/^https?:\/\//, '')}`} onPress={() => {}} right={<View />} />

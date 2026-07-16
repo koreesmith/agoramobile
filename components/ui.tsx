@@ -25,36 +25,52 @@ export function Avatar({ url, name, size = 40, online }: { url?: string; name?: 
   )
 }
 
-const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi
+// Matches URLs, fediverse mentions (@handle@instance.tld), local @mentions,
+// and +group-slug tags -- ports web's renderContent() (AMOBILE-99), so
+// mobile matches web's link handling instead of only linkifying URLs.
+// The fediverse-mention alternative must come before the bare-local one so a
+// full remote handle is captured as one token rather than just its @handle
+// portion (AGORA-163 hit the equivalent ordering bug server-side).
+const LINK_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+|@[a-zA-Z0-9_]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+|@[a-zA-Z0-9_-]+|\+[a-zA-Z0-9_-]+)/g
+const MENTION_RE = /^@[a-zA-Z0-9_-]+$|^@[a-zA-Z0-9_]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+$/
+const GROUP_TAG_RE = /^\+[a-zA-Z0-9_-]+$/
+const URL_PART_RE = /^https?:\/\//i
 
-/** Renders a string with any http/https URLs as tappable links. */
+/** Renders a string with URLs, @mentions, and +group-slug tags as tappable
+ * links -- URLs open externally; mentions and group tags navigate in-app. */
 export function LinkedText({ text, style, linkStyle }: { text: string; style?: object; linkStyle?: object }) {
-  const parts: { text: string; isUrl: boolean }[] = []
-  let last = 0
-  let match: RegExpExecArray | null
-  URL_REGEX.lastIndex = 0
-  while ((match = URL_REGEX.exec(text)) !== null) {
-    if (match.index > last) parts.push({ text: text.slice(last, match.index), isUrl: false })
-    parts.push({ text: match[0], isUrl: true })
-    last = match.index + match[0].length
-  }
-  if (last < text.length) parts.push({ text: text.slice(last), isUrl: false })
+  const router = useRouter()
+  const parts = text.split(LINK_REGEX)
 
   return (
     <Text style={style}>
-      {parts.map((part, i) =>
-        part.isUrl ? (
-          <Text
-            key={i}
-            style={[{ color: '#3b82f6', textDecorationLine: 'underline' }, linkStyle]}
-            onPress={() => Linking.openURL(part.text)}
-          >
-            {part.text}
-          </Text>
-        ) : (
-          <Text key={i}>{part.text}</Text>
-        )
-      )}
+      {parts.map((part, i) => {
+        if (MENTION_RE.test(part)) {
+          return (
+            <Text key={i} style={[{ color: '#3b82f6', fontWeight: '600' }, linkStyle]}
+              onPress={() => router.push(`/profile/${part.slice(1)}` as any)}>
+              {part}
+            </Text>
+          )
+        }
+        if (GROUP_TAG_RE.test(part)) {
+          return (
+            <Text key={i} style={[{ color: '#3b82f6', fontWeight: '600' }, linkStyle]}
+              onPress={() => router.push(`/group/${part.slice(1)}` as any)}>
+              {part}
+            </Text>
+          )
+        }
+        if (URL_PART_RE.test(part)) {
+          return (
+            <Text key={i} style={[{ color: '#3b82f6', textDecorationLine: 'underline' }, linkStyle]}
+              onPress={() => Linking.openURL(part)}>
+              {part}
+            </Text>
+          )
+        }
+        return <Text key={i}>{part}</Text>
+      })}
     </Text>
   )
 }

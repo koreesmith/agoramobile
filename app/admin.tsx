@@ -10,6 +10,15 @@ import { useC } from '../constants/ColorContext'
 
 type Tab = 'reports' | 'moderation' | 'users' | 'waitlist' | 'instances' | 'invites' | 'rules' | 'settings' | 'audit'
 
+// GetSettings (internal/admin/admin.go) serializes every instance_settings
+// value as a string ("true"/"false", not a JSON boolean), so `typeof value
+// === 'boolean'` never fires. Listing the known boolean-shaped keys
+// explicitly lets the generic settings list render a real Switch for them
+// instead of a raw text input the admin has to type true/false into.
+// activitypub_enabled is deliberately excluded — it already gets its own
+// dedicated toggle above this list.
+const BOOLEAN_SETTING_KEYS = new Set(['federation_enabled', 'smtp_enabled', 'user_invites_enabled'])
+
 export default function AdminScreen() {
   const c = useC()
   const { user } = useAuthStore()
@@ -754,14 +763,28 @@ export default function AdminScreen() {
           {settingsLoading ? <Spinner /> : (
             <View style={{ gap: 12 }}>
               <Text style={[s.sectionTitle, { color: c.textMuted }]}>Instance Settings</Text>
-              {Object.entries(settings).map(([key, value]: [string, any]) => (
+              <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>Fediverse (ActivityPub)</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={{ color: c.textMd, fontSize: 12, flex: 1, marginRight: 8 }}>
+                    Let Mastodon and other fediverse apps discover, follow, and interact with users on this instance.
+                    Separate from Agora-to-Agora federation below; users can also opt out individually in their own Settings.
+                  </Text>
+                  <Switch
+                    value={settings.activitypub_enabled !== 'false'}
+                    onValueChange={v => updateSettings.mutate({ activitypub_enabled: v ? 'true' : 'false' })}
+                    trackColor={{ false: c.border, true: c.primary }}
+                  />
+                </View>
+              </View>
+              {Object.entries(settings).filter(([key]) => key !== 'activitypub_enabled').map(([key, value]: [string, any]) => (
                 <View key={key} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
                   <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>{key.replace(/_/g, ' ')}</Text>
-                  {typeof value === 'boolean' ? (
+                  {BOOLEAN_SETTING_KEYS.has(key) ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={{ color: c.text, fontSize: 14 }}>{value ? 'Enabled' : 'Disabled'}</Text>
-                      <Switch value={value}
-                        onValueChange={v => updateSettings.mutate({ [key]: v })}
+                      <Text style={{ color: c.text, fontSize: 14 }}>{value === 'true' ? 'Enabled' : 'Disabled'}</Text>
+                      <Switch value={value === 'true'}
+                        onValueChange={v => updateSettings.mutate({ [key]: v ? 'true' : 'false' })}
                         trackColor={{ false: c.border, true: c.primary }} />
                     </View>
                   ) : (
