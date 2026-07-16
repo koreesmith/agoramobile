@@ -12,6 +12,7 @@ import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Header, Spinner, EmptyState, UploadingModal, Avatar } from '../../components/ui'
+import AutoGrowInput from '../../components/AutoGrowInput'
 import PostCard from '../../components/PostCard'
 import { feedApi, feedsApi, friendsApi, instanceApi, usersApi, pagesApi, imgUrl } from '../../api'
 import { trackInteraction } from '../../utils/interactions'
@@ -522,11 +523,13 @@ export default function FeedScreen() {
               </View>
             )}
 
-            <TextInput
-              style={[s.composeInput, { color: c.text }]}
+            <AutoGrowInput
+              minHeight={64}
+              maxHeight={260}
+              style={[s.composeInput, { color: c.text, flex: undefined }]}
               placeholder={showPoll ? 'Ask a question…' : 'What\'s on your mind?'}
               placeholderTextColor={c.textLight}
-              value={content} onChangeText={handleContentChange} multiline autoFocus={!showCW}
+              value={content} onChangeText={handleContentChange} autoFocus={!showCW}
             />
             {mentionSuggestions.length > 0 && mentionQuery !== null && (
               <View style={[s.mentionList, { backgroundColor: c.card, borderColor: c.border }]}>
