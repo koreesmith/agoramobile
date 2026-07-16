@@ -14,6 +14,7 @@ import { trackInteraction } from '../utils/interactions'
 import { handle } from '../utils/handle'
 import { useAuthStore } from '../store/auth'
 import { useBlockStore } from '../store/blocks'
+import { useToastStore } from '../store/toast'
 import { Avatar } from './ui'
 import { useC } from '../constants/ColorContext'
 import ReactorsModal from './ReactorsModal'
@@ -173,6 +174,7 @@ const pw = StyleSheet.create({
 export default function PostCard({ post, queryKey }: { post: any; queryKey: any[] }) {
   const { user } = useAuthStore()
   const { addBlock } = useBlockStore()
+  const showToast = useToastStore(s => s.show)
   const qc = useQueryClient()
   const [showReactions, setShowReactions] = useState(false)
   const [hoveredReaction, setHoveredReaction] = useState<string | null>(null)
@@ -275,8 +277,11 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
 
   const repost = useMutation({
     mutationFn: () => feedApi.repostPost(post.id, { content: shareContent, visibility: 'friends' }),
-    onSuccess: () => { setShowShare(false); setShareContent(''); trackInteraction('repost', post.id); invalidate() },
-    onError: (e: any) => Alert.alert('Cannot share', e.response?.data?.error || 'Could not share post'),
+    onSuccess: () => {
+      setShowShare(false); setShareContent(''); trackInteraction('repost', post.id); invalidate()
+      showToast('Shared!')
+    },
+    onError: (e: any) => showToast(e.response?.data?.error || 'Could not share post', 'error'),
   })
   const del    = useMutation({ mutationFn: () => feedApi.deletePost(post.id), onSuccess: invalidate })
   const edit   = useMutation({
