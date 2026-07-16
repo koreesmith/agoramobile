@@ -14,7 +14,7 @@ import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Header, Spinner, EmptyState, UploadingModal, Avatar } from '../../components/ui'
 import AutoGrowInput from '../../components/AutoGrowInput'
 import PostCard from '../../components/PostCard'
-import { feedApi, feedsApi, friendsApi, instanceApi, usersApi, pagesApi, imgUrl } from '../../api'
+import { feedApi, feedsApi, friendsApi, instanceApi, usersApi, pagesApi, groupMentionApi, imgUrl } from '../../api'
 import { trackInteraction } from '../../utils/interactions'
 import WhatsNewModal, { shouldShowWhatsNew } from '../../components/WhatsNewModal'
 import { useAuthStore } from '../../store/auth'
@@ -176,6 +176,10 @@ export default function FeedScreen() {
     }
     const match = text.match(/@(\w*)$/)
     setMentionQuery(match ? match[1] : null)
+
+    // AMOBILE-99: +group-slug tag autocomplete, mirrors web's CreatePost.tsx
+    const groupMatch = text.match(/\+([a-zA-Z0-9_-]*)$/)
+    setGroupTagQuery(groupMatch ? groupMatch[1] : null)
   }
 
   const { data: mentionData } = useQuery({
@@ -188,6 +192,28 @@ export default function FeedScreen() {
   const insertMention = (username: string) => {
     setContent(prev => prev.replace(/@\w*$/, `@${username} `))
     setMentionQuery(null)
+  }
+
+  // AMOBILE-99: debounced (200ms per AC) so a group isn't queried on every
+  // keystroke -- web's equivalent debounces the same way.
+  const [groupTagQuery, setGroupTagQuery] = useState<string | null>(null)
+  const [debouncedGroupTagQuery, setDebouncedGroupTagQuery] = useState<string | null>(null)
+  useEffect(() => {
+    if (groupTagQuery === null) { setDebouncedGroupTagQuery(null); return }
+    const t = setTimeout(() => setDebouncedGroupTagQuery(groupTagQuery), 200)
+    return () => clearTimeout(t)
+  }, [groupTagQuery])
+
+  const { data: groupTagData } = useQuery({
+    queryKey: ['group-mention-search', debouncedGroupTagQuery],
+    queryFn: () => groupMentionApi.search(debouncedGroupTagQuery!).then(r => r.data),
+    enabled: debouncedGroupTagQuery !== null && debouncedGroupTagQuery.length >= 1,
+  })
+  const groupTagSuggestions: any[] = groupTagData?.groups || []
+
+  const insertGroupTag = (slug: string) => {
+    setContent(prev => prev.replace(/\+[a-zA-Z0-9_-]*$/, `+${slug} `))
+    setGroupTagQuery(null)
   }
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch, isRefetching } = useInfiniteQuery({
@@ -540,6 +566,20 @@ export default function FeedScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>{u.display_name || u.username}</Text>
                       <Text style={{ fontSize: 11, color: c.textMuted }}>@{u.username}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {groupTagSuggestions.length > 0 && groupTagQuery !== null && (
+              <View style={[s.mentionList, { backgroundColor: c.card, borderColor: c.border }]}>
+                {groupTagSuggestions.slice(0, 8).map((g: any) => (
+                  <TouchableOpacity key={g.slug} onPress={() => insertGroupTag(g.slug)}
+                    style={[s.mentionRow, { borderBottomColor: c.border }]}>
+                    <Avatar url={g.avatar_url} name={g.name} size={28} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>{g.name}</Text>
+                      <Text style={{ fontSize: 11, color: c.textMuted }}>+{g.slug}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}

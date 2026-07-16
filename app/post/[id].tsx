@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
 import { formatDistanceToNow } from 'date-fns'
-import { Screen, Spinner, Avatar } from '../../components/ui'
+import { Screen, Spinner, Avatar, LinkedText } from '../../components/ui'
 import PostCard from '../../components/PostCard'
 import ReactorsModal from '../../components/ReactorsModal'
 import { feedApi, imgUrl } from '../../api'
@@ -103,7 +103,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
               </View>
             </View>
           ) : (
-            <Text style={[s.commentText, { color: c.textMd }]}>{comment.content}{comment.edited_at ? <Text style={{ color: c.textLight, fontSize: 11 }}> (edited)</Text> : null}</Text>
+            <Text style={[s.commentText, { color: c.textMd }]}><LinkedText text={comment.content} />{comment.edited_at ? <Text style={{ color: c.textLight, fontSize: 11 }}> (edited)</Text> : null}</Text>
           )}
           {comment.image_url ? (
             <>
