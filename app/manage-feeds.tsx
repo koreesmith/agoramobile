@@ -7,10 +7,10 @@ import { Stack, router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Spinner, EmptyState } from '../components/ui'
-import { feedsApi, friendsApi, groupsApi } from '../api'
+import { feedsApi, friendsApi, groupsApi, federationApi } from '../api'
 import { useC } from '../constants/ColorContext'
 
-type FilterType = 'friend_group' | 'community_group' | 'exclude_friend' | 'exclude_group'
+type FilterType = 'friend_group' | 'community_group' | 'exclude_friend' | 'exclude_group' | 'fediverse_account' | 'fediverse_all'
 
 interface FilterRule {
   filter_type: FilterType
@@ -57,6 +57,16 @@ export default function ManageFeedsScreen() {
     enabled: showEditor,
   })
   const friends: any[] = friendsData?.friends || []
+
+  const { data: followingData } = useQuery({
+    queryKey: ['fediverse-following'],
+    queryFn: () => federationApi.listFollowing().then(r => r.data),
+    enabled: showEditor,
+  })
+  // A followed account only gets a local stub (users.id) once its first post
+  // has been ingested — nothing to filter by before that, so it's left out
+  // of the picker until then, matching web's FeedBuilderModal.
+  const fediverseAccounts: any[] = (followingData?.following || []).filter((f: any) => f.user_id)
 
   const openCreate = () => {
     setEditingId(null)
@@ -213,6 +223,20 @@ export default function ManageFeedsScreen() {
 
               <FilterSection title="INCLUDE FROM FRIEND LISTS" items={friendLists} type="friend_group" labelKey="name" />
               <FilterSection title="INCLUDE FROM COMMUNITIES" items={joinedGroups} type="community_group" labelKey="name" />
+              <FilterSection
+                title="INCLUDE FROM THE FEDIVERSE"
+                items={[{ id: 'true', name: 'Everyone I follow on the fediverse' }]}
+                type="fediverse_all"
+                labelKey="name"
+              />
+              {fediverseAccounts.length > 0 && (
+                <FilterSection
+                  title="INCLUDE ONE FEDIVERSE ACCOUNT"
+                  items={fediverseAccounts.map((f: any) => ({ id: f.user_id, name: f.display_name || f.username || f.actor_url }))}
+                  type="fediverse_account"
+                  labelKey="name"
+                />
+              )}
               <FilterSection title="EXCLUDE FRIENDS" items={friends} type="exclude_friend" labelKey="display_name" />
               <FilterSection title="EXCLUDE COMMUNITIES" items={joinedGroups} type="exclude_group" labelKey="name" />
 
