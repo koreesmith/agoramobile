@@ -39,6 +39,16 @@ export default function SettingsScreen() {
     onSuccess: () => updateUser({ approve_wall_posts: !(user as any)?.approve_wall_posts } as any),
   })
 
+  const toggleActivityPub = useMutation({
+    mutationFn: () => usersApi.updateProfile({ activitypub_enabled: !(user as any)?.activitypub_enabled }),
+    onSuccess: () => updateUser({ activitypub_enabled: !(user as any)?.activitypub_enabled } as any),
+  })
+
+  const toggleFediverseNotifications = useMutation({
+    mutationFn: () => usersApi.updateProfile({ fediverse_notifications_enabled: !(user as any)?.fediverse_notifications_enabled }),
+    onSuccess: () => updateUser({ fediverse_notifications_enabled: !(user as any)?.fediverse_notifications_enabled } as any),
+  })
+
   const MESSAGE_PERM_OPTIONS = [
     { label: 'Everyone', value: 'everyone' },
     { label: 'Friends only', value: 'friends' },
@@ -214,6 +224,10 @@ export default function SettingsScreen() {
           right={<Switch value={!!(user as any)?.hide_timeline} onValueChange={() => toggleHideTimeline.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleHideTimeline.isPending} />} />
         <Row icon="checkmark-circle-outline" label="Approve wall posts"
           right={<Switch value={!!(user as any)?.approve_wall_posts} onValueChange={() => toggleApproveWallPosts.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleApproveWallPosts.isPending} />} />
+        <Row icon="planet-outline" label="Fediverse (ActivityPub)"
+          right={<Switch value={(user as any)?.activitypub_enabled ?? true} onValueChange={() => toggleActivityPub.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleActivityPub.isPending} />} />
+        <Row icon="notifications-outline" label="Fediverse post notifications"
+          right={<Switch value={(user as any)?.fediverse_notifications_enabled ?? true} onValueChange={() => toggleFediverseNotifications.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleFediverseNotifications.isPending} />} />
         <View style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
           <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
             <Ionicons name="chatbubble-ellipses-outline" size={18} color={c.primary} />
