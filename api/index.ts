@@ -178,7 +178,7 @@ export const dmApi = {
   acceptRequest:      (id: string)          => api.post(`/conversations/${id}/accept`),
   leaveConversation:  (id: string)          => api.delete(`/conversations/${id}`),
   friendSearch:       (q: string)           => api.get('/conversations/friend-search', { params: { q } }),
-  reactMessage:       (msgId: string, emoji: string) => api.post(`/messages/${msgId}/react`, { emoji }),
+  reactMessage:       (msgId: string, emoji: string) => api.post(`/messages/${msgId}/react`, { reaction: emoji }),
   unreactMessage:     (msgId: string)       => api.delete(`/messages/${msgId}/react`),
 }
 
@@ -213,6 +213,19 @@ export const moderationApi = {
   unbanInstance:      (id: string)            => api.delete(`/moderation/instance-bans/${id}`),
 }
 
+// ── Fediverse (ActivityPub) ──────────────────────────────────────────────────
+// AGORA-146: resolve a fediverse handle/URL to a preview (search), follow/
+// unfollow a remote account, and list current follows. Distinct from the
+// native Agora-to-Agora protocol's /federation/lookup (see AMOBILE-118) —
+// this only talks to real fediverse software (Mastodon/Pleroma/etc.).
+export const federationApi = {
+  resolveFediverseHandle:   (handle: string)   => api.get('/federation/ap-lookup', { params: { handle } }),
+  followFediverseAccount:   (actorUrl: string) => api.post('/federation/follow', { actor_url: actorUrl }),
+  unfollowFediverseAccount: (id: string)       => api.delete(`/federation/follow/${id}`),
+  listFollowing:            ()                 => api.get('/federation/following'),
+  toggleFollowNotify:       (id: string, notify: boolean) => api.put(`/federation/follow/${id}/notify`, { notify }),
+}
+
 // ── Instance rules ────────────────────────────────────────────────────────────
 export const rulesApi = {
   list: () => api.get('/instance/rules'),
@@ -245,6 +258,44 @@ export const adminApi = {
   deleteInvite:   (id: string)                   => api.delete(`/admin/invites/${id}`),
   // Audit log
   getAuditLog:    (page = 0)                     => api.get('/admin/audit-log', { params: { page } }),
+}
+
+// ── Pages ─────────────────────────────────────────────────────────────────────
+export const pagesApi = {
+  list:         (featured?: boolean)           => api.get('/pages', { params: featured ? { featured: true } : {} }),
+  mine:         ()                             => api.get('/pages/mine'),
+  get:          (slug: string)                 => api.get(`/pages/${slug}`),
+  create:       (data: any)                    => api.post('/pages', data),
+  update:       (slug: string, data: any)      => api.patch(`/pages/${slug}`, data),
+  delete:       (slug: string)                 => api.delete(`/pages/${slug}`),
+  subscribe:    (slug: string)                 => api.post(`/pages/${slug}/subscribe`),
+  unsubscribe:  (slug: string)                 => api.delete(`/pages/${slug}/subscribe`),
+  getFeed:      (slug: string, page = 0)       => api.get(`/pages/${slug}/feed`, { params: { page } }),
+  getMembers:   (slug: string)                 => api.get(`/pages/${slug}/members`),
+  inviteMember: (slug: string, data: any)      => api.post(`/pages/${slug}/members`, data),
+  acceptInvite: (slug: string)                 => api.post(`/pages/${slug}/members/accept`),
+  setMemberRole:(slug: string, userId: string, role: string) =>
+                                                  api.patch(`/pages/${slug}/members/${userId}/role`, { role }),
+  removeMember: (slug: string, userId: string) => api.delete(`/pages/${slug}/members/${userId}`),
+  getAnalytics: (slug: string)                 => api.get(`/pages/${slug}/analytics`),
+  createPost:   (slug: string, data: any)      => api.post(`/pages/${slug}/posts`, data),
+  search:       (q: string, page = 0)          => api.get('/search/pages', { params: { q, page } }),
+}
+
+// ── Feed Interactions ─────────────────────────────────────────────────────────
+export const interactionsApi = {
+  track: (data: any) => api.post('/feed/interactions', data),
+  reset: ()          => api.delete('/feed/interactions'),
+}
+
+// ── Group mention search ──────────────────────────────────────────────────────
+export const groupMentionApi = {
+  search: (q: string) => api.get('/groups/mention-search', { params: { q } }),
+}
+
+// ── Poll voters ───────────────────────────────────────────────────────────────
+export const pollApi = {
+  getVoters: (postId: string) => api.get(`/posts/${postId}/poll/voters`),
 }
 
 // ── Waitlist ──────────────────────────────────────────────────────────────────

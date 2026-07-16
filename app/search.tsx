@@ -5,10 +5,11 @@ import { useQuery } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Spinner, Avatar } from '../components/ui'
 import PostCard from '../components/PostCard'
-import { searchApi } from '../api'
+import { searchApi, pagesApi, imgUrl } from '../api'
 import { useC } from '../constants/ColorContext'
+import { handle } from '../utils/handle'
 
-type Tab = 'users' | 'posts'
+type Tab = 'users' | 'posts' | 'pages'
 
 export default function SearchScreen() {
   const c = useC()
@@ -37,8 +38,15 @@ export default function SearchScreen() {
     enabled: query.length >= 2,
   })
 
+  const { data: pagesData, isLoading: pagesLoading } = useQuery({
+    queryKey: ['search-pages', query],
+    queryFn: () => pagesApi.search(query).then(r => r.data),
+    enabled: query.length >= 2,
+  })
+
   const users: any[] = usersData?.users || []
   const posts: any[] = postsData?.posts || []
+  const pages: any[] = pagesData?.pages || []
 
   const friendStatusLabel = (status: string | undefined) => {
     if (!status || status === 'none') return null
@@ -59,7 +67,7 @@ export default function SearchScreen() {
         <Avatar url={item.avatar_url} name={item.display_name || item.username} size={44} />
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={[s.displayName, { color: c.text }]}>{item.display_name || item.username}</Text>
-          <Text style={[s.username, { color: c.textMuted }]}>@{item.username}</Text>
+          <Text style={[s.username, { color: c.textMuted }]}>{handle(item.username, item.is_remote, item.remote_instance)}</Text>
         </View>
         {label && (
           <View style={[s.badge, { backgroundColor: c.primaryBg, borderColor: c.primaryLt }]}>
@@ -71,14 +79,14 @@ export default function SearchScreen() {
     )
   }
 
-  const isLoading = activeTab === 'users' ? usersLoading : postsLoading
+  const isLoading = activeTab === 'users' ? usersLoading : activeTab === 'posts' ? postsLoading : pagesLoading
 
   const renderContent = () => {
     if (!query) {
       return (
         <View style={s.emptyState}>
           <Ionicons name="search-outline" size={48} color={c.textMuted} style={{ marginBottom: 12 }} />
-          <Text style={[s.emptyTitle, { color: c.textMd }]}>Search for people or posts</Text>
+          <Text style={[s.emptyTitle, { color: c.textMd }]}>Search for people, posts, or pages</Text>
           <Text style={[s.emptySub, { color: c.textLight }]}>Type at least 2 characters to search</Text>
         </View>
       )
@@ -131,6 +139,52 @@ export default function SearchScreen() {
       )
     }
 
+    // Pages tab
+    if (activeTab === 'pages') {
+      if (pages.length === 0) {
+        return (
+          <View style={s.emptyState}>
+            <Ionicons name="bookmark-outline" size={40} color={c.textMuted} style={{ marginBottom: 10 }} />
+            <Text style={[s.emptyTitle, { color: c.textMd }]}>No pages found for "{query}"</Text>
+          </View>
+        )
+      }
+      return (
+        <FlatList
+          data={pages}
+          keyExtractor={p => p.slug || p.id}
+          scrollEnabled={false}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[s.userRow, { borderBottomColor: c.border, backgroundColor: c.card }]}
+              onPress={() => router.push(`/pages/${item.slug}` as any)}
+              activeOpacity={0.7}
+            >
+              <Avatar url={imgUrl(item.avatar_url)} name={item.display_name} size={44} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={[s.displayName, { color: c.text }]}>{item.display_name}</Text>
+                <Text style={[s.username, { color: c.textMuted }]}>@{item.slug}</Text>
+              </View>
+              {item.page_type && (
+                <View style={[s.badge, { backgroundColor: c.primaryBg, borderColor: c.primaryLt, marginRight: 6 }]}>
+                  <Text style={[s.badgeText, { color: c.primary }]}>
+                    {item.page_type.charAt(0).toUpperCase() + item.page_type.slice(1)}
+                  </Text>
+                </View>
+              )}
+              {item.subscriber_count !== undefined && (
+                <View style={[s.badge, { backgroundColor: c.bg, borderColor: c.border }]}>
+                  <Ionicons name="people-outline" size={11} color={c.textMuted} />
+                  <Text style={[s.badgeText, { color: c.textMuted, marginLeft: 2 }]}>{item.subscriber_count}</Text>
+                </View>
+              )}
+              <Ionicons name="chevron-forward" size={16} color={c.textMuted} style={{ marginLeft: 8 }} />
+            </TouchableOpacity>
+          )}
+        />
+      )
+    }
+
     // Posts tab
     if (posts.length === 0) {
       return (
@@ -158,7 +212,7 @@ export default function SearchScreen() {
         <Ionicons name="search-outline" size={18} color={c.textMuted} style={{ marginRight: 8 }} />
         <TextInput
           style={[s.input, { color: c.text }]}
-          placeholder="Search people or posts..."
+          placeholder="Search people, posts, or pages..."
           placeholderTextColor={c.textLight}
           value={inputValue}
           onChangeText={setInputValue}
@@ -175,14 +229,14 @@ export default function SearchScreen() {
       </View>
 
       <View style={[s.tabs, { borderBottomColor: c.border }]}>
-        {(['users', 'posts'] as Tab[]).map(tab => (
+        {(['users', 'posts', 'pages'] as Tab[]).map(tab => (
           <TouchableOpacity
             key={tab}
             onPress={() => setActiveTab(tab)}
             style={[s.tab, activeTab === tab && { borderBottomColor: c.primary, borderBottomWidth: 2 }]}
           >
             <Text style={[s.tabText, { color: activeTab === tab ? c.primary : c.textMuted }]}>
-              {tab === 'users' ? 'Users' : 'Posts'}
+              {tab === 'users' ? 'Users' : tab === 'posts' ? 'Posts' : 'Pages'}
             </Text>
           </TouchableOpacity>
         ))}

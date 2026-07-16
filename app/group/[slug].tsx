@@ -21,7 +21,7 @@ export default function GroupScreen() {
   const [imageUrls, setImageUrls] = useState<string[]>([])
   const [showCW, setShowCW] = useState(false)
   const [cwLabel, setCwLabel] = useState('')
-  const MAX_IMAGES = 4
+  const MAX_IMAGES = 10
 
   const resetCompose = () => { setContent(''); setImageUrls([]); setShowCW(false); setCwLabel(''); setShowCompose(false) }
   const [uploading, setUploading] = useState(false)
@@ -109,27 +109,27 @@ export default function GroupScreen() {
         ListFooterComponent={isFetchingNextPage ? <ActivityIndicator color={c.primary} style={{ padding: 16 }} /> : null}
         ListHeaderComponent={(
           <View>
-            <View style={s.cover}>
+            <View style={[s.cover, { backgroundColor: c.primaryLt }]}>
               {group.cover_url ? <Image source={{ uri: imgUrl(group.cover_url) }} style={{ width: '100%', height: 100 }} resizeMode="cover" /> : null}
             </View>
-            <View style={s.groupCard}>
+            <View style={[s.groupCard, { backgroundColor: c.card }]}>
               <View style={s.groupHeaderRow}>
-                <View style={s.groupIcon}>
-                  {group.avatar_url ? <Image source={{ uri: imgUrl(group.avatar_url) }} style={{ width: 64, height: 64 }} /> : <Text style={s.groupLetter}>{group.name[0]}</Text>}
+                <View style={[s.groupIcon, { backgroundColor: c.primaryBg, borderColor: c.card }]}>
+                  {group.avatar_url ? <Image source={{ uri: imgUrl(group.avatar_url) }} style={{ width: 64, height: 64 }} /> : <Text style={[s.groupLetter, { color: c.primary }]}>{group.name[0]}</Text>}
                 </View>
                 {!group.is_member && (
-                  <TouchableOpacity onPress={() => join.mutate()} disabled={join.isPending} style={s.joinBtn}>
+                  <TouchableOpacity onPress={() => join.mutate()} disabled={join.isPending} style={[s.joinBtn, { backgroundColor: c.primary }]}>
                     <Text style={s.joinBtnText}>Join</Text>
                   </TouchableOpacity>
                 )}
               </View>
-              <Text style={s.groupName}>{group.name}</Text>
-              <Text style={s.groupMeta}>{group.privacy} · {group.member_count} members</Text>
-              {group.description ? <Text style={s.groupDesc}>{group.description}</Text> : null}
+              <Text style={[s.groupName, { color: c.text }]}>{group.name}</Text>
+              <Text style={[s.groupMeta, { color: c.textMuted }]}>{group.privacy} · {group.member_count} members</Text>
+              {group.description ? <Text style={[s.groupDesc, { color: c.textMd }]}>{group.description}</Text> : null}
             </View>
 
             {group.is_member && (
-              <View style={s.composer}>
+              <View style={[s.composer, { backgroundColor: c.card }]}>
                 {showCompose ? (
                   <>
                     {showCW && (
@@ -139,7 +139,7 @@ export default function GroupScreen() {
                           value={cwLabel} onChangeText={setCwLabel} returnKeyType="done" />
                       </View>
                     )}
-                    <TextInput style={s.composeInput} placeholder={`Post to ${group.name}…`} placeholderTextColor={c.textLight}
+                    <TextInput style={[s.composeInput, { color: c.text }]} placeholder={`Post to ${group.name}…`} placeholderTextColor={c.textLight}
                       value={content} onChangeText={setContent} multiline autoFocus={!showCW} />
                     {imageUrls.length > 0 ? (
                       <ScrollView
@@ -165,7 +165,7 @@ export default function GroupScreen() {
                         ))}
                       </ScrollView>
                     ) : null}
-                    <View style={s.composeActions}>
+                    <View style={[s.composeActions, { borderTopColor: c.border }]}>
                       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                         <TouchableOpacity onPress={pickImage} disabled={uploading || imageUrls.length >= MAX_IMAGES}>
                           {uploading
@@ -181,10 +181,10 @@ export default function GroupScreen() {
                         </TouchableOpacity>
                       </View>
                       <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <TouchableOpacity onPress={resetCompose} style={s.cancelBtn}>
-                          <Text style={s.cancelBtnText}>Cancel</Text>
+                        <TouchableOpacity onPress={resetCompose} style={[s.cancelBtn, { borderColor: c.border }]}>
+                          <Text style={[s.cancelBtnText, { color: c.textMd }]}>Cancel</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => createPost.mutate()} disabled={(!content.trim() && imageUrls.length === 0) || createPost.isPending} style={[s.postBtn, (!content.trim() && imageUrls.length === 0) && { backgroundColor: c.primaryLt }]}>
+                        <TouchableOpacity onPress={() => createPost.mutate()} disabled={(!content.trim() && imageUrls.length === 0) || createPost.isPending} style={[s.postBtn, { backgroundColor: c.primary }, (!content.trim() && imageUrls.length === 0) && { backgroundColor: c.primaryLt }]}>
                           <Text style={s.postBtnText}>{createPost.isPending ? '…' : 'Post'}</Text>
                         </TouchableOpacity>
                       </View>
@@ -193,15 +193,15 @@ export default function GroupScreen() {
                 ) : (
                   <TouchableOpacity onPress={() => setShowCompose(true)} style={s.composerPrompt}>
                     <Avatar url={user?.avatar_url} name={user?.display_name} size={32} />
-                    <Text style={s.composerText}>Post to {group.name}…</Text>
+                    <Text style={[s.composerText, { color: c.textLight }]}>Post to {group.name}…</Text>
                   </TouchableOpacity>
                 )}
               </View>
             )}
-            <Text style={s.postsHeader}>Posts</Text>
+            <Text style={[s.postsHeader, { color: c.textMuted }]}>Posts</Text>
           </View>
         )}
-        ListEmptyComponent={<Text style={s.empty}>{group.is_member ? 'No posts yet. Be the first!' : 'Join to see posts.'}</Text>}
+        ListEmptyComponent={<Text style={[s.empty, { color: c.textLight }]}>{group.is_member ? 'No posts yet. Be the first!' : 'Join to see posts.'}</Text>}
       />
     </Screen>
   )

@@ -1,17 +1,23 @@
-import { useState, useRef } from 'react'
-import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, Dimensions, Linking, TextInput, PanResponder, ScrollView } from 'react-native'
+import { useState, useRef, useEffect } from 'react'
+import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, Dimensions, Linking, TextInput, PanResponder, ScrollView, KeyboardAvoidingView } from 'react-native'
 import { Image } from 'expo-image'
+import { VideoView, useVideoPlayer } from 'expo-video'
 import ZoomableImage from './ZoomableImage'
+import AutoGrowInput from './AutoGrowInput'
+import PollVotersModal from './PollVotersModal'
 import { router } from 'expo-router'
 import * as MediaLibrary from 'expo-media-library'
 import * as FileSystem from 'expo-file-system'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { formatDistanceToNow } from 'date-fns'
-import { feedApi, imgUrl, blockApi, moderationApi, friendsApi } from '../api'
+import { feedApi, imgUrl, blockApi, moderationApi, friendsApi, pagesApi } from '../api'
+import { trackInteraction } from '../utils/interactions'
+import { handle } from '../utils/handle'
 import { useAuthStore } from '../store/auth'
 import { useBlockStore } from '../store/blocks'
-import { Avatar } from './ui'
+import { useToastStore } from '../store/toast'
+import { Avatar, LinkedText } from './ui'
 import { useC } from '../constants/ColorContext'
 import ReactorsModal from './ReactorsModal'
 
@@ -27,6 +33,7 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
   const c = useC()
   const [showAddOption, setShowAddOption] = useState(false)
   const [newOptionText, setNewOptionText] = useState('')
+  const [showVoters, setShowVoters] = useState(false)
 
   const vote = useMutation({
     mutationFn: (optionId: string | null) =>
@@ -96,6 +103,15 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
           </TouchableOpacity>
         )
       })}
+
+      {totalVotes > 0 && (
+        <TouchableOpacity onPress={() => setShowVoters(true)}>
+          <Text style={{ fontSize: 12, color: c.textMuted, textDecorationLine: 'underline' }}>
+            {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
+          </Text>
+        </TouchableOpacity>
+      )}
+      <PollVotersModal postId={post.id} visible={showVoters} onClose={() => setShowVoters(false)} />
 
       {canVote && post.poll_allows_new_options && !showAddOption && (
         <TouchableOpacity
@@ -170,6 +186,7 @@ const pw = StyleSheet.create({
 export default function PostCard({ post, queryKey }: { post: any; queryKey: any[] }) {
   const { user } = useAuthStore()
   const { addBlock } = useBlockStore()
+  const showToast = useToastStore(s => s.show)
   const qc = useQueryClient()
   const [showReactions, setShowReactions] = useState(false)
   const [hoveredReaction, setHoveredReaction] = useState<string | null>(null)
@@ -263,14 +280,20 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const react = useMutation({
     mutationFn: ({ type }: { type: string }) =>
       post.my_reaction === type ? feedApi.unreactPost(post.id) : feedApi.reactPost(post.id, type),
-    onSuccess: invalidate,
+    onSuccess: (_data, vars) => {
+      if (post.my_reaction !== vars.type) trackInteraction('like', post.id)
+      invalidate()
+    },
   })
   reactMutateRef.current = (vars) => react.mutate(vars)
 
   const repost = useMutation({
     mutationFn: () => feedApi.repostPost(post.id, { content: shareContent, visibility: 'friends' }),
-    onSuccess: () => { setShowShare(false); setShareContent(''); invalidate() },
-    onError: (e: any) => Alert.alert('Cannot share', e.response?.data?.error || 'Could not share post'),
+    onSuccess: () => {
+      setShowShare(false); setShareContent(''); trackInteraction('repost', post.id); invalidate()
+      showToast('Shared!')
+    },
+    onError: (e: any) => showToast(e.response?.data?.error || 'Could not share post', 'error'),
   })
   const del    = useMutation({ mutationFn: () => feedApi.deletePost(post.id), onSuccess: invalidate })
   const edit   = useMutation({
@@ -283,6 +306,16 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
     onSuccess: () => { setShowEdit(false); invalidate() },
     onError: () => Alert.alert('Error', 'Could not save changes'),
   })
+
+  const commentMutation = useMutation({
+    mutationFn: () => feedApi.createComment(post.id, { content: inlineComment.trim() }),
+    onSuccess: () => { setInlineComment(''); trackInteraction('comment', post.id); invalidate() },
+    onError: () => Alert.alert('Error', 'Could not post comment'),
+  })
+  const submitInlineComment = () => {
+    if (!inlineComment.trim() || commentMutation.isPending) return
+    commentMutation.mutate()
+  }
 
   const blockUser = useMutation({
     mutationFn: async () => {
@@ -301,20 +334,38 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   })
 
   const isOwn    = user?.id === post.author_id
-  const author   = post.repost_of_id ? post.repost_author_display_name : (post.author_display_name || post.display_name)
-  const pronouns = post.repost_of_id ? post.repost_author_pronouns     : post.author_pronouns
-  const username = post.repost_of_id ? post.repost_author_username    : (post.author_username || post.username)
-  const avatar   = imgUrl(post.repost_of_id ? post.repost_author_avatar_url  : (post.author_avatar_url || post.avatar_url))
-  const content  = post.repost_of_id ? post.repost_content            : post.content
+  // Page posts: use page identity for author display
+  const isPagePost = !!post.page_id && !post.repost_of_id
+  // Author row always identifies whoever made *this* post — for a repost, that's
+  // the person sharing it, not the original author (shown in the nested quote card below).
+  const author   = isPagePost ? post.page_display_name : (post.author_display_name || post.display_name)
+  const pronouns = isPagePost ? undefined : post.author_pronouns
+  const username = isPagePost ? post.page_slug : (post.author_username || post.username)
+  const avatar   = imgUrl(isPagePost ? post.page_avatar_url : (post.author_avatar_url || post.avatar_url))
+  const content  = post.content
+
+  const subscribePageMutation = useMutation({
+    mutationFn: () => post.page_is_subscribed
+      ? pagesApi.unsubscribe(post.page_slug)
+      : pagesApi.subscribe(post.page_slug),
+    onSuccess: invalidate,
+  })
   const linkImage = imgUrl(post.link_image)
 
   // Normalize image URLs: prefer photo_urls array (AGORA-93), fall back to single image_url
-  const rawImageUrls: string[] = post.repost_of_id
-    ? (post.repost_image_url ? [post.repost_image_url] : [])
-    : (post.photo_urls?.length ? post.photo_urls : post.image_url ? [post.image_url] : [])
+  const rawImageUrls: string[] = post.photo_urls?.length ? post.photo_urls : post.image_url ? [post.image_url] : []
   const postImageUrls = rawImageUrls.map((u: string) => imgUrl(u)).filter(Boolean) as string[]
   const imageUrl = postImageUrls[0]
 
+  const [videoPlaying, setVideoPlaying] = useState(false)
+  const videoSource = post.video_url ? imgUrl(post.video_url) ?? null : null
+  const videoPlayer = useVideoPlayer(videoSource, p => { p.loop = false })
+  useEffect(() => {
+    videoPlayer.muted = !videoPlaying
+    if (videoPlaying) videoPlayer.play()
+    else videoPlayer.pause()
+  }, [videoPlaying, videoPlayer])
+  const [inlineComment, setInlineComment] = useState('')
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [showLightbox, setShowLightbox] = useState(false)
   const screenWidth = Dimensions.get('window').width
@@ -353,6 +404,20 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   return (
     <View style={[s.card, { backgroundColor: c.card }, post.group_slug && { borderLeftWidth: 3, borderLeftColor: c.primaryLt }]}>
       {/* Group badge */}
+      {/* Page badge */}
+      {isPagePost && (
+        <TouchableOpacity
+          onPress={() => router.push(`/pages/${post.page_slug}` as any)}
+          style={[s.groupBadge, { backgroundColor: c.primaryBg }]}
+        >
+          <Ionicons name="bookmark" size={11} color={c.primary} />
+          <Text style={[s.groupBadgeText, { color: c.primary }]}>{post.page_display_name}</Text>
+          {post.page_is_verified && <Ionicons name="checkmark-circle" size={12} color={c.primary} />}
+          <Text style={[s.groupBadgeArrow, { color: c.textLight }]}>
+            · {post.page_type ? post.page_type.charAt(0).toUpperCase() + post.page_type.slice(1) : 'Page'}
+          </Text>
+        </TouchableOpacity>
+      )}
       {post.group_slug && (
         <TouchableOpacity
           onPress={() => router.push(`/group/${post.group_slug}`)}
@@ -366,7 +431,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
       {post.repost_of_id && (
         <View style={s.banner}>
           <Ionicons name="repeat" size={13} color={c.primary} />
-          <Text style={[s.bannerText, { color: c.primary }]}>{post.author_display_name} reposted</Text>
+          <Text style={[s.bannerText, { color: c.primary }]}>Reposted</Text>
         </View>
       )}
       {post.wall_user_id && (
@@ -377,15 +442,26 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
       )}
 
       <View style={s.body}>
-        <TouchableOpacity style={s.authorRow} onPress={() => router.push(`/profile/${username}`)}>
+        <TouchableOpacity
+          style={s.authorRow}
+          onPress={() => isPagePost
+            ? router.push(`/pages/${post.page_slug}` as any)
+            : router.push(`/profile/${username}`)
+          }
+        >
           <Avatar url={avatar} name={author} size={40} />
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 }}>
               <Text style={[s.authorName, { color: c.text }]}>{author}</Text>
+              {post.page_is_verified && isPagePost && (
+                <Ionicons name="checkmark-circle" size={14} color={c.primary} />
+              )}
               {pronouns ? <Text style={[s.pronouns, { color: c.textLight }]}>({pronouns})</Text> : null}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={[s.authorMeta, { color: c.textMuted }]}>@{username} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</Text>
+              <Text style={[s.authorMeta, { color: c.textMuted }]}>
+                {isPagePost ? post.page_type || 'Page' : handle(username, post.is_remote, post.remote_instance)} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+              </Text>
               <Ionicons
                 name={
                   post.visibility === 'public'  ? 'globe-outline' :
@@ -425,9 +501,61 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         )}
 
         {(!post.content_warning || twExpanded) && content ? (
-          <TouchableOpacity onPress={() => router.push(`/post/${post.id}`)}>
-            <Text style={[s.content, { color: c.textMd }]}>{content}</Text>
+          <LinkedText text={content} style={[s.content, { color: c.textMd }]} />
+        ) : null}
+
+        {/* Quoted post — the original post being shared, nested so it reads as quoted material rather than the reposter's own words */}
+        {(!post.content_warning || twExpanded) && post.repost_of_id ? (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push(`/post/${post.repost_of_id}` as any)}
+            style={[s.quotedPost, { borderColor: c.border }]}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+              <Avatar url={post.repost_author_avatar_url} name={post.repost_author_display_name} size={22} />
+              <Text style={[s.quotedAuthorName, { color: c.text }]}>
+                {post.repost_author_display_name || post.repost_author_username}
+              </Text>
+              {post.repost_author_pronouns ? (
+                <Text style={[s.pronouns, { color: c.textLight }]}>({post.repost_author_pronouns})</Text>
+              ) : null}
+              <Text style={[s.quotedAuthorMeta, { color: c.textMuted }]}>{handle(post.repost_author_username)}</Text>
+            </View>
+            {post.repost_content ? (
+              <LinkedText text={post.repost_content} style={[s.quotedContent, { color: c.textMd }]} />
+            ) : null}
+            {post.repost_image_url ? (
+              <Image source={{ uri: imgUrl(post.repost_image_url) }} style={s.quotedImage} contentFit="cover" />
+            ) : null}
           </TouchableOpacity>
+        ) : null}
+
+        {(!post.content_warning || twExpanded) && post.video_url && postImageUrls.length === 0 ? (
+          <View style={[s.imageWrapper, { position: 'relative' }]}>
+            <VideoView
+              player={videoPlayer}
+              style={[s.image, { backgroundColor: '#000' }]}
+              contentFit="contain"
+              nativeControls={videoPlaying}
+            />
+            {!videoPlaying && (
+              <>
+                {post.video_thumb_url ? (
+                  <Image
+                    source={{ uri: imgUrl(post.video_thumb_url) }}
+                    style={[s.image, StyleSheet.absoluteFill]}
+                    contentFit="cover"
+                  />
+                ) : null}
+                <TouchableOpacity
+                  onPress={() => setVideoPlaying(true)}
+                  style={s.playBtn}
+                >
+                  <Ionicons name="play-circle" size={52} color="rgba(255,255,255,0.9)" />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         ) : null}
 
         {(!post.content_warning || twExpanded) && postImageUrls.length > 0 ? (
@@ -538,12 +666,48 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
           </TouchableOpacity>
 
         </View>
+
+        {/* Inline comment box */}
+        <View style={[s.inlineComment, { borderTopColor: c.border }]}>
+          <Avatar url={imgUrl(user?.avatar_url)} name={user?.display_name} size={28} />
+          <AutoGrowInput
+            minHeight={32}
+            maxHeight={80}
+            style={[s.inlineCommentInput, { color: c.text, borderColor: c.border }]}
+            placeholder="Write a comment…"
+            placeholderTextColor={c.textLight}
+            value={inlineComment}
+            onChangeText={setInlineComment}
+            returnKeyType="send"
+            blurOnSubmit
+            onSubmitEditing={submitInlineComment}
+          />
+          {inlineComment.trim().length > 0 && (
+            <TouchableOpacity onPress={submitInlineComment} disabled={commentMutation.isPending}>
+              <Ionicons name="send" size={18} color={commentMutation.isPending ? c.textLight : c.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* ── Three-dots menu ───────────────────────────────────────── */}
       <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
         <TouchableOpacity style={s.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
           <View style={[s.menuSheet, { backgroundColor: c.card, borderColor: c.border }]}>
+            {isPagePost && (
+              <>
+                <TouchableOpacity style={s.menuItem} onPress={() => {
+                  setShowMenu(false)
+                  subscribePageMutation.mutate()
+                }}>
+                  <Ionicons name={post.page_is_subscribed ? 'bookmark' : 'bookmark-outline'} size={18} color={c.primary} />
+                  <Text style={[s.menuItemText, { color: c.primary }]}>
+                    {post.page_is_subscribed ? 'Unsubscribe from page' : 'Subscribe to page'}
+                  </Text>
+                </TouchableOpacity>
+                <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+              </>
+            )}
             {isOwn ? (
               <>
                 <TouchableOpacity style={s.menuItem} onPress={() => { setShowMenu(false); setEditContent(post.content || ''); setEditCW(post.content_warning || ''); setShowEditCW(!!post.content_warning); setEditVisibility(post.visibility === 'locked' ? 'group' : (post.visibility || 'friends')); setEditFriendListId(post.group_id || ''); setShowEditVisibilitySheet(false); setShowEditListSheet(false); setShowEdit(true) }}>
@@ -747,7 +911,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             <View style={[s.sharePreview, { borderColor: c.border, backgroundColor: c.bg }]}>
               <Text style={[s.sharePreviewAuthor, { color: c.text }]}>
                 {post.author_display_name || post.author_username}
-                <Text style={{ color: c.textMuted, fontWeight: '400' }}> @{post.author_username}</Text>
+                <Text style={{ color: c.textMuted, fontWeight: '400' }}> {handle(post.author_username, post.is_remote, post.remote_instance)}</Text>
               </Text>
               {post.content ? <Text style={[s.sharePreviewContent, { color: c.textMd }]} numberOfLines={3}>{post.content}</Text> : null}
               {(post.photo_urls?.length > 1 ? true : post.image_url) ? (
@@ -821,6 +985,11 @@ const s = StyleSheet.create({
   cw: { backgroundColor: '#fefce8', borderWidth: 1, borderColor: '#fde68a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8 },
   cwText: { fontSize: 12, color: '#92400e', fontWeight: '500' },
   content: { fontSize: 14, lineHeight: 21, marginBottom: 8 },
+  quotedPost: { borderWidth: 1, borderRadius: 12, padding: 10, marginBottom: 8 },
+  quotedAuthorName: { fontWeight: '600', fontSize: 13 },
+  quotedAuthorMeta: { fontSize: 12 },
+  quotedContent: { fontSize: 13, lineHeight: 19 },
+  quotedImage: { width: '100%', aspectRatio: 1.4, borderRadius: 8, marginTop: 6 },
   imageWrapper: { marginHorizontal: -14, marginVertical: 8 },
   image: { width: '100%', aspectRatio: 1 },
   imageMulti: { width: Dimensions.get('window').width * 0.72, aspectRatio: 1 },
@@ -863,4 +1032,7 @@ const s = StyleSheet.create({
   sharePreview:        { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12 },
   sharePreviewAuthor:  { fontSize: 13, fontWeight: '600', marginBottom: 4 },
   sharePreviewContent: { fontSize: 13, lineHeight: 19 },
+  playBtn: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  inlineComment: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10, paddingHorizontal: 14, paddingBottom: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  inlineCommentInput: { flex: 1, borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, fontSize: 13, maxHeight: 80 },
 })
