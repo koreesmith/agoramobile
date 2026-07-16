@@ -336,11 +336,13 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const isOwn    = user?.id === post.author_id
   // Page posts: use page identity for author display
   const isPagePost = !!post.page_id && !post.repost_of_id
-  const author   = post.repost_of_id ? post.repost_author_display_name : isPagePost ? post.page_display_name : (post.author_display_name || post.display_name)
-  const pronouns = post.repost_of_id ? post.repost_author_pronouns     : isPagePost ? undefined : post.author_pronouns
-  const username = post.repost_of_id ? post.repost_author_username    : isPagePost ? post.page_slug : (post.author_username || post.username)
-  const avatar   = imgUrl(post.repost_of_id ? post.repost_author_avatar_url  : isPagePost ? post.page_avatar_url : (post.author_avatar_url || post.avatar_url))
-  const content  = post.repost_of_id ? post.repost_content            : post.content
+  // Author row always identifies whoever made *this* post — for a repost, that's
+  // the person sharing it, not the original author (shown in the nested quote card below).
+  const author   = isPagePost ? post.page_display_name : (post.author_display_name || post.display_name)
+  const pronouns = isPagePost ? undefined : post.author_pronouns
+  const username = isPagePost ? post.page_slug : (post.author_username || post.username)
+  const avatar   = imgUrl(isPagePost ? post.page_avatar_url : (post.author_avatar_url || post.avatar_url))
+  const content  = post.content
 
   const subscribePageMutation = useMutation({
     mutationFn: () => post.page_is_subscribed
@@ -351,9 +353,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const linkImage = imgUrl(post.link_image)
 
   // Normalize image URLs: prefer photo_urls array (AGORA-93), fall back to single image_url
-  const rawImageUrls: string[] = post.repost_of_id
-    ? (post.repost_image_url ? [post.repost_image_url] : [])
-    : (post.photo_urls?.length ? post.photo_urls : post.image_url ? [post.image_url] : [])
+  const rawImageUrls: string[] = post.photo_urls?.length ? post.photo_urls : post.image_url ? [post.image_url] : []
   const postImageUrls = rawImageUrls.map((u: string) => imgUrl(u)).filter(Boolean) as string[]
   const imageUrl = postImageUrls[0]
 
@@ -431,7 +431,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
       {post.repost_of_id && (
         <View style={s.banner}>
           <Ionicons name="repeat" size={13} color={c.primary} />
-          <Text style={[s.bannerText, { color: c.primary }]}>{post.author_display_name} reposted</Text>
+          <Text style={[s.bannerText, { color: c.primary }]}>Reposted</Text>
         </View>
       )}
       {post.wall_user_id && (
@@ -460,7 +460,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={[s.authorMeta, { color: c.textMuted }]}>
-                {isPagePost ? post.page_type || 'Page' : handle(username, !post.repost_of_id && post.is_remote, !post.repost_of_id ? post.remote_instance : undefined)} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                {isPagePost ? post.page_type || 'Page' : handle(username, post.is_remote, post.remote_instance)} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
               </Text>
               <Ionicons
                 name={
@@ -502,6 +502,32 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
 
         {(!post.content_warning || twExpanded) && content ? (
           <LinkedText text={content} style={[s.content, { color: c.textMd }]} />
+        ) : null}
+
+        {/* Quoted post — the original post being shared, nested so it reads as quoted material rather than the reposter's own words */}
+        {(!post.content_warning || twExpanded) && post.repost_of_id ? (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push(`/post/${post.repost_of_id}` as any)}
+            style={[s.quotedPost, { borderColor: c.border }]}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+              <Avatar url={post.repost_author_avatar_url} name={post.repost_author_display_name} size={22} />
+              <Text style={[s.quotedAuthorName, { color: c.text }]}>
+                {post.repost_author_display_name || post.repost_author_username}
+              </Text>
+              {post.repost_author_pronouns ? (
+                <Text style={[s.pronouns, { color: c.textLight }]}>({post.repost_author_pronouns})</Text>
+              ) : null}
+              <Text style={[s.quotedAuthorMeta, { color: c.textMuted }]}>{handle(post.repost_author_username)}</Text>
+            </View>
+            {post.repost_content ? (
+              <LinkedText text={post.repost_content} style={[s.quotedContent, { color: c.textMd }]} />
+            ) : null}
+            {post.repost_image_url ? (
+              <Image source={{ uri: imgUrl(post.repost_image_url) }} style={s.quotedImage} contentFit="cover" />
+            ) : null}
+          </TouchableOpacity>
         ) : null}
 
         {(!post.content_warning || twExpanded) && post.video_url && postImageUrls.length === 0 ? (
@@ -959,6 +985,11 @@ const s = StyleSheet.create({
   cw: { backgroundColor: '#fefce8', borderWidth: 1, borderColor: '#fde68a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8 },
   cwText: { fontSize: 12, color: '#92400e', fontWeight: '500' },
   content: { fontSize: 14, lineHeight: 21, marginBottom: 8 },
+  quotedPost: { borderWidth: 1, borderRadius: 12, padding: 10, marginBottom: 8 },
+  quotedAuthorName: { fontWeight: '600', fontSize: 13 },
+  quotedAuthorMeta: { fontSize: 12 },
+  quotedContent: { fontSize: 13, lineHeight: 19 },
+  quotedImage: { width: '100%', aspectRatio: 1.4, borderRadius: 8, marginTop: 6 },
   imageWrapper: { marginHorizontal: -14, marginVertical: 8 },
   image: { width: '100%', aspectRatio: 1 },
   imageMulti: { width: Dimensions.get('window').width * 0.72, aspectRatio: 1 },
