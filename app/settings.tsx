@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Switch, Alert, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native'
 import { router, Stack } from 'expo-router'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
@@ -12,12 +12,15 @@ import { usersApi, authApi, instanceApi, interactionsApi } from '../api'
 import { resetWhatsNew } from '../components/WhatsNewModal'
 import { useAuthStore } from '../store/auth'
 import { useWhatsNewStore } from '../store/whatsNew'
+import { useToastStore } from '../store/toast'
 import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
 import { useThemeStore, ThemePreference } from '../store/theme'
 
 export default function SettingsScreen() {
   const c = useC()
+  const qc = useQueryClient()
+  const showToast = useToastStore(s => s.show)
   const { user, updateUser, logout } = useAuthStore()
   const { preference, setPreference } = useThemeStore()
   const [currentPassword, setCurrentPassword] = useState('')
@@ -111,6 +114,15 @@ export default function SettingsScreen() {
       setExportLoading(false)
     }
   }
+
+  const resetFeedHistory = useMutation({
+    mutationFn: () => interactionsApi.reset(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['feed'] })
+      showToast('Your feed history has been reset')
+    },
+    onError: (e: any) => showToast(e.response?.data?.error || 'Could not reset feed history', 'error'),
+  })
 
   const requestDeletion = useMutation({
     mutationFn: () => usersApi.requestDeletion(),
@@ -252,7 +264,7 @@ export default function SettingsScreen() {
         <Row icon="refresh-circle-outline" label="Reset feed history" onPress={() =>
           Alert.alert('Reset feed history?', 'This will clear your interaction history and your feed will return to the default ranking.', [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Reset', style: 'destructive', onPress: () => interactionsApi.reset().catch(() => {}) },
+            { text: 'Reset', style: 'destructive', onPress: () => resetFeedHistory.mutate() },
           ])} />
         {deletionScheduledAt ? (
           <Row icon="refresh-outline" label="Cancel account deletion" onPress={() =>
