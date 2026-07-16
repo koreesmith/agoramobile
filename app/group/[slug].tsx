@@ -21,7 +21,7 @@ export default function GroupScreen() {
   const [imageUrls, setImageUrls] = useState<string[]>([])
   const [showCW, setShowCW] = useState(false)
   const [cwLabel, setCwLabel] = useState('')
-  const MAX_IMAGES = 4
+  const MAX_IMAGES = 10
 
   const resetCompose = () => { setContent(''); setImageUrls([]); setShowCW(false); setCwLabel(''); setShowCompose(false) }
   const [uploading, setUploading] = useState(false)
