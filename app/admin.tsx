@@ -754,7 +754,21 @@ export default function AdminScreen() {
           {settingsLoading ? <Spinner /> : (
             <View style={{ gap: 12 }}>
               <Text style={[s.sectionTitle, { color: c.textMuted }]}>Instance Settings</Text>
-              {Object.entries(settings).map(([key, value]: [string, any]) => (
+              <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>Fediverse (ActivityPub)</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={{ color: c.textMd, fontSize: 12, flex: 1, marginRight: 8 }}>
+                    Let Mastodon and other fediverse apps discover, follow, and interact with users on this instance.
+                    Separate from Agora-to-Agora federation below; users can also opt out individually in their own Settings.
+                  </Text>
+                  <Switch
+                    value={settings.activitypub_enabled !== 'false'}
+                    onValueChange={v => updateSettings.mutate({ activitypub_enabled: v ? 'true' : 'false' })}
+                    trackColor={{ false: c.border, true: c.primary }}
+                  />
+                </View>
+              </View>
+              {Object.entries(settings).filter(([key]) => key !== 'activitypub_enabled').map(([key, value]: [string, any]) => (
                 <View key={key} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
                   <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>{key.replace(/_/g, ' ')}</Text>
                   {typeof value === 'boolean' ? (
