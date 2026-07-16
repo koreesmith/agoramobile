@@ -7,6 +7,7 @@ import { Screen, Header, Spinner, Avatar } from '../components/ui'
 import PostCard from '../components/PostCard'
 import { searchApi, pagesApi, imgUrl } from '../api'
 import { useC } from '../constants/ColorContext'
+import { handle } from '../utils/handle'
 
 type Tab = 'users' | 'posts' | 'pages'
 
@@ -66,7 +67,7 @@ export default function SearchScreen() {
         <Avatar url={item.avatar_url} name={item.display_name || item.username} size={44} />
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={[s.displayName, { color: c.text }]}>{item.display_name || item.username}</Text>
-          <Text style={[s.username, { color: c.textMuted }]}>@{item.username}</Text>
+          <Text style={[s.username, { color: c.textMuted }]}>{handle(item.username, item.is_remote, item.remote_instance)}</Text>
         </View>
         {label && (
           <View style={[s.badge, { backgroundColor: c.primaryBg, borderColor: c.primaryLt }]}>

@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { formatDistanceToNow } from 'date-fns'
 import { feedApi, imgUrl, blockApi, moderationApi, friendsApi, pagesApi } from '../api'
 import { trackInteraction } from '../utils/interactions'
+import { handle } from '../utils/handle'
 import { useAuthStore } from '../store/auth'
 import { useBlockStore } from '../store/blocks'
 import { Avatar } from './ui'
@@ -435,7 +436,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={[s.authorMeta, { color: c.textMuted }]}>
-                {isPagePost ? post.page_type || 'Page' : `@${username}`} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                {isPagePost ? post.page_type || 'Page' : handle(username, !post.repost_of_id && post.is_remote, !post.repost_of_id ? post.remote_instance : undefined)} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
               </Text>
               <Ionicons
                 name={
@@ -858,7 +859,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             <View style={[s.sharePreview, { borderColor: c.border, backgroundColor: c.bg }]}>
               <Text style={[s.sharePreviewAuthor, { color: c.text }]}>
                 {post.author_display_name || post.author_username}
-                <Text style={{ color: c.textMuted, fontWeight: '400' }}> @{post.author_username}</Text>
+                <Text style={{ color: c.textMuted, fontWeight: '400' }}> {handle(post.author_username, post.is_remote, post.remote_instance)}</Text>
               </Text>
               {post.content ? <Text style={[s.sharePreviewContent, { color: c.textMd }]} numberOfLines={3}>{post.content}</Text> : null}
               {(post.photo_urls?.length > 1 ? true : post.image_url) ? (
