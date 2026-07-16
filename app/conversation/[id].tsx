@@ -45,7 +45,11 @@ export default function ConversationScreen() {
     onSuccess: () => { setText(''); setImageUrl(''); refetch(); qc.invalidateQueries({ queryKey: ['conversations'] }) },
   })
   const del      = useMutation({ mutationFn: (msgId: string) => dmApi.deleteMessage(msgId), onSuccess: refetch })
-  const react    = useMutation({ mutationFn: ({ msgId, emoji }: { msgId: string; emoji: string }) => dmApi.reactMessage(msgId, emoji), onSuccess: () => { setReactionTarget(null); refetch() } })
+  const react    = useMutation({
+    mutationFn: ({ msgId, emoji }: { msgId: string; emoji: string }) => dmApi.reactMessage(msgId, emoji),
+    onSuccess: () => { setReactionTarget(null); refetch() },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not react to message'),
+  })
   const unreact  = useMutation({ mutationFn: (msgId: string) => dmApi.unreactMessage(msgId), onSuccess: refetch })
   const accept = useMutation({ mutationFn: () => dmApi.acceptRequest(id!), onSuccess: () => qc.invalidateQueries({ queryKey: ['conversation', id] }) })
 

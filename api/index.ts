@@ -178,7 +178,7 @@ export const dmApi = {
   acceptRequest:      (id: string)          => api.post(`/conversations/${id}/accept`),
   leaveConversation:  (id: string)          => api.delete(`/conversations/${id}`),
   friendSearch:       (q: string)           => api.get('/conversations/friend-search', { params: { q } }),
-  reactMessage:       (msgId: string, emoji: string) => api.post(`/messages/${msgId}/react`, { emoji }),
+  reactMessage:       (msgId: string, emoji: string) => api.post(`/messages/${msgId}/react`, { reaction: emoji }),
   unreactMessage:     (msgId: string)       => api.delete(`/messages/${msgId}/react`),
 }
 
