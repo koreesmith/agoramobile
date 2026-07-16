@@ -213,6 +213,19 @@ export const moderationApi = {
   unbanInstance:      (id: string)            => api.delete(`/moderation/instance-bans/${id}`),
 }
 
+// ── Fediverse (ActivityPub) ──────────────────────────────────────────────────
+// AGORA-146: resolve a fediverse handle/URL to a preview (search), follow/
+// unfollow a remote account, and list current follows. Distinct from the
+// native Agora-to-Agora protocol's /federation/lookup (see AMOBILE-118) —
+// this only talks to real fediverse software (Mastodon/Pleroma/etc.).
+export const federationApi = {
+  resolveFediverseHandle:   (handle: string)   => api.get('/federation/ap-lookup', { params: { handle } }),
+  followFediverseAccount:   (actorUrl: string) => api.post('/federation/follow', { actor_url: actorUrl }),
+  unfollowFediverseAccount: (id: string)       => api.delete(`/federation/follow/${id}`),
+  listFollowing:            ()                 => api.get('/federation/following'),
+  toggleFollowNotify:       (id: string, notify: boolean) => api.put(`/federation/follow/${id}/notify`, { notify }),
+}
+
 // ── Instance rules ────────────────────────────────────────────────────────────
 export const rulesApi = {
   list: () => api.get('/instance/rules'),
