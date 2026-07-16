@@ -18,6 +18,7 @@ import { trackInteraction } from '../../utils/interactions'
 import WhatsNewModal, { shouldShowWhatsNew } from '../../components/WhatsNewModal'
 import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
+import { useWhatsNewStore } from '../../store/whatsNew'
 
 import { C } from '../../constants/colors'
 import { useC } from '../../constants/ColorContext'
@@ -116,6 +117,15 @@ export default function FeedScreen() {
   useEffect(() => {
     shouldShowWhatsNew().then(should => { if (should) setShowWhatsNew(true) })
   }, [])
+
+  const forceShowWhatsNew = useWhatsNewStore(s => s.forceShow)
+  const consumeWhatsNew = useWhatsNewStore(s => s.consume)
+  useEffect(() => {
+    if (forceShowWhatsNew) {
+      setShowWhatsNew(true)
+      consumeWhatsNew()
+    }
+  }, [forceShowWhatsNew])
 
   // Auto-detect URLs pasted into content: GIFs become inline images, others become link preview cards
   useEffect(() => {
