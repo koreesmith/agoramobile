@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Alert, StyleSheet, Modal, Dimensions, Lin
 import { Image } from 'expo-image'
 import { VideoView, useVideoPlayer } from 'expo-video'
 import ZoomableImage from './ZoomableImage'
+import AutoGrowInput from './AutoGrowInput'
 import { router } from 'expo-router'
 import * as MediaLibrary from 'expo-media-library'
 import * as FileSystem from 'expo-file-system'
@@ -634,13 +635,14 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         {/* Inline comment box */}
         <View style={[s.inlineComment, { borderTopColor: c.border }]}>
           <Avatar url={imgUrl(user?.avatar_url)} name={user?.display_name} size={28} />
-          <TextInput
+          <AutoGrowInput
+            minHeight={32}
+            maxHeight={80}
             style={[s.inlineCommentInput, { color: c.text, borderColor: c.border }]}
             placeholder="Write a comment…"
             placeholderTextColor={c.textLight}
             value={inlineComment}
             onChangeText={setInlineComment}
-            multiline
             returnKeyType="send"
             blurOnSubmit
             onSubmitEditing={submitInlineComment}
