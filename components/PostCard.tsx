@@ -16,7 +16,7 @@ import { handle } from '../utils/handle'
 import { useAuthStore } from '../store/auth'
 import { useBlockStore } from '../store/blocks'
 import { useToastStore } from '../store/toast'
-import { Avatar } from './ui'
+import { Avatar, LinkedText } from './ui'
 import { useC } from '../constants/ColorContext'
 import ReactorsModal from './ReactorsModal'
 
@@ -490,9 +490,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         )}
 
         {(!post.content_warning || twExpanded) && content ? (
-          <TouchableOpacity onPress={() => router.push(`/post/${post.id}`)}>
-            <Text style={[s.content, { color: c.textMd }]}>{content}</Text>
-          </TouchableOpacity>
+          <LinkedText text={content} style={[s.content, { color: c.textMd }]} />
         ) : null}
 
         {(!post.content_warning || twExpanded) && post.video_url && postImageUrls.length === 0 ? (
