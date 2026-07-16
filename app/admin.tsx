@@ -10,6 +10,15 @@ import { useC } from '../constants/ColorContext'
 
 type Tab = 'reports' | 'moderation' | 'users' | 'waitlist' | 'instances' | 'invites' | 'rules' | 'settings' | 'audit'
 
+// GetSettings (internal/admin/admin.go) serializes every instance_settings
+// value as a string ("true"/"false", not a JSON boolean), so `typeof value
+// === 'boolean'` never fires. Listing the known boolean-shaped keys
+// explicitly lets the generic settings list render a real Switch for them
+// instead of a raw text input the admin has to type true/false into.
+// activitypub_enabled is deliberately excluded — it already gets its own
+// dedicated toggle above this list.
+const BOOLEAN_SETTING_KEYS = new Set(['federation_enabled', 'smtp_enabled', 'user_invites_enabled'])
+
 export default function AdminScreen() {
   const c = useC()
   const { user } = useAuthStore()
@@ -771,11 +780,11 @@ export default function AdminScreen() {
               {Object.entries(settings).filter(([key]) => key !== 'activitypub_enabled').map(([key, value]: [string, any]) => (
                 <View key={key} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
                   <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>{key.replace(/_/g, ' ')}</Text>
-                  {typeof value === 'boolean' ? (
+                  {BOOLEAN_SETTING_KEYS.has(key) ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={{ color: c.text, fontSize: 14 }}>{value ? 'Enabled' : 'Disabled'}</Text>
-                      <Switch value={value}
-                        onValueChange={v => updateSettings.mutate({ [key]: v })}
+                      <Text style={{ color: c.text, fontSize: 14 }}>{value === 'true' ? 'Enabled' : 'Disabled'}</Text>
+                      <Switch value={value === 'true'}
+                        onValueChange={v => updateSettings.mutate({ [key]: v ? 'true' : 'false' })}
                         trackColor={{ false: c.border, true: c.primary }} />
                     </View>
                   ) : (
