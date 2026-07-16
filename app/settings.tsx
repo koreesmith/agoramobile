@@ -6,10 +6,12 @@ import { Ionicons } from '@expo/vector-icons'
 import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
 import Constants from 'expo-constants'
+import * as WebBrowser from 'expo-web-browser'
 import { Screen } from '../components/ui'
 import { usersApi, authApi, instanceApi, interactionsApi } from '../api'
 import { resetWhatsNew } from '../components/WhatsNewModal'
 import { useAuthStore } from '../store/auth'
+import { useWhatsNewStore } from '../store/whatsNew'
 import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
 import { useThemeStore, ThemePreference } from '../store/theme'
@@ -266,8 +268,15 @@ export default function SettingsScreen() {
             ])} right={<View />} />
         )}
         <Text style={[s.section, { color: c.textMuted }]}>Help</Text>
+        <Row icon="help-circle-outline" label="Help & Documentation" onPress={() => {
+          const instanceUrl = useAuthStore.getState().instanceUrl
+          if (instanceUrl) WebBrowser.openBrowserAsync(`${instanceUrl}/docs#user/index`)
+        }} />
         <Row icon="sparkles-outline" label="What's New" onPress={() => {
-          resetWhatsNew().then(() => Alert.alert("What's New", "Reopen the app to see What's New again."))
+          resetWhatsNew().then(() => {
+            useWhatsNewStore.getState().trigger()
+            router.back()
+          })
         }} />
         <Text style={[s.section, { color: c.textMuted }]}>About</Text>
         <Row icon="person-circle-outline" label={`Signed in as @${user?.username}`} onPress={() => {}} right={<View />} />
