@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
 import { router } from 'expo-router'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import * as SecureStore from 'expo-secure-store'
 import { Ionicons } from '@expo/vector-icons'
 import { useC } from '../constants/ColorContext'
 
@@ -26,7 +26,7 @@ const FEATURES: { icon: string; title: string; desc: string; link?: string; link
 
 export async function shouldShowWhatsNew(): Promise<boolean> {
   try {
-    const seen = await AsyncStorage.getItem(STORAGE_KEY)
+    const seen = await SecureStore.getItemAsync(STORAGE_KEY)
     return seen !== WHATS_NEW_VERSION
   } catch {
     return false
@@ -35,13 +35,13 @@ export async function shouldShowWhatsNew(): Promise<boolean> {
 
 export async function markWhatsNewSeen() {
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, WHATS_NEW_VERSION)
+    await SecureStore.setItemAsync(STORAGE_KEY, WHATS_NEW_VERSION)
   } catch {}
 }
 
 export async function resetWhatsNew() {
   try {
-    await AsyncStorage.removeItem(STORAGE_KEY)
+    await SecureStore.deleteItemAsync(STORAGE_KEY)
   } catch {}
 }
 
