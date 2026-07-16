@@ -4,6 +4,7 @@ import { Image } from 'expo-image'
 import { VideoView, useVideoPlayer } from 'expo-video'
 import ZoomableImage from './ZoomableImage'
 import AutoGrowInput from './AutoGrowInput'
+import PollVotersModal from './PollVotersModal'
 import { router } from 'expo-router'
 import * as MediaLibrary from 'expo-media-library'
 import * as FileSystem from 'expo-file-system'
@@ -32,6 +33,7 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
   const c = useC()
   const [showAddOption, setShowAddOption] = useState(false)
   const [newOptionText, setNewOptionText] = useState('')
+  const [showVoters, setShowVoters] = useState(false)
 
   const vote = useMutation({
     mutationFn: (optionId: string | null) =>
@@ -101,6 +103,15 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
           </TouchableOpacity>
         )
       })}
+
+      {totalVotes > 0 && (
+        <TouchableOpacity onPress={() => setShowVoters(true)}>
+          <Text style={{ fontSize: 12, color: c.textMuted, textDecorationLine: 'underline' }}>
+            {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
+          </Text>
+        </TouchableOpacity>
+      )}
+      <PollVotersModal postId={post.id} visible={showVoters} onClose={() => setShowVoters(false)} />
 
       {canVote && post.poll_allows_new_options && !showAddOption && (
         <TouchableOpacity
