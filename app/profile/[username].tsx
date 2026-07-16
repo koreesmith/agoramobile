@@ -4,10 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Spinner, Avatar } from '../../components/ui'
 import PostCard from '../../components/PostCard'
-import { usersApi, friendsApi, feedApi, dmApi, imgUrl, blockApi, moderationApi, albumsApi } from '../../api'
+import { usersApi, friendsApi, feedApi, dmApi, imgUrl, blockApi, moderationApi, albumsApi, federationApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
 import { useC } from '../../constants/ColorContext'
+import { handle } from '../../utils/handle'
 
 export default function ProfileViewScreen() {
   const c = useC()
@@ -47,12 +48,33 @@ export default function ProfileViewScreen() {
     qc.invalidateQueries({ queryKey: ['friends'] })
     qc.invalidateQueries({ queryKey: ['requests'] })
   }
-  const sendReq  = useMutation({ mutationFn: () => friendsApi.sendRequest(profile!.id), onSuccess: inv })
+  const sendReq  = useMutation({
+    mutationFn: () => friendsApi.sendRequest(profile!.id),
+    onSuccess: inv,
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not send friend request'),
+  })
   const accept   = useMutation({ mutationFn: () => friendsApi.acceptRequest(profile!.id), onSuccess: inv })
   const unfriend = useMutation({ mutationFn: () => friendsApi.unfriend(profile!.id), onSuccess: inv })
   const startDM  = useMutation({
     mutationFn: () => dmApi.startConversation(username!),
     onSuccess: (res) => router.push(`/conversation/${res.data.id}`)
+  })
+
+  // AGORA-167: fediverse accounts have no friending concept — follow/notify
+  // (ap_following) is the equivalent, surfaced here instead of Add friend.
+  const isFediverse = !!(profile as any)?.ap_actor_url
+  const followFed = useMutation({
+    mutationFn: () => federationApi.followFediverseAccount((profile as any).ap_actor_url),
+    onSuccess: inv,
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not follow this account'),
+  })
+  const unfollowFed = useMutation({
+    mutationFn: () => federationApi.unfollowFediverseAccount((profile as any).follow_id),
+    onSuccess: inv,
+  })
+  const toggleFedNotify = useMutation({
+    mutationFn: () => federationApi.toggleFollowNotify((profile as any).follow_id, !(profile as any)?.follow_notify),
+    onSuccess: inv,
   })
 
   const notifying = !!(profile as any)?.notify
@@ -128,45 +150,89 @@ export default function ProfileViewScreen() {
             </View>
             {!isSelf && (
               <View style={s.actions}>
-                {status === 'accepted' && (
-                  <TouchableOpacity onPress={() => startDM.mutate()} style={[s.actionBtn, { borderColor: c.border }]}>
-                    <Ionicons name="chatbubble-outline" size={15} color={c.primary} />
-                    <Text style={[s.actionBtnText, { color: c.textMd }]}>Message</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  onPress={() => followNotif.mutate()}
-                  disabled={followNotif.isPending}
-                  style={[s.actionBtn, { borderColor: notifying ? c.primary : c.border, backgroundColor: notifying ? c.primaryBg : 'transparent' }]}
-                >
-                  <Ionicons name={notifying ? 'notifications' : 'notifications-outline'} size={15} color={notifying ? c.primary : c.textMuted} />
-                  <Text style={[s.actionBtnText, { color: notifying ? c.primary : c.textMuted }]}>{notifying ? 'Notifying' : 'Notify'}</Text>
-                </TouchableOpacity>
-                {!status && (
-                  <TouchableOpacity onPress={() => sendReq.mutate()} disabled={sendReq.isPending}
-                    style={[s.primaryBtn, { backgroundColor: c.primary }]}>
-                    <Text style={s.primaryBtnText}>Add friend</Text>
-                  </TouchableOpacity>
-                )}
-                {status === 'pending' && (
-                  <View style={[s.actionBtn, { borderColor: c.border }]}>
-                    <Text style={{ fontSize: 13, color: c.textMuted }}>Pending</Text>
-                  </View>
-                )}
-                {status === 'pending_incoming' && (
-                  <TouchableOpacity onPress={() => accept.mutate()}
-                    style={[s.primaryBtn, { backgroundColor: c.primary }]}>
-                    <Text style={s.primaryBtnText}>Accept</Text>
-                  </TouchableOpacity>
-                )}
-                {status === 'accepted' && (
-                  <TouchableOpacity onPress={() => Alert.alert('Unfriend?', undefined, [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Unfriend', style: 'destructive', onPress: () => unfriend.mutate() },
-                  ])} style={[s.actionBtn, { borderColor: c.border }]}>
-                    <Ionicons name="checkmark" size={15} color={c.green} />
-                    <Text style={[s.actionBtnText, { color: c.textMd }]}>Friends</Text>
-                  </TouchableOpacity>
+                {isFediverse ? (
+                  <>
+                    <TouchableOpacity
+                      onPress={() => (profile as any).following
+                        ? Alert.alert('Unfollow?', `Unfollow ${profile.display_name}?`, [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Unfollow', style: 'destructive', onPress: () => unfollowFed.mutate() },
+                          ])
+                        : followFed.mutate()}
+                      disabled={followFed.isPending || unfollowFed.isPending}
+                      style={[s.actionBtn, (profile as any).following
+                        ? { borderColor: c.border }
+                        : { borderColor: c.primary, backgroundColor: c.primary }]}
+                    >
+                      <Ionicons
+                        name={(profile as any).following ? 'checkmark' : 'person-add-outline'}
+                        size={15}
+                        color={(profile as any).following ? c.textMd : 'white'}
+                      />
+                      <Text style={[s.actionBtnText, { color: (profile as any).following ? c.textMd : 'white' }]}>
+                        {(profile as any).following ? 'Following' : 'Follow'}
+                      </Text>
+                    </TouchableOpacity>
+                    {(profile as any).following && (
+                      <TouchableOpacity
+                        onPress={() => toggleFedNotify.mutate()}
+                        disabled={toggleFedNotify.isPending}
+                        style={[s.actionBtn, { borderColor: (profile as any).follow_notify ? c.primary : c.border, backgroundColor: (profile as any).follow_notify ? c.primaryBg : 'transparent' }]}
+                      >
+                        <Ionicons
+                          name={(profile as any).follow_notify ? 'notifications' : 'notifications-outline'}
+                          size={15}
+                          color={(profile as any).follow_notify ? c.primary : c.textMuted}
+                        />
+                        <Text style={[s.actionBtnText, { color: (profile as any).follow_notify ? c.primary : c.textMuted }]}>
+                          {(profile as any).follow_notify ? 'Notifying' : 'Notify'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {status === 'accepted' && (
+                      <TouchableOpacity onPress={() => startDM.mutate()} style={[s.actionBtn, { borderColor: c.border }]}>
+                        <Ionicons name="chatbubble-outline" size={15} color={c.primary} />
+                        <Text style={[s.actionBtnText, { color: c.textMd }]}>Message</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      onPress={() => followNotif.mutate()}
+                      disabled={followNotif.isPending}
+                      style={[s.actionBtn, { borderColor: notifying ? c.primary : c.border, backgroundColor: notifying ? c.primaryBg : 'transparent' }]}
+                    >
+                      <Ionicons name={notifying ? 'notifications' : 'notifications-outline'} size={15} color={notifying ? c.primary : c.textMuted} />
+                      <Text style={[s.actionBtnText, { color: notifying ? c.primary : c.textMuted }]}>{notifying ? 'Notifying' : 'Notify'}</Text>
+                    </TouchableOpacity>
+                    {!status && (
+                      <TouchableOpacity onPress={() => sendReq.mutate()} disabled={sendReq.isPending}
+                        style={[s.primaryBtn, { backgroundColor: c.primary }]}>
+                        <Text style={s.primaryBtnText}>Add friend</Text>
+                      </TouchableOpacity>
+                    )}
+                    {status === 'pending' && (
+                      <View style={[s.actionBtn, { borderColor: c.border }]}>
+                        <Text style={{ fontSize: 13, color: c.textMuted }}>Pending</Text>
+                      </View>
+                    )}
+                    {status === 'pending_incoming' && (
+                      <TouchableOpacity onPress={() => accept.mutate()}
+                        style={[s.primaryBtn, { backgroundColor: c.primary }]}>
+                        <Text style={s.primaryBtnText}>Accept</Text>
+                      </TouchableOpacity>
+                    )}
+                    {status === 'accepted' && (
+                      <TouchableOpacity onPress={() => Alert.alert('Unfriend?', undefined, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Unfriend', style: 'destructive', onPress: () => unfriend.mutate() },
+                      ])} style={[s.actionBtn, { borderColor: c.border }]}>
+                        <Ionicons name="checkmark" size={15} color={c.green} />
+                        <Text style={[s.actionBtnText, { color: c.textMd }]}>Friends</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
                 )}
                 {blocked ? (
                   <TouchableOpacity
@@ -201,7 +267,7 @@ export default function ProfileViewScreen() {
             <Text style={[s.name, { color: c.text }]}>{profile.display_name || profile.username}</Text>
             {profile.pronouns ? <Text style={{ fontSize: 13, color: c.textLight }}>({profile.pronouns})</Text> : null}
           </View>
-          <Text style={[s.username, { color: c.textMuted }]}>@{profile.username}</Text>
+          <Text style={[s.username, { color: c.textMuted }]}>{handle(profile.username, (profile as any).is_remote, (profile as any).remote_instance)}</Text>
           {profile.bio ? <Text style={[s.bio, { color: c.textMd }]}>{profile.bio}</Text> : null}
           {(profile as any).location ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
