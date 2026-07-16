@@ -153,6 +153,16 @@ export default function FeedScreen() {
   // Detect @mention being typed and extract the query
   const handleContentChange = (text: string) => {
     setContent(text)
+    // A fediverse handle in progress (@user@instance.tld) is not a local
+    // mention — matching the fragment after the second @ against local
+    // usernames (e.g. "mastodon" from "@gargron@mastodon.social") would
+    // offer to insert the wrong person and corrupt the handle being typed.
+    // AGORA-163 hit the equivalent bug server-side with a bare local-only
+    // mention regex; this is the client-side half of the same failure mode.
+    if (/@\w+@[\w.-]*$/.test(text)) {
+      setMentionQuery(null)
+      return
+    }
     const match = text.match(/@(\w*)$/)
     setMentionQuery(match ? match[1] : null)
   }
