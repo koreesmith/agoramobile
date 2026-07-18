@@ -53,14 +53,23 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
   const myVotes = new Set([post.my_poll_vote, ...(post.my_poll_votes || [])].filter(Boolean))
   const hasVoted = myVotes.size > 0
   const isExpired = !!post.poll_expired
-  const canVote = !isExpired
+  // AGORA-210: an inbound fediverse poll has no way to deliver a vote back
+  // to the origin server, so voting locally would either do nothing real or
+  // misrepresent the poll's actual tally — read-only here, same as an
+  // expired poll, but with its own honest label rather than claiming it
+  // "ended" when it may still be open on the source instance.
+  const isRemote = !!post.is_remote
+  const canVote = !isExpired && !isRemote
 
   return (
     <View style={{ marginTop: 10, gap: 6 }}>
       {isExpired && (
         <Text style={{ fontSize: 12, color: c.textMuted }}>🔒 This poll has ended</Text>
       )}
-      {!isExpired && post.poll_expires_at && (
+      {!isExpired && isRemote && (
+        <Text style={{ fontSize: 12, color: c.textMuted }}>📡 Results from the fediverse — voting happens on the original post</Text>
+      )}
+      {!isExpired && !isRemote && post.poll_expires_at && (
         <Text style={{ fontSize: 12, color: c.textMuted }}>
           ⏱ Closes {new Date(post.poll_expires_at).toLocaleString()}
         </Text>
@@ -72,7 +81,7 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
       {opts.map((opt: any) => {
         const isMyVote = myVotes.has(opt.id)
         const pct = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0
-        const showResults = hasVoted || isExpired
+        const showResults = hasVoted || isExpired || isRemote
 
         return showResults ? (
           <TouchableOpacity
