@@ -213,6 +213,7 @@ export default function SettingsScreen() {
         <Text style={[s.section, { color: c.textMuted }]}>Account</Text>
         <Row icon="person-outline" label="Edit profile" onPress={() => router.push('/edit-profile')} />
         <Row icon="people-outline" label="Friend lists" onPress={() => router.push('/friend-lists')} />
+        <Row icon="ban-outline" label="Blocked users" onPress={() => router.push('/blocked-users')} />
         <Row icon="mail-outline" label="Change email" onPress={() => setSection('email')} />
         <Row icon="key-outline" label="Change password" onPress={() => setSection('password')} />
         {invitesEnabled && (
