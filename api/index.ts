@@ -57,8 +57,8 @@ export const feedsApi = {
 }
 
 export const feedApi = {
-  getFeed:      (offset = 0, customFeedId?: string) =>
-    api.get('/feed', { params: { offset, ...(customFeedId ? { custom_feed_id: customFeedId } : {}) } }),
+  getFeed:      (offset = 0, customFeedId?: string, listId?: string) =>
+    api.get('/feed', { params: { offset, ...(customFeedId ? { custom_feed_id: customFeedId } : {}), ...(listId ? { list_id: listId } : {}) } }),
   getPost:      (id: string)         => api.get(`/posts/${id}`),
   createPost:   (data: any)          => api.post('/posts', data),
   deletePost:   (id: string)         => api.delete(`/posts/${id}`),
