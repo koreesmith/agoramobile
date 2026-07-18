@@ -8,7 +8,7 @@ import { moderationApi, adminApi, waitlistApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
 
-type Tab = 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'invites' | 'rules' | 'settings' | 'audit'
+type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'invites' | 'rules' | 'settings' | 'audit'
 
 // GetSettings (internal/admin/admin.go) serializes every instance_settings
 // value as a string ("true"/"false", not a JSON boolean), so `typeof value
@@ -25,7 +25,7 @@ export default function AdminScreen() {
   const { user } = useAuthStore()
   const qc = useQueryClient()
   const params = useLocalSearchParams<{ tab?: string }>()
-  const initialTab = (params.tab as Tab) || 'reports'
+  const initialTab = (params.tab as Tab) || 'overview'
   const [tab, setTab] = useState<Tab>(initialTab)
   const [reportStatus, setReportStatus] = useState('pending')
   const [suspendForms, setSuspendForms] = useState<Record<string,{days:string,reason:string,notes:string}>>({})
@@ -52,6 +52,12 @@ export default function AdminScreen() {
       </Screen>
     )
   }
+
+  const { data: statsData, isLoading: statsLoading } = useQuery({
+    queryKey: ['admin-stats'],
+    queryFn: () => adminApi.getStats().then(r => r.data),
+    enabled: tab === 'overview',
+  })
 
   const { data: repsData, isLoading: repsLoading } = useQuery({
     queryKey: ['admin-reports', reportStatus],
@@ -282,6 +288,7 @@ export default function AdminScreen() {
   const auditEntries: any[] = auditData?.entries || auditData?.logs || []
   const auditHasMore: boolean = auditData?.has_more ?? false
   const settings: any = settingsData || {}
+  const stats: any = statsData || {}
 
   return (
     <Screen>
@@ -295,7 +302,7 @@ export default function AdminScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={[s.tabBar, { backgroundColor: c.card, borderBottomColor: c.border }]}
         contentContainerStyle={{ flexDirection: 'row' }}>
-        {(['reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'invites', 'rules', 'settings', 'audit'] as Tab[]).map(t => (
+        {(['overview', 'reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'invites', 'rules', 'settings', 'audit'] as Tab[]).map(t => (
           <TouchableOpacity key={t} onPress={() => setTab(t)}
             style={[s.tabItem, tab === t && { borderBottomColor: c.primary }]}>
             <Text style={[s.tabText, { color: tab === t ? c.primary : c.textMuted }]}>
@@ -304,6 +311,27 @@ export default function AdminScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* Overview tab: instance stats dashboard, parity with web AdminPage.tsx's overview tab */}
+      {tab === 'overview' && (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+          {statsLoading ? <Spinner /> : (
+            <View style={s.statsGrid}>
+              {([
+                ['Total Users', stats.total_users],
+                ['Posts Today', stats.posts_today],
+                ['Active (7d)', stats.active_users_7d],
+                ['Pending Reports', stats.pending_reports],
+              ] as [string, number][]).map(([label, value]) => (
+                <View key={label} style={[s.statCard, { backgroundColor: c.card, borderColor: c.border }]}>
+                  <Text style={[s.statValue, { color: c.text }]}>{value ?? 0}</Text>
+                  <Text style={[s.statLabel, { color: c.textMuted }]}>{label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      )}
 
       {/* Reports tab */}
       {tab === 'reports' && (
@@ -992,4 +1020,8 @@ const s = StyleSheet.create({
   miniInput:        { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13 },
   sectionTitle:     { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
   smallBtn:         { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  statsGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  statCard:         { flexBasis: '47%', flexGrow: 1, borderWidth: 1, borderRadius: 12, padding: 14 },
+  statValue:        { fontSize: 24, fontWeight: '700' },
+  statLabel:        { fontSize: 13, marginTop: 4 },
 })
