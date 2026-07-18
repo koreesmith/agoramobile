@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Switch, StyleSheet } from 'react-native'
+import { useRouter } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Avatar } from '../components/ui'
@@ -29,6 +30,7 @@ interface FollowingEntry {
 
 export default function FediverseScreen() {
   const c = useC()
+  const router = useRouter()
   const qc = useQueryClient()
   const { user, updateUser } = useAuthStore()
   const [handle, setHandle] = useState('')
@@ -169,17 +171,23 @@ export default function FediverseScreen() {
             <View style={{ marginTop: 8 }}>
               {following.map(f => (
                 <View key={f.id} style={[s.followRow, { borderBottomColor: c.border }]}>
-                  <Avatar url={f.avatar_url} name={f.display_name || f.username} size={38} />
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={[s.previewName, { color: c.text }]} numberOfLines={1}>
-                      {f.display_name || f.username || f.actor_url}
-                    </Text>
-                    {!!f.username && (
-                      <Text style={[s.previewHandle, { color: c.textMuted }]} numberOfLines={1}>
-                        @{f.username}{f.instance ? `@${f.instance}` : ''}
+                  <TouchableOpacity
+                    style={s.followRowMain}
+                    disabled={!f.username}
+                    onPress={() => router.push(`/profile/${f.username}` as any)}
+                  >
+                    <Avatar url={f.avatar_url} name={f.display_name || f.username} size={38} />
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={[s.previewName, { color: c.text }]} numberOfLines={1}>
+                        {f.display_name || f.username || f.actor_url}
                       </Text>
-                    )}
-                  </View>
+                      {!!f.username && (
+                        <Text style={[s.previewHandle, { color: c.textMuted }]} numberOfLines={1}>
+                          @{f.username}{f.instance ? `@${f.instance}` : ''}
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
                   {!f.accepted && (
                     <View style={s.pendingTag}>
                       <Ionicons name="time-outline" size={13} color={c.textMuted} />
@@ -238,6 +246,7 @@ const s = StyleSheet.create({
   followBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },
   emptyText: { fontSize: 13, fontStyle: 'italic', textAlign: 'center', paddingVertical: 20, marginTop: 10, borderWidth: 1, borderStyle: 'dashed', borderRadius: 10 },
   followRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  followRowMain: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   pendingTag: { flexDirection: 'row', alignItems: 'center', gap: 3, marginRight: 4 },
   pendingText: { fontSize: 11 },
   iconBtn: { padding: 6, marginLeft: 2 },
