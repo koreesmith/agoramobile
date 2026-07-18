@@ -4,11 +4,11 @@ import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Spinner } from '../components/ui'
-import { moderationApi, adminApi, waitlistApi } from '../api'
+import { moderationApi, adminApi, waitlistApi, pagesApi, adminPagesApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
 
-type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'federation' | 'invites' | 'rules' | 'settings' | 'audit'
+type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'federation' | 'invites' | 'rules' | 'settings' | 'audit' | 'pages'
 
 // GetSettings (internal/admin/admin.go) serializes every instance_settings
 // value as a string ("true"/"false", not a JSON boolean), so `typeof value
@@ -106,6 +106,12 @@ export default function AdminScreen() {
     queryKey: ['admin-fed'],
     queryFn: () => adminApi.listInstances().then(r => r.data),
     enabled: tab === 'federation',
+  })
+
+  const { data: adminPagesData, isLoading: adminPagesLoading } = useQuery({
+    queryKey: ['admin-pages'],
+    queryFn: () => pagesApi.list().then(r => r.data),
+    enabled: tab === 'pages',
   })
 
   const { data: rulesData, isLoading: rulesLoading } = useQuery({
@@ -249,6 +255,18 @@ export default function AdminScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-fed'] }),
   })
 
+  const verifyPage = useMutation({
+    mutationFn: ({ slug, v }: { slug: string; v: boolean }) => adminPagesApi.verify(slug, v),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-pages'] }),
+    onError: () => Alert.alert('Error', 'Could not update verification'),
+  })
+
+  const featurePage = useMutation({
+    mutationFn: ({ slug, v }: { slug: string; v: boolean }) => adminPagesApi.feature(slug, v),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-pages'] }),
+    onError: () => Alert.alert('Error', 'Could not update featured status'),
+  })
+
   const moveRule = useMutation({
     mutationFn: ({ id, direction }: { id: string; direction: 'up' | 'down' }) => adminApi.moveRule(id, direction),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-rules'] }),
@@ -313,6 +331,7 @@ export default function AdminScreen() {
   const settings: any = settingsData || {}
   const stats: any = statsData || {}
   const fedInstances: any[] = fedData?.instances || []
+  const adminPages: any[] = adminPagesData?.pages || []
 
   return (
     <Screen>
@@ -326,7 +345,7 @@ export default function AdminScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={[s.tabBar, { backgroundColor: c.card, borderBottomColor: c.border }]}
         contentContainerStyle={{ flexDirection: 'row' }}>
-        {(['overview', 'reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'federation', 'invites', 'rules', 'settings', 'audit'] as Tab[]).map(t => (
+        {(['overview', 'reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'federation', 'invites', 'rules', 'settings', 'audit', 'pages'] as Tab[]).map(t => (
           <TouchableOpacity key={t} onPress={() => setTab(t)}
             style={[s.tabItem, tab === t && { borderBottomColor: c.primary }]}>
             <Text style={[s.tabText, { color: tab === t ? c.primary : c.textMuted }]}>
@@ -1080,6 +1099,61 @@ export default function AdminScreen() {
               </View>
             </>
           )}
+        </ScrollView>
+      )}
+
+      {/* Pages tab (AGORA-114): verify/feature moderation for pages */}
+      {tab === 'pages' && (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+          <Text style={{ color: c.textMd, fontSize: 12, marginBottom: 12 }}>
+            Verify notable pages and feature them in the discovery section. Verified and featured status survive
+            owner edits.
+          </Text>
+          {adminPagesLoading ? <Spinner /> : adminPages.length === 0 ? (
+            <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>No pages yet.</Text>
+          ) : adminPages.map((p: any) => (
+            <View key={p.id} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>{p.display_name}</Text>
+                    <Text style={{ fontSize: 12, color: c.textMuted }}>@{p.slug}</Text>
+                    {p.is_verified && (
+                      <View style={[s.violationBadge, { backgroundColor: '#dbeafe' }]}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#2563eb' }}>✓ Verified</Text>
+                      </View>
+                    )}
+                    {p.is_featured && (
+                      <View style={[s.violationBadge, { backgroundColor: '#fef3c7' }]}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#92400e' }}>★ Featured</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 3 }}>
+                    {p.subscriber_count ?? 0} subscribers · {p.post_count ?? 0} posts
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                <TouchableOpacity
+                  disabled={verifyPage.isPending}
+                  onPress={() => verifyPage.mutate({ slug: p.slug, v: !p.is_verified })}
+                  style={[s.smallBtn, { flex: 1, alignItems: 'center', borderColor: c.border, backgroundColor: p.is_verified ? '#dbeafe' : c.bg }]}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: p.is_verified ? '#2563eb' : c.textMd }}>
+                    {p.is_verified ? '✓ Verified' : 'Verify'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  disabled={featurePage.isPending}
+                  onPress={() => featurePage.mutate({ slug: p.slug, v: !p.is_featured })}
+                  style={[s.smallBtn, { flex: 1, alignItems: 'center', borderColor: c.border, backgroundColor: p.is_featured ? '#fef3c7' : c.bg }]}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: p.is_featured ? '#92400e' : c.textMd }}>
+                    {p.is_featured ? '★ Featured' : '☆ Feature'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
         </ScrollView>
       )}
 
