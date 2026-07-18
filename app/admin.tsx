@@ -8,7 +8,7 @@ import { moderationApi, adminApi, waitlistApi, pagesApi, adminPagesApi } from '.
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
 
-type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'federation' | 'invites' | 'rules' | 'settings' | 'audit' | 'pages'
+type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'federation' | 'invites' | 'rules' | 'settings' | 'audit' | 'pages' | 'media'
 
 // GetSettings (internal/admin/admin.go) serializes every instance_settings
 // value as a string ("true"/"false", not a JSON boolean), so `typeof value
@@ -42,6 +42,8 @@ export default function AdminScreen() {
   const [newInviteCreated, setNewInviteCreated] = useState<string | null>(null)
   const [auditPage, setAuditPage] = useState(0)
   const [fedDomain, setFedDomain] = useState('')
+  const [orphanScan, setOrphanScan] = useState<{ count: number; total_bytes: number; orphans: { path: string; size: number; mod_time: string }[] } | null>(null)
+  const [orphanScanning, setOrphanScanning] = useState(false)
 
   if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
     return (
@@ -267,6 +269,24 @@ export default function AdminScreen() {
     onError: () => Alert.alert('Error', 'Could not update featured status'),
   })
 
+  const deleteOrphans = useMutation({
+    mutationFn: () => adminApi.deleteOrphans(),
+    onSuccess: (res) => { Alert.alert('Done', `Deleted ${res.data.count} file(s)`); setOrphanScan(null) },
+    onError: () => Alert.alert('Error', 'Could not delete orphaned files'),
+  })
+
+  const scanOrphans = async () => {
+    setOrphanScanning(true)
+    try {
+      const res = await adminApi.scanOrphans()
+      setOrphanScan(res.data)
+    } catch {
+      Alert.alert('Error', 'Scan failed')
+    } finally {
+      setOrphanScanning(false)
+    }
+  }
+
   const moveRule = useMutation({
     mutationFn: ({ id, direction }: { id: string; direction: 'up' | 'down' }) => adminApi.moveRule(id, direction),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-rules'] }),
@@ -345,7 +365,7 @@ export default function AdminScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={[s.tabBar, { backgroundColor: c.card, borderBottomColor: c.border }]}
         contentContainerStyle={{ flexDirection: 'row' }}>
-        {(['overview', 'reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'federation', 'invites', 'rules', 'settings', 'audit', 'pages'] as Tab[]).map(t => (
+        {(['overview', 'reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'federation', 'invites', 'rules', 'settings', 'audit', 'pages', 'media'] as Tab[]).map(t => (
           <TouchableOpacity key={t} onPress={() => setTab(t)}
             style={[s.tabItem, tab === t && { borderBottomColor: c.primary }]}>
             <Text style={[s.tabText, { color: tab === t ? c.primary : c.textMuted }]}>
@@ -1099,6 +1119,73 @@ export default function AdminScreen() {
               </View>
             </>
           )}
+        </ScrollView>
+      )}
+
+      {/* Storage/Media tab: orphaned media scan/cleanup */}
+      {tab === 'media' && (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+          <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>Orphaned Media</Text>
+            <Text style={{ color: c.textMd, fontSize: 12, marginBottom: 10 }}>
+              Scan the uploads directory for files no longer referenced by any post, album, profile, or page.
+            </Text>
+            <TouchableOpacity
+              disabled={orphanScanning}
+              onPress={scanOrphans}
+              style={[s.actionBtn, { borderWidth: 1, borderColor: c.border, backgroundColor: c.bg }]}>
+              <Text style={{ color: c.textMd, fontSize: 13, fontWeight: '600' }}>
+                {orphanScanning ? 'Scanning…' : 'Scan for orphaned files'}
+              </Text>
+            </TouchableOpacity>
+
+            {orphanScan && (
+              <View style={{ marginTop: 14, gap: 10 }}>
+                <Text style={{ color: c.text, fontSize: 13 }}>
+                  Found <Text style={{ fontWeight: '700' }}>{orphanScan.count}</Text> orphaned file{orphanScan.count !== 1 ? 's' : ''}
+                  {orphanScan.count > 0 && (
+                    <Text style={{ color: c.textMuted }}> · {(orphanScan.total_bytes / 1024 / 1024).toFixed(1)} MB</Text>
+                  )}
+                </Text>
+
+                {orphanScan.count > 0 && (
+                  <TouchableOpacity
+                    disabled={deleteOrphans.isPending}
+                    onPress={() => Alert.alert(
+                      'Delete orphaned files?',
+                      `Permanently delete ${orphanScan.count} orphaned file(s)?`,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: () => deleteOrphans.mutate() },
+                      ]
+                    )}
+                    style={[s.actionBtn, { backgroundColor: '#ef4444' }]}>
+                    <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>
+                      {deleteOrphans.isPending ? 'Deleting…' : `Delete all ${orphanScan.count} file(s)`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {orphanScan.count === 0 && (
+                  <Text style={{ color: c.textMuted, fontStyle: 'italic', fontSize: 13 }}>No orphaned files found.</Text>
+                )}
+
+                {orphanScan.orphans.length > 0 && (
+                  <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: 10, overflow: 'hidden' }}>
+                    {orphanScan.orphans.map((f, i) => (
+                      <View key={f.path} style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8,
+                        borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.border,
+                      }}>
+                        <Text style={{ fontSize: 11, color: c.textMuted, flex: 1 }} numberOfLines={1}>{f.path}</Text>
+                        <Text style={{ fontSize: 11, color: c.textLight, flexShrink: 0 }}>{(f.size / 1024).toFixed(0)} KB</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
         </ScrollView>
       )}
 
