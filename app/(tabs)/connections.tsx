@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Spinner, EmptyState, Avatar } from '../../components/ui'
-import { friendsApi, usersApi, instanceApi, federationApi } from '../../api'
+import { friendsApi, usersApi, instanceApi, federationApi, atprotoApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
 
 import { C } from '../../constants/colors'
@@ -106,6 +106,43 @@ export default function ConnectionsScreen() {
     if (!trimmed) return
     setFediSearchError('')
     resolveFediHandle.mutate(trimmed)
+  }
+
+  // ── Bluesky follows (AGORA-195) ────────────────────────────────────────────
+  const [bskyHandle, setBskyHandle] = useState('')
+  const [bskyPreview, setBskyPreview] = useState<any>(null)
+  const [bskySearchError, setBskySearchError] = useState('')
+
+  const { data: bskyFollowingData } = useQuery({
+    queryKey: ['bluesky-following'],
+    queryFn: () => atprotoApi.listBlueskyFollowing().then(r => r.data),
+    enabled: tab === 'bluesky',
+  })
+  const bskyFollowing: any[] = bskyFollowingData?.following ?? []
+
+  const resolveBskyHandle = useMutation({
+    mutationFn: (h: string) => atprotoApi.resolveBlueskyHandle(h).then(r => r.data),
+    onSuccess: (data) => { setBskyPreview(data); setBskySearchError('') },
+    onError: (e: any) => { setBskyPreview(null); setBskySearchError(e.response?.data?.error || 'Could not resolve that handle.') },
+  })
+  const alreadyFollowingBsky = bskyPreview && bskyFollowing.some(f => f.did === bskyPreview.did)
+  const followBsky = useMutation({
+    mutationFn: (actor: string) => atprotoApi.followBlueskyAccount(actor),
+    onSuccess: () => {
+      setBskyPreview(null); setBskyHandle('')
+      qc.invalidateQueries({ queryKey: ['bluesky-following'] })
+    },
+    onError: (e: any) => setBskySearchError(e.response?.data?.error || 'Could not follow that account.'),
+  })
+  const unfollowBsky = useMutation({
+    mutationFn: (id: string) => atprotoApi.unfollowBlueskyAccount(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bluesky-following'] }),
+  })
+  const handleBskySearch = () => {
+    const trimmed = bskyHandle.trim()
+    if (!trimmed) return
+    setBskySearchError('')
+    resolveBskyHandle.mutate(trimmed)
   }
 
   const PersonRow = ({ user, right }: { user: any; right: React.ReactNode }) => (
@@ -348,13 +385,102 @@ export default function ConnectionsScreen() {
         )}
 
         {tab === 'bluesky' && (
-          <View style={s.blueskyEmpty}>
-            <Ionicons name="globe-outline" size={32} color={c.textLight} />
-            <Text style={[s.blueskyTitle, { color: c.textMuted }]}>Bluesky following is coming soon</Text>
-            <Text style={[s.blueskySubtitle, { color: c.textLight }]}>
-              Agora can already post your public updates to Bluesky. Following native Bluesky accounts from here is next.
-            </Text>
-          </View>
+          <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+            <View style={[s.card, { backgroundColor: c.card }]}>
+              <Text style={[s.cardTitle, { color: c.text }]}>Follow a Bluesky account</Text>
+              <Text style={[s.cardSubtitle, { color: c.textMuted, marginBottom: 12 }]}>
+                Enter a full handle (e.g. user.bsky.social) or a DID.
+              </Text>
+              <View style={s.searchRow}>
+                <TextInput
+                  style={[s.input, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
+                  value={bskyHandle}
+                  onChangeText={setBskyHandle}
+                  placeholder="user.bsky.social"
+                  placeholderTextColor={c.textLight}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="search"
+                  onSubmitEditing={handleBskySearch}
+                />
+                <TouchableOpacity
+                  onPress={handleBskySearch}
+                  disabled={resolveBskyHandle.isPending || !bskyHandle.trim()}
+                  style={[s.searchBtn, { backgroundColor: c.primaryBg }, (!bskyHandle.trim() || resolveBskyHandle.isPending) && { opacity: 0.5 }]}
+                >
+                  <Ionicons name="search" size={18} color={c.primary} />
+                </TouchableOpacity>
+              </View>
+
+              {!!bskySearchError && <Text style={[s.error, { color: c.red }]}>{bskySearchError}</Text>}
+
+              {bskyPreview && (
+                <View style={[s.previewRow, { borderColor: c.border }]}>
+                  <Avatar url={bskyPreview.avatar_url} name={bskyPreview.display_name || bskyPreview.handle} size={44} />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={[s.previewName, { color: c.text }]} numberOfLines={1}>
+                      {bskyPreview.display_name || bskyPreview.handle}
+                    </Text>
+                    <Text style={[s.previewHandle, { color: c.textMuted }]} numberOfLines={1}>
+                      @{bskyPreview.handle}
+                    </Text>
+                    {!!bskyPreview.description && (
+                      <Text style={[s.previewSummary, { color: c.textMuted }]} numberOfLines={2}>{bskyPreview.description}</Text>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => followBsky.mutate(bskyPreview.did)}
+                    disabled={followBsky.isPending || !!alreadyFollowingBsky}
+                    style={[s.followBtn, { backgroundColor: alreadyFollowingBsky ? c.border : c.primary }]}
+                  >
+                    <Text style={[s.followBtnText, alreadyFollowingBsky && { color: c.textMuted }]}>
+                      {alreadyFollowingBsky ? 'Following' : followBsky.isPending ? 'Following…' : 'Follow'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            <View style={[s.card, { backgroundColor: c.card }]}>
+              <Text style={[s.cardTitle, { color: c.text }]}>Your follows</Text>
+              {bskyFollowing.length === 0 ? (
+                <Text style={[s.emptyText, { color: c.textMuted, borderColor: c.border }]}>
+                  You're not following anyone on Bluesky yet.
+                </Text>
+              ) : (
+                <View style={{ marginTop: 8 }}>
+                  {bskyFollowing.map(f => (
+                    <View key={f.id} style={[s.followRow, { borderBottomColor: c.border }]}>
+                      <View style={s.followRowMain}>
+                        <Avatar url={f.avatar_url} name={f.display_name || f.handle} size={38} />
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                          <Text style={[s.previewName, { color: c.text }]} numberOfLines={1}>
+                            {f.display_name || f.handle}
+                          </Text>
+                          <Text style={[s.previewHandle, { color: c.textMuted }]} numberOfLines={1}>
+                            @{f.handle}
+                          </Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => unfollowBsky.mutate(f.id)}
+                        disabled={unfollowBsky.isPending}
+                        style={s.iconBtn}
+                      >
+                        <Ionicons name="person-remove-outline" size={18} color={c.red} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity onPress={() => router.push('/settings?tab=bluesky' as any)}>
+              <Text style={[s.hintLink, { color: c.textMuted }]}>
+                Want to opt out of Bluesky entirely? That toggle lives in <Text style={{ textDecorationLine: 'underline' }}>Settings → Bluesky</Text>.
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
         )}
 
         {/* Invite FAB */}
@@ -425,8 +551,4 @@ const s = StyleSheet.create({
   iconBtn: { padding: 6, marginLeft: 2 },
   hintLink: { fontSize: 12, textAlign: 'center', marginTop: 4, lineHeight: 17 },
   hintText: { fontSize: 11, marginTop: 10, lineHeight: 15 },
-  // ── Bluesky tab ──
-  blueskyEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
-  blueskyTitle: { fontSize: 15, fontWeight: '600' },
-  blueskySubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 18 },
 })
