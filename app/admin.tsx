@@ -35,6 +35,8 @@ export default function AdminScreen() {
   const [userSuspendForms, setUserSuspendForms] = useState<Record<string,{days:string,reason:string,notes:string}>>({})
   const [userBanForms, setUserBanForms] = useState<Record<string,{reason:string,notes:string}>>({})
   const [instanceBanForm, setInstanceBanForm] = useState({ domain: '', reason: '' })
+  const [pdsBanForm, setPdsBanForm] = useState({ instance: '', reason: '' })
+  const [didBlockForm, setDidBlockForm] = useState({ did: '', reason: '' })
   const [newRuleForm, setNewRuleForm] = useState({ title: '', description: '' })
   const [editingRule, setEditingRule] = useState<{ id: string; title: string; description: string } | null>(null)
   const [newInviteCreated, setNewInviteCreated] = useState<string | null>(null)
@@ -78,7 +80,13 @@ export default function AdminScreen() {
   const { data: instanceBansData, isLoading: instanceBansLoading } = useQuery({
     queryKey: ['instance-bans'],
     queryFn: () => moderationApi.listInstanceBans().then(r => r.data),
-    enabled: tab === 'fediverse',
+    enabled: tab === 'fediverse' || tab === 'bluesky',
+  })
+
+  const { data: blockedDidsData, isLoading: blockedDidsLoading } = useQuery({
+    queryKey: ['blocked-dids'],
+    queryFn: () => moderationApi.listBlockedDIDs().then(r => r.data),
+    enabled: tab === 'bluesky',
   })
 
   const { data: settingsData, isLoading: settingsLoading } = useQuery({
@@ -167,6 +175,27 @@ export default function AdminScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['instance-bans'] }),
   })
 
+  const banPds = useMutation({
+    mutationFn: (data: any) => moderationApi.banInstance(data),
+    onSuccess: () => {
+      setPdsBanForm({ instance: '', reason: '' })
+      qc.invalidateQueries({ queryKey: ['instance-bans'] })
+    },
+  })
+
+  const blockDid = useMutation({
+    mutationFn: (data: any) => moderationApi.blockDID(data),
+    onSuccess: () => {
+      setDidBlockForm({ did: '', reason: '' })
+      qc.invalidateQueries({ queryKey: ['blocked-dids'] })
+    },
+  })
+
+  const unblockDid = useMutation({
+    mutationFn: (id: string) => moderationApi.unblockDID(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['blocked-dids'] }),
+  })
+
   const updateSettings = useMutation({
     mutationFn: (data: any) => adminApi.updateSettings(data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-settings'] }); Alert.alert('Saved') },
@@ -247,6 +276,7 @@ export default function AdminScreen() {
   const users: any[] = usersData?.users || []
   const waitlistUsers: any[] = waitlistData?.users || []
   const instanceBans: any[] = instanceBansData?.instance_bans || []
+  const blockedDids: any[] = blockedDidsData?.blocks || []
   const rules: any[] = rulesData?.rules || []
   const invites: any[] = invitesData?.invites || []
   const auditEntries: any[] = auditData?.entries || auditData?.logs || []
@@ -658,7 +688,7 @@ export default function AdminScreen() {
       {tab === 'bluesky' && (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
           {settingsLoading ? <Spinner /> : (
-            <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={[s.card, { backgroundColor: c.card, borderColor: c.border, marginBottom: 16 }]}>
               <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>Bluesky (AT Protocol)</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ color: c.textMd, fontSize: 12, flex: 1, marginRight: 8 }}>
@@ -674,6 +704,66 @@ export default function AdminScreen() {
               </View>
             </View>
           )}
+
+          {/* AGORA-205: DID-scoped block list — checked from every inbound
+              Bluesky path (ingested posts, replies, likes/reposts). */}
+          <View style={[s.actionSection, { borderColor: c.border, marginBottom: 16 }]}>
+            <Text style={[s.actionSectionTitle, { color: c.textMuted }]}>Block a Bluesky DID</Text>
+            <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
+              placeholder="DID (e.g. did:plc:abc123…)" placeholderTextColor={c.textLight}
+              autoCapitalize="none"
+              value={didBlockForm.did}
+              onChangeText={t => setDidBlockForm(f => ({ ...f, did: t }))} />
+            <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
+              placeholder="Reason" placeholderTextColor={c.textLight}
+              value={didBlockForm.reason}
+              onChangeText={t => setDidBlockForm(f => ({ ...f, reason: t }))} />
+            <TouchableOpacity
+              disabled={!didBlockForm.did || !didBlockForm.reason || blockDid.isPending}
+              onPress={() => blockDid.mutate({ did: didBlockForm.did, reason: didBlockForm.reason })}
+              style={[s.actionBtn, { backgroundColor: '#ef4444', opacity: (!didBlockForm.did || !didBlockForm.reason) ? 0.5 : 1 }]}>
+              <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>Block DID</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[s.sectionTitle, { color: c.textMuted }]}>Blocked DIDs</Text>
+          {blockedDidsLoading ? <Spinner /> : blockedDids.length === 0 ? (
+            <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>No blocked DIDs.</Text>
+          ) : blockedDids.map((b: any) => (
+            <View key={b.id} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>{b.did}</Text>
+                  {b.reason && <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 2 }}>Reason: {b.reason}</Text>}
+                </View>
+                <TouchableOpacity onPress={() => unblockDid.mutate(b.id)}
+                  style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
+                  <Text style={{ fontSize: 12, color: c.textMd }}>Unblock</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+
+          {/* PDS-host block scope reuses instance_bans as-is — same list the
+              Fediverse tab's Instance Bans manage. */}
+          <View style={[s.actionSection, { borderColor: c.border, marginTop: 16, marginBottom: 16 }]}>
+            <Text style={[s.actionSectionTitle, { color: c.textMuted }]}>Ban a PDS domain</Text>
+            <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
+              placeholder="PDS domain (e.g. bad-pds.example.com)" placeholderTextColor={c.textLight}
+              autoCapitalize="none" keyboardType="url"
+              value={pdsBanForm.instance}
+              onChangeText={t => setPdsBanForm(f => ({ ...f, instance: t }))} />
+            <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
+              placeholder="Reason" placeholderTextColor={c.textLight}
+              value={pdsBanForm.reason}
+              onChangeText={t => setPdsBanForm(f => ({ ...f, reason: t }))} />
+            <TouchableOpacity
+              disabled={!pdsBanForm.instance || !pdsBanForm.reason || banPds.isPending}
+              onPress={() => banPds.mutate({ instance: pdsBanForm.instance, reason: pdsBanForm.reason })}
+              style={[s.actionBtn, { backgroundColor: '#ef4444', opacity: (!pdsBanForm.instance || !pdsBanForm.reason) ? 0.5 : 1 }]}>
+              <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>Ban domain</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       )}
       {/* Invites tab (AMOBILE-69) */}
