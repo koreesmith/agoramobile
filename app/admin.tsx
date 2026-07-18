@@ -8,7 +8,7 @@ import { moderationApi, adminApi, waitlistApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
 
-type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'invites' | 'rules' | 'settings' | 'audit'
+type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'federation' | 'invites' | 'rules' | 'settings' | 'audit'
 
 // GetSettings (internal/admin/admin.go) serializes every instance_settings
 // value as a string ("true"/"false", not a JSON boolean), so `typeof value
@@ -41,6 +41,7 @@ export default function AdminScreen() {
   const [editingRule, setEditingRule] = useState<{ id: string; title: string; description: string } | null>(null)
   const [newInviteCreated, setNewInviteCreated] = useState<string | null>(null)
   const [auditPage, setAuditPage] = useState(0)
+  const [fedDomain, setFedDomain] = useState('')
 
   if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
     return (
@@ -99,6 +100,12 @@ export default function AdminScreen() {
     queryKey: ['admin-settings'],
     queryFn: () => adminApi.getSettings().then(r => r.data),
     enabled: tab === 'settings' || tab === 'fediverse' || tab === 'bluesky',
+  })
+
+  const { data: fedData, isLoading: fedLoading } = useQuery({
+    queryKey: ['admin-fed'],
+    queryFn: () => adminApi.listInstances().then(r => r.data),
+    enabled: tab === 'federation',
   })
 
   const { data: rulesData, isLoading: rulesLoading } = useQuery({
@@ -226,6 +233,22 @@ export default function AdminScreen() {
     onError: () => Alert.alert('Error', 'Could not delete rule'),
   })
 
+  const addInstance = useMutation({
+    mutationFn: (domain: string) => adminApi.addInstance(domain),
+    onSuccess: () => { setFedDomain(''); qc.invalidateQueries({ queryKey: ['admin-fed'] }) },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not add instance'),
+  })
+
+  const blockInstance = useMutation({
+    mutationFn: (id: string) => adminApi.blockInstance(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-fed'] }),
+  })
+
+  const unblockInstance = useMutation({
+    mutationFn: (id: string) => adminApi.unblockInstance(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-fed'] }),
+  })
+
   const moveRule = useMutation({
     mutationFn: ({ id, direction }: { id: string; direction: 'up' | 'down' }) => adminApi.moveRule(id, direction),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-rules'] }),
@@ -289,6 +312,7 @@ export default function AdminScreen() {
   const auditHasMore: boolean = auditData?.has_more ?? false
   const settings: any = settingsData || {}
   const stats: any = statsData || {}
+  const fedInstances: any[] = fedData?.instances || []
 
   return (
     <Screen>
@@ -302,7 +326,7 @@ export default function AdminScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={[s.tabBar, { backgroundColor: c.card, borderBottomColor: c.border }]}
         contentContainerStyle={{ flexDirection: 'row' }}>
-        {(['overview', 'reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'invites', 'rules', 'settings', 'audit'] as Tab[]).map(t => (
+        {(['overview', 'reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'federation', 'invites', 'rules', 'settings', 'audit'] as Tab[]).map(t => (
           <TouchableOpacity key={t} onPress={() => setTab(t)}
             style={[s.tabItem, tab === t && { borderBottomColor: c.primary }]}>
             <Text style={[s.tabText, { color: tab === t ? c.primary : c.textMuted }]}>
@@ -794,6 +818,63 @@ export default function AdminScreen() {
           </View>
         </ScrollView>
       )}
+      {/* Federation tab: Agora-to-Agora peer instance management, distinct
+          from the Fediverse tab's Mastodon/AP instance bans above. */}
+      {tab === 'federation' && (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+          <View style={[s.actionSection, { borderColor: c.border, marginBottom: 16 }]}>
+            <Text style={[s.actionSectionTitle, { color: c.textMuted }]}>Add Federated Instance</Text>
+            <Text style={{ color: c.textMd, fontSize: 12 }}>
+              Enter the domain of another Agora instance to federate with. Both instances must have federation
+              enabled. This is specifically for the Agora-to-Agora protocol — to block a Mastodon or other standard
+              fediverse instance, use the Fediverse tab's Instance Bans instead.
+            </Text>
+            <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
+              placeholder="social.example.com" placeholderTextColor={c.textLight}
+              autoCapitalize="none" keyboardType="url"
+              value={fedDomain} onChangeText={setFedDomain} />
+            <TouchableOpacity
+              disabled={!fedDomain.trim() || addInstance.isPending}
+              onPress={() => addInstance.mutate(fedDomain.trim())}
+              style={[s.actionBtn, { backgroundColor: c.primary, opacity: !fedDomain.trim() ? 0.5 : 1 }]}>
+              <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>
+                {addInstance.isPending ? 'Connecting…' : 'Add Instance'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[s.sectionTitle, { color: c.textMuted }]}>Federated Instances</Text>
+          {fedLoading ? <Spinner /> : fedInstances.length === 0 ? (
+            <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>No federated instances yet.</Text>
+          ) : fedInstances.map((inst: any) => (
+            <View key={inst.id} style={[s.card, { backgroundColor: c.card, borderColor: c.border, opacity: inst.status === 'blocked' ? 0.6 : 1 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>{inst.name || inst.domain}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    <Text style={{ fontSize: 12, color: c.textMuted }}>{inst.domain}</Text>
+                    <View style={[s.violationBadge, { backgroundColor: inst.status === 'active' ? '#dcfce7' : '#fee2e2' }]}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: inst.status === 'active' ? '#15803d' : '#dc2626' }}>
+                        {inst.status}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                {inst.status === 'active'
+                  ? <TouchableOpacity onPress={() => blockInstance.mutate(inst.id)}
+                      style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
+                      <Text style={{ fontSize: 12, color: c.red }}>Block</Text>
+                    </TouchableOpacity>
+                  : <TouchableOpacity onPress={() => unblockInstance.mutate(inst.id)}
+                      style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
+                      <Text style={{ fontSize: 12, color: c.textMd }}>Unblock</Text>
+                    </TouchableOpacity>}
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      )}
+
       {/* Invites tab (AMOBILE-69) */}
       {tab === 'invites' && (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
