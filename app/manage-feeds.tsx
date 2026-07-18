@@ -7,10 +7,10 @@ import { Stack, router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Spinner, EmptyState } from '../components/ui'
-import { feedsApi, friendsApi, groupsApi, federationApi } from '../api'
+import { feedsApi, friendsApi, groupsApi, federationApi, atprotoApi } from '../api'
 import { useC } from '../constants/ColorContext'
 
-type FilterType = 'friend_group' | 'community_group' | 'exclude_friend' | 'exclude_group' | 'fediverse_account' | 'fediverse_all'
+type FilterType = 'friend_group' | 'community_group' | 'exclude_friend' | 'exclude_group' | 'fediverse_account' | 'fediverse_all' | 'atproto_account' | 'atproto_all'
 
 interface FilterRule {
   filter_type: FilterType
@@ -67,6 +67,13 @@ export default function ManageFeedsScreen() {
   // has been ingested — nothing to filter by before that, so it's left out
   // of the picker until then, matching web's FeedBuilderModal.
   const fediverseAccounts: any[] = (followingData?.following || []).filter((f: any) => f.user_id)
+
+  const { data: bskyFollowingData } = useQuery({
+    queryKey: ['bluesky-following'],
+    queryFn: () => atprotoApi.listBlueskyFollowing().then(r => r.data),
+    enabled: showEditor,
+  })
+  const bskyAccounts: any[] = (bskyFollowingData?.following || []).filter((f: any) => f.user_id)
 
   const openCreate = () => {
     setEditingId(null)
@@ -234,6 +241,20 @@ export default function ManageFeedsScreen() {
                   title="INCLUDE ONE FEDIVERSE ACCOUNT"
                   items={fediverseAccounts.map((f: any) => ({ id: f.user_id, name: f.display_name || f.username || f.actor_url }))}
                   type="fediverse_account"
+                  labelKey="name"
+                />
+              )}
+              <FilterSection
+                title="INCLUDE FROM BLUESKY"
+                items={[{ id: 'true', name: 'Everyone I follow on Bluesky' }]}
+                type="atproto_all"
+                labelKey="name"
+              />
+              {bskyAccounts.length > 0 && (
+                <FilterSection
+                  title="INCLUDE ONE BLUESKY ACCOUNT"
+                  items={bskyAccounts.map((f: any) => ({ id: f.user_id, name: f.display_name || f.handle }))}
+                  type="atproto_account"
                   labelKey="name"
                 />
               )}
