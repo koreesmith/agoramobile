@@ -12,8 +12,8 @@ const FEATURES: { icon: string; title: string; desc: string; link?: string; link
   {
     icon: 'planet',
     title: 'Fediverse (ActivityPub)',
-    desc: "Your public posts are now discoverable and followable from Mastodon and other fediverse apps, and replies go both ways. Off by default for private posts, on by default for public ones — there's a toggle in Settings → Privacy if you'd rather opt out.",
-    link: '/fediverse',
+    desc: "Your public posts are now discoverable and followable from Mastodon and other fediverse apps, and replies go both ways. Off by default for private posts, on by default for public ones — there's a toggle in Settings → Fediverse if you'd rather opt out.",
+    link: '/connections?tab=fediverse',
     linkText: 'Explore the Fediverse →',
   },
   { icon: 'bookmark', title: 'Pages', desc: 'Follow bands, businesses, and creators. Their posts now appear in your feed.' },

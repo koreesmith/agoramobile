@@ -30,7 +30,7 @@ function getRouteForNotification(data: Record<string, string>): string | null {
       return post_id ? `/post/${post_id}` : null
     case 'friend_request':
     case 'friend_accepted':
-      return actor_username ? `/profile/${actor_username}` : '/(tabs)/friends'
+      return actor_username ? `/profile/${actor_username}` : '/(tabs)/connections'
     case 'group_join_request':
     case 'group_join_approved':
       return '/(tabs)/notifications'
