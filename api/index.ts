@@ -87,6 +87,11 @@ export const feedApi = {
     })
   },
   previewUrl:   (url: string)        => api.get('/preview', { params: { url } }),
+  // Guest-reachable — unauthenticated, so it bypasses the `api` instance
+  // (which always attaches whatever token/instanceUrl auth store currently
+  // holds) and hits the given instance directly, same as authApi.instance.
+  getPublicFeedWithUrl: (baseUrl: string, offset = 0) =>
+    axios.get(`${baseUrl}/api/feed/public`, { params: { offset } }),
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
