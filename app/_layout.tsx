@@ -27,6 +27,7 @@ function getRouteForNotification(data: Record<string, string>): string | null {
     case 'wall_post':
     case 'wall_post_pending':
     case 'fediverse_post':
+    case 'atproto_post':
       return post_id ? `/post/${post_id}` : null
     case 'friend_request':
     case 'friend_accepted':

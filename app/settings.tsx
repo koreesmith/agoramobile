@@ -59,6 +59,11 @@ export default function SettingsScreen() {
     onSuccess: () => updateUser({ atproto_enabled: !(user as any)?.atproto_enabled } as any),
   })
 
+  const toggleAtprotoNotifications = useMutation({
+    mutationFn: () => usersApi.updateProfile({ atproto_notifications_enabled: !(user as any)?.atproto_notifications_enabled }),
+    onSuccess: () => updateUser({ atproto_notifications_enabled: !(user as any)?.atproto_notifications_enabled } as any),
+  })
+
   const MESSAGE_PERM_OPTIONS = [
     { label: 'Everyone', value: 'everyone' },
     { label: 'Friends only', value: 'friends' },
@@ -276,6 +281,8 @@ export default function SettingsScreen() {
         </Text>
         <Row icon="cloud-outline" label="Bluesky (AT Protocol)"
           right={<Switch value={(user as any)?.atproto_enabled ?? true} onValueChange={() => toggleAtproto.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleAtproto.isPending} />} />
+        <Row icon="notifications-outline" label="Bluesky post notifications"
+          right={<Switch value={(user as any)?.atproto_notifications_enabled ?? true} onValueChange={() => toggleAtprotoNotifications.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleAtprotoNotifications.isPending} />} />
         <Row icon="people-outline" label="Manage Bluesky follows" onPress={() => router.push('/connections?tab=bluesky' as any)} />
         <Text style={[s.section, { color: c.textMuted }]}>Data</Text>
         <Row icon="download-outline" label={exportLoading ? 'Exporting…' : 'Export my data'} onPress={exportData} />
