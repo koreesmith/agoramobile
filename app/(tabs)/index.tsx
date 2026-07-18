@@ -546,6 +546,9 @@ export default function FeedScreen() {
                 <TextInput style={s.cwInput} placeholder="e.g. spoilers, violence…"
                   placeholderTextColor="#d97706" value={cwLabel} onChangeText={setCwLabel}
                   returnKeyType="done" />
+                {/* AGORA-204: Bluesky has no free-text CW field, only a fixed
+                    label vocabulary, so this specific text can't carry over. */}
+                <Text style={s.cwInputHint}>On Bluesky, this shows as a generic content warning — the text above won't carry over.</Text>
               </View>
             )}
 
@@ -756,6 +759,7 @@ const s = StyleSheet.create({
   cwInputWrap: { borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 12 },
   cwInputLabel: { fontSize: 11, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
   cwInput: { fontSize: 14, color: '#92400e', padding: 0 },
+  cwInputHint: { fontSize: 11, color: '#b45309', marginTop: 6 },
   pollEditor: { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12 },
   pollEditorLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 0.8, marginBottom: 10 },
   pollOptionInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14 },
