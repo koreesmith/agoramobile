@@ -233,6 +233,7 @@ export const atprotoApi = {
   followBlueskyAccount:   (actor: string)  => api.post('/atproto/follow', { actor }),
   unfollowBlueskyAccount: (id: string)     => api.delete(`/atproto/follow/${id}`),
   listBlueskyFollowing:   ()               => api.get('/atproto/following'),
+  migrateBridgedFollow:   (apFollowingId: string) => api.post(`/atproto/bridged-follows/${apFollowingId}/migrate`),
 }
 
 // ── Instance rules ────────────────────────────────────────────────────────────

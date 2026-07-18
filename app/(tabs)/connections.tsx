@@ -12,6 +12,12 @@ import { useC } from '../../constants/ColorContext'
 
 type Tab = 'friends' | 'requests' | 'discover' | 'fediverse' | 'bluesky'
 
+// AGORA-196: a fediverse actor federated through Bridgy Fed's bsky.brid.gy
+// (or any *.brid.gy) is a Bluesky account, not a real fediverse one.
+function isBridgedBlueskyInstance(instance?: string): boolean {
+  return !!instance && /(^|\.)brid\.gy$/i.test(instance)
+}
+
 interface FediversePreview {
   actor_url: string
   preferred_username: string
@@ -100,6 +106,14 @@ export default function ConnectionsScreen() {
   const toggleFediShowInFeed = useMutation({
     mutationFn: ({ id, showInFeed }: { id: string; showInFeed: boolean }) => federationApi.toggleShowInFeed(id, showInFeed),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['fediverse-following'] }),
+  })
+  const migrateBridged = useMutation({
+    mutationFn: (id: string) => atprotoApi.migrateBridgedFollow(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fediverse-following'] })
+      qc.invalidateQueries({ queryKey: ['bluesky-following'] })
+    },
+    onError: (e: any) => Alert.alert('Could not migrate', e.response?.data?.error || 'Something went wrong.'),
   })
   const handleFediSearch = () => {
     const trimmed = fediHandle.trim()
@@ -259,7 +273,26 @@ export default function ConnectionsScreen() {
 
               {!!fediSearchError && <Text style={[s.error, { color: c.red }]}>{fediSearchError}</Text>}
 
-              {fediPreview && (
+              {/* AGORA-196: a Bluesky account bridged into the fediverse via
+                  Bridgy Fed should be followed natively instead — no
+                  "follow via bridge" option offered for it. */}
+              {fediPreview && isBridgedBlueskyInstance(fediPreview.instance) && (
+                <View style={[s.previewRow, { borderColor: c.border, backgroundColor: '#fef3c7' }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.previewName, { color: '#92400e' }]}>This is a Bluesky account</Text>
+                    <Text style={[s.previewSummary, { color: '#92400e', marginTop: 2 }]}>
+                      @{fediPreview.preferred_username} is a Bluesky account bridged into the fediverse — follow it natively from the Bluesky tab instead.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => { setTab('bluesky'); setBskyHandle(fediPreview.preferred_username); setFediPreview(null); setFediHandle('') }}
+                    style={[s.followBtn, { backgroundColor: c.primary }]}
+                  >
+                    <Text style={s.followBtnText}>Go to Bluesky</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {fediPreview && !isBridgedBlueskyInstance(fediPreview.instance) && (
                 <View style={[s.previewRow, { borderColor: c.border }]}>
                   <Avatar url={fediPreview.icon_url} name={fediPreview.name || fediPreview.preferred_username} size={44} />
                   <View style={{ flex: 1, marginLeft: 10 }}>
@@ -323,6 +356,15 @@ export default function ConnectionsScreen() {
                           <Ionicons name="time-outline" size={13} color={c.textMuted} />
                           <Text style={[s.pendingText, { color: c.textMuted }]}>Requested</Text>
                         </View>
+                      )}
+                      {f.accepted && isBridgedBlueskyInstance(f.instance) && (
+                        <TouchableOpacity
+                          onPress={() => migrateBridged.mutate(f.id)}
+                          disabled={migrateBridged.isPending}
+                          style={s.iconBtn}
+                        >
+                          <Ionicons name="cloud-outline" size={18} color={c.primary} />
+                        </TouchableOpacity>
                       )}
                       {f.accepted && f.user_id && (
                         <TouchableOpacity
