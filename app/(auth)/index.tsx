@@ -179,6 +179,13 @@ export default function LoginScreen() {
               >
                 {loading ? <ActivityIndicator color="white" /> : <Text style={s.btnText}>Sign in</Text>}
               </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: '/explore', params: { instanceUrl, instanceName } })}
+                style={{ alignItems: 'center', paddingVertical: 8, flexDirection: 'row', justifyContent: 'center', gap: 6 }}
+              >
+                <Ionicons name="compass-outline" size={16} color="#486581" />
+                <Text style={{ color: '#486581', fontSize: 14, fontWeight: '600' }}>Explore public posts</Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => { setStep('instance'); setShowCustomUrl(false) }} style={s.backBtn}>
                 <Text style={{ color: '#486581', fontSize: 14 }}>← Change server</Text>
               </TouchableOpacity>
