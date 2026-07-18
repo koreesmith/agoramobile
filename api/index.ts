@@ -277,6 +277,20 @@ export const adminApi = {
   deleteInvite:   (id: string)                   => api.delete(`/admin/invites/${id}`),
   // Audit log
   getAuditLog:    (page = 0)                     => api.get('/admin/audit-log', { params: { page } }),
+  // Federation (Agora-to-Agora peer instances)
+  listInstances:   ()                            => api.get('/admin/federation/instances'),
+  addInstance:     (domain: string)              => api.post('/admin/federation/instances', { domain }),
+  blockInstance:   (id: string)                  => api.post(`/admin/federation/instances/${id}/block`),
+  unblockInstance: (id: string)                  => api.post(`/admin/federation/instances/${id}/unblock`),
+  // Storage / orphaned media
+  scanOrphans:    ()                             => api.get('/admin/media/orphans'),
+  deleteOrphans:  ()                             => api.delete('/admin/media/orphans'),
+}
+
+// ── Admin: Page moderation ────────────────────────────────────────────────────
+export const adminPagesApi = {
+  verify:  (slug: string, verified: boolean) => api.patch(`/admin/pages/${slug}/verify`,  { verified }),
+  feature: (slug: string, featured: boolean) => api.patch(`/admin/pages/${slug}/feature`, { featured }),
 }
 
 // ── Pages ─────────────────────────────────────────────────────────────────────
