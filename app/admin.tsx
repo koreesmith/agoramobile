@@ -8,15 +8,16 @@ import { moderationApi, adminApi, waitlistApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
 
-type Tab = 'reports' | 'moderation' | 'users' | 'waitlist' | 'instances' | 'invites' | 'rules' | 'settings' | 'audit'
+type Tab = 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'invites' | 'rules' | 'settings' | 'audit'
 
 // GetSettings (internal/admin/admin.go) serializes every instance_settings
 // value as a string ("true"/"false", not a JSON boolean), so `typeof value
 // === 'boolean'` never fires. Listing the known boolean-shaped keys
 // explicitly lets the generic settings list render a real Switch for them
 // instead of a raw text input the admin has to type true/false into.
-// activitypub_enabled is deliberately excluded — it already gets its own
-// dedicated toggle above this list.
+// activitypub_enabled is deliberately excluded — it lives on the Fediverse
+// tab instead, alongside instance bans (parity with the web admin panel's
+// AGORA-178 consolidation).
 const BOOLEAN_SETTING_KEYS = new Set(['federation_enabled', 'smtp_enabled', 'user_invites_enabled'])
 
 export default function AdminScreen() {
@@ -77,13 +78,13 @@ export default function AdminScreen() {
   const { data: instanceBansData, isLoading: instanceBansLoading } = useQuery({
     queryKey: ['instance-bans'],
     queryFn: () => moderationApi.listInstanceBans().then(r => r.data),
-    enabled: tab === 'instances',
+    enabled: tab === 'fediverse',
   })
 
   const { data: settingsData, isLoading: settingsLoading } = useQuery({
     queryKey: ['admin-settings'],
     queryFn: () => adminApi.getSettings().then(r => r.data),
-    enabled: tab === 'settings',
+    enabled: tab === 'settings' || tab === 'fediverse',
   })
 
   const { data: rulesData, isLoading: rulesLoading } = useQuery({
@@ -264,7 +265,7 @@ export default function AdminScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={[s.tabBar, { backgroundColor: c.card, borderBottomColor: c.border }]}
         contentContainerStyle={{ flexDirection: 'row' }}>
-        {(['reports', 'moderation', 'users', 'waitlist', 'instances', 'invites', 'rules', 'settings', 'audit'] as Tab[]).map(t => (
+        {(['reports', 'moderation', 'users', 'waitlist', 'fediverse', 'invites', 'rules', 'settings', 'audit'] as Tab[]).map(t => (
           <TouchableOpacity key={t} onPress={() => setTab(t)}
             style={[s.tabItem, tab === t && { borderBottomColor: c.primary }]}>
             <Text style={[s.tabText, { color: tab === t ? c.primary : c.textMuted }]}>
@@ -588,9 +589,29 @@ export default function AdminScreen() {
         </ScrollView>
       )}
 
-      {/* Instances tab */}
-      {tab === 'instances' && (
+      {/* Fediverse tab (AGORA-178 parity): instance-wide ActivityPub toggle
+          + instance bans, the single enforced way to block a fediverse
+          instance (AGORA-177) — consolidated here instead of splitting the
+          toggle off into Settings. */}
+      {tab === 'fediverse' && (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+          {settingsLoading ? <Spinner /> : (
+            <View style={[s.card, { backgroundColor: c.card, borderColor: c.border, marginBottom: 16 }]}>
+              <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>Fediverse (ActivityPub)</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ color: c.textMd, fontSize: 12, flex: 1, marginRight: 8 }}>
+                  Let Mastodon and other fediverse apps discover, follow, and interact with users on this instance.
+                  Separate from Agora-to-Agora federation in Settings; users can also opt out individually in their own Settings.
+                </Text>
+                <Switch
+                  value={settings.activitypub_enabled !== 'false'}
+                  onValueChange={v => updateSettings.mutate({ activitypub_enabled: v ? 'true' : 'false' })}
+                  trackColor={{ false: c.border, true: c.primary }}
+                />
+              </View>
+            </View>
+          )}
+
           {/* Ban new instance form */}
           <View style={[s.actionSection, { borderColor: c.border, marginBottom: 16 }]}>
             <Text style={[s.actionSectionTitle, { color: c.textMuted }]}>Ban instance</Text>
@@ -763,20 +784,6 @@ export default function AdminScreen() {
           {settingsLoading ? <Spinner /> : (
             <View style={{ gap: 12 }}>
               <Text style={[s.sectionTitle, { color: c.textMuted }]}>Instance Settings</Text>
-              <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
-                <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>Fediverse (ActivityPub)</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={{ color: c.textMd, fontSize: 12, flex: 1, marginRight: 8 }}>
-                    Let Mastodon and other fediverse apps discover, follow, and interact with users on this instance.
-                    Separate from Agora-to-Agora federation below; users can also opt out individually in their own Settings.
-                  </Text>
-                  <Switch
-                    value={settings.activitypub_enabled !== 'false'}
-                    onValueChange={v => updateSettings.mutate({ activitypub_enabled: v ? 'true' : 'false' })}
-                    trackColor={{ false: c.border, true: c.primary }}
-                  />
-                </View>
-              </View>
               {Object.entries(settings).filter(([key]) => key !== 'activitypub_enabled').map(([key, value]: [string, any]) => (
                 <View key={key} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
                   <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>{key.replace(/_/g, ' ')}</Text>
