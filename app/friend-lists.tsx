@@ -12,7 +12,7 @@ import {
   RefreshControl,
   StyleSheet,
 } from 'react-native'
-import { Stack } from 'expo-router'
+import { Stack, router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Avatar, Spinner, EmptyState } from '../components/ui'
@@ -314,6 +314,13 @@ export default function FriendListsScreen() {
                 )}
               </View>
               <TouchableOpacity
+                onPress={() => router.push(`/list-feed/${item.id}`)}
+                style={s.viewFeedBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={[s.viewFeedText, { color: c.primary }]}>View feed</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 onPress={() => confirmDelete(item)}
                 style={s.deleteBtn}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -345,6 +352,8 @@ const s = StyleSheet.create({
   listName: { fontWeight: '600', fontSize: 15 },
   listMeta: { fontSize: 12, marginTop: 2 },
   deleteBtn: { padding: 4 },
+  viewFeedBtn: { paddingHorizontal: 6, paddingVertical: 4 },
+  viewFeedText: { fontSize: 12, fontWeight: '600' },
   // Modal
   modalContainer: { flex: 1 },
   modalHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
