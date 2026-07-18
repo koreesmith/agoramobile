@@ -54,6 +54,11 @@ export default function SettingsScreen() {
     onSuccess: () => updateUser({ fediverse_notifications_enabled: !(user as any)?.fediverse_notifications_enabled } as any),
   })
 
+  const toggleAtproto = useMutation({
+    mutationFn: () => usersApi.updateProfile({ atproto_enabled: !(user as any)?.atproto_enabled }),
+    onSuccess: () => updateUser({ atproto_enabled: !(user as any)?.atproto_enabled } as any),
+  })
+
   const MESSAGE_PERM_OPTIONS = [
     { label: 'Everyone', value: 'everyone' },
     { label: 'Friends only', value: 'friends' },
@@ -264,6 +269,13 @@ export default function SettingsScreen() {
         <Row icon="notifications-outline" label="Fediverse post notifications"
           right={<Switch value={(user as any)?.fediverse_notifications_enabled ?? true} onValueChange={() => toggleFediverseNotifications.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleFediverseNotifications.isPending} />} />
         <Row icon="people-outline" label="Manage fediverse follows" onPress={() => router.push('/connections?tab=fediverse' as any)} />
+        <Text style={[s.section, { color: c.textMuted }]}>Bluesky</Text>
+        <Text style={[s.sectionHint, { color: c.textMuted }]}>
+          Agora can also talk to Bluesky over AT Protocol, a separate network from the fediverse. Turning this on
+          lets people on Bluesky find, follow, and see your public posts.
+        </Text>
+        <Row icon="cloud-outline" label="Bluesky (AT Protocol)"
+          right={<Switch value={(user as any)?.atproto_enabled ?? true} onValueChange={() => toggleAtproto.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleAtproto.isPending} />} />
         <Text style={[s.section, { color: c.textMuted }]}>Data</Text>
         <Row icon="download-outline" label={exportLoading ? 'Exporting…' : 'Export my data'} onPress={exportData} />
         <Row icon="refresh-circle-outline" label="Reset feed history" onPress={() =>
