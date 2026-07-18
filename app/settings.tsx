@@ -203,7 +203,6 @@ export default function SettingsScreen() {
         <Text style={[s.section, { color: c.textMuted }]}>Account</Text>
         <Row icon="person-outline" label="Edit profile" onPress={() => router.push('/edit-profile')} />
         <Row icon="people-outline" label="Friend lists" onPress={() => router.push('/friend-lists')} />
-        <Row icon="planet-outline" label="Fediverse" onPress={() => router.push('/fediverse')} />
         <Row icon="mail-outline" label="Change email" onPress={() => setSection('email')} />
         <Row icon="key-outline" label="Change password" onPress={() => setSection('password')} />
         {invitesEnabled && (
@@ -239,10 +238,6 @@ export default function SettingsScreen() {
           right={<Switch value={!!(user as any)?.hide_timeline} onValueChange={() => toggleHideTimeline.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleHideTimeline.isPending} />} />
         <Row icon="checkmark-circle-outline" label="Approve wall posts"
           right={<Switch value={!!(user as any)?.approve_wall_posts} onValueChange={() => toggleApproveWallPosts.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleApproveWallPosts.isPending} />} />
-        <Row icon="planet-outline" label="Fediverse (ActivityPub)"
-          right={<Switch value={(user as any)?.activitypub_enabled ?? true} onValueChange={() => toggleActivityPub.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleActivityPub.isPending} />} />
-        <Row icon="notifications-outline" label="Fediverse post notifications"
-          right={<Switch value={(user as any)?.fediverse_notifications_enabled ?? true} onValueChange={() => toggleFediverseNotifications.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleFediverseNotifications.isPending} />} />
         <View style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
           <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
             <Ionicons name="chatbubble-ellipses-outline" size={18} color={c.primary} />
@@ -259,6 +254,16 @@ export default function SettingsScreen() {
             ))}
           </View>
         </View>
+        <Text style={[s.section, { color: c.textMuted }]}>Fediverse</Text>
+        <Text style={[s.sectionHint, { color: c.textMuted }]}>
+          Agora can talk to Mastodon and the rest of the fediverse over ActivityPub. Turning this on lets people
+          out there find, follow, and see your public posts. Private and friends-only posts are never federated.
+        </Text>
+        <Row icon="planet-outline" label="Fediverse (ActivityPub)"
+          right={<Switch value={(user as any)?.activitypub_enabled ?? true} onValueChange={() => toggleActivityPub.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleActivityPub.isPending} />} />
+        <Row icon="notifications-outline" label="Fediverse post notifications"
+          right={<Switch value={(user as any)?.fediverse_notifications_enabled ?? true} onValueChange={() => toggleFediverseNotifications.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleFediverseNotifications.isPending} />} />
+        <Row icon="people-outline" label="Manage fediverse follows" onPress={() => router.push('/connections?tab=fediverse' as any)} />
         <Text style={[s.section, { color: c.textMuted }]}>Data</Text>
         <Row icon="download-outline" label={exportLoading ? 'Exporting…' : 'Export my data'} onPress={exportData} />
         <Row icon="refresh-circle-outline" label="Reset feed history" onPress={() =>
@@ -307,6 +312,7 @@ export default function SettingsScreen() {
 
 const s = StyleSheet.create({
   section: { fontSize: 11, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 6 },
+  sectionHint: { fontSize: 12, lineHeight: 17, paddingHorizontal: 16, paddingBottom: 10 },
   themeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
   themePicker: { flexDirection: 'row', borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
   themeOption: { paddingHorizontal: 12, paddingVertical: 6 },
