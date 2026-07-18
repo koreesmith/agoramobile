@@ -133,6 +133,7 @@ export default function ConnectionsScreen() {
     enabled: tab === 'bluesky',
   })
   const bskyFollowing: any[] = bskyFollowingData?.following ?? []
+  const atprotoNotificationsEnabled = (user as any)?.atproto_notifications_enabled ?? true
 
   const resolveBskyHandle = useMutation({
     mutationFn: (h: string) => atprotoApi.resolveBlueskyHandle(h).then(r => r.data),
@@ -150,6 +151,10 @@ export default function ConnectionsScreen() {
   })
   const unfollowBsky = useMutation({
     mutationFn: (id: string) => atprotoApi.unfollowBlueskyAccount(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bluesky-following'] }),
+  })
+  const toggleBskyNotify = useMutation({
+    mutationFn: ({ id, notify }: { id: string; notify: boolean }) => atprotoApi.toggleFollowNotify(id, notify),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['bluesky-following'] }),
   })
   const handleBskySearch = () => {
@@ -505,6 +510,17 @@ export default function ConnectionsScreen() {
                         </View>
                       </View>
                       <TouchableOpacity
+                        onPress={() => toggleBskyNotify.mutate({ id: f.id, notify: !f.notify })}
+                        disabled={toggleBskyNotify.isPending || !atprotoNotificationsEnabled}
+                        style={s.iconBtn}
+                      >
+                        <Ionicons
+                          name={f.notify ? 'notifications' : 'notifications-off-outline'}
+                          size={18}
+                          color={f.notify && atprotoNotificationsEnabled ? c.primary : c.textLight}
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
                         onPress={() => unfollowBsky.mutate(f.id)}
                         disabled={unfollowBsky.isPending}
                         style={s.iconBtn}
@@ -514,6 +530,11 @@ export default function ConnectionsScreen() {
                     </View>
                   ))}
                 </View>
+              )}
+              {!atprotoNotificationsEnabled && bskyFollowing.length > 0 && (
+                <Text style={[s.hintText, { color: c.textMuted }]}>
+                  Bluesky post notifications are off globally — turn them on in Settings → Bluesky to use per-account notify toggles.
+                </Text>
               )}
             </View>
 
