@@ -26,6 +26,8 @@ interface FollowingEntry {
   actor_url: string
   accepted: boolean
   notify: boolean
+  show_in_feed: boolean
+  user_id?: string
   username?: string
   display_name?: string
   avatar_url?: string
@@ -93,6 +95,10 @@ export default function ConnectionsScreen() {
   })
   const toggleFediNotify = useMutation({
     mutationFn: ({ id, notify }: { id: string; notify: boolean }) => federationApi.toggleFollowNotify(id, notify),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['fediverse-following'] }),
+  })
+  const toggleFediShowInFeed = useMutation({
+    mutationFn: ({ id, showInFeed }: { id: string; showInFeed: boolean }) => federationApi.toggleShowInFeed(id, showInFeed),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['fediverse-following'] }),
   })
   const handleFediSearch = () => {
@@ -245,6 +251,11 @@ export default function ConnectionsScreen() {
 
             <View style={[s.card, { backgroundColor: c.card }]}>
               <Text style={[s.cardTitle, { color: c.text }]}>Your follows</Text>
+              {following.length > 0 && (
+                <Text style={[s.cardSubtitle, { color: c.textMuted, marginTop: 2 }]}>
+                  Add to a friend list, show in your main feed (off by default), or get notified on new posts.
+                </Text>
+              )}
               {following.length === 0 ? (
                 <Text style={[s.emptyText, { color: c.textMuted, borderColor: c.border }]}>
                   You're not following anyone on the fediverse yet.
@@ -275,6 +286,27 @@ export default function ConnectionsScreen() {
                           <Ionicons name="time-outline" size={13} color={c.textMuted} />
                           <Text style={[s.pendingText, { color: c.textMuted }]}>Requested</Text>
                         </View>
+                      )}
+                      {f.accepted && f.user_id && (
+                        <TouchableOpacity
+                          onPress={() => router.push('/friend-lists' as any)}
+                          style={s.iconBtn}
+                        >
+                          <Ionicons name="list-outline" size={18} color={c.textLight} />
+                        </TouchableOpacity>
+                      )}
+                      {f.accepted && (
+                        <TouchableOpacity
+                          onPress={() => toggleFediShowInFeed.mutate({ id: f.id, showInFeed: !f.show_in_feed })}
+                          disabled={toggleFediShowInFeed.isPending}
+                          style={s.iconBtn}
+                        >
+                          <Ionicons
+                            name={f.show_in_feed ? 'home' : 'home-outline'}
+                            size={18}
+                            color={f.show_in_feed ? c.primary : c.textLight}
+                          />
+                        </TouchableOpacity>
                       )}
                       {f.accepted && (
                         <TouchableOpacity

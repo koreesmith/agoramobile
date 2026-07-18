@@ -16,7 +16,8 @@ import { Stack } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Avatar, Spinner, EmptyState } from '../components/ui'
-import { friendsApi } from '../api'
+import { friendsApi, federationApi } from '../api'
+import { handle } from '../utils/handle'
 import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
 
@@ -32,6 +33,8 @@ interface Friend {
   username: string
   display_name?: string
   avatar_url?: string
+  is_remote?: boolean
+  remote_instance?: string
 }
 
 // ── Member Detail Modal ───────────────────────────────────────────────────────
@@ -59,10 +62,23 @@ function MemberDetailModal({
     enabled: !!list?.id && visible,
   })
 
+  // AGORA-182: an accepted fediverse follow (with a resolved cached user
+  // row) can join a list too, same as a friend — merged here so the rest of
+  // this modal doesn't need to know there are two underlying relationship
+  // types.
+  const { data: followingData, isLoading: followingLoading } = useQuery({
+    queryKey: ['fediverse-following'],
+    queryFn: () => federationApi.listFollowing().then(r => r.data),
+    enabled: !!list?.id && visible,
+  })
+
   const members: Friend[] = membersData?.members || []
   const allFriends: Friend[] = friendsData?.friends || []
+  const fediverseConnections: Friend[] = (followingData?.following || [])
+    .filter((f: any) => f.accepted && f.user_id)
+    .map((f: any) => ({ id: f.user_id, username: f.username, display_name: f.display_name, avatar_url: f.avatar_url, is_remote: true, remote_instance: f.instance }))
   const memberIds = new Set(members.map(m => m.id))
-  const addableFriends = allFriends.filter(f => !memberIds.has(f.id))
+  const addableFriends = [...allFriends, ...fediverseConnections].filter(f => !memberIds.has(f.id))
 
   const removeMember = useMutation({
     mutationFn: (friendId: string) => friendsApi.removeFriendFromList(list!.id, friendId),
@@ -93,7 +109,7 @@ function MemberDetailModal({
     )
   }
 
-  const isLoading = membersLoading || friendsLoading
+  const isLoading = membersLoading || friendsLoading || followingLoading
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -126,7 +142,7 @@ function MemberDetailModal({
                     <Avatar url={item.avatar_url} name={item.display_name || item.username} size={40} />
                     <View style={{ flex: 1 }}>
                       <Text style={[s.friendName, { color: c.text }]}>{item.display_name || item.username}</Text>
-                      <Text style={[s.friendUsername, { color: c.textMuted }]}>@{item.username}</Text>
+                      <Text style={[s.friendUsername, { color: c.textMuted }]}>{handle(item.username, item.is_remote, item.remote_instance)}</Text>
                     </View>
                     <TouchableOpacity
                       onPress={() => confirmRemove(item)}
@@ -150,13 +166,13 @@ function MemberDetailModal({
             ListFooterComponent={
               addableFriends.length > 0 ? (
                 <>
-                  <Text style={[s.sectionLabel, { color: c.textMuted }]}>Add friends</Text>
+                  <Text style={[s.sectionLabel, { color: c.textMuted }]}>Add people</Text>
                   {addableFriends.map(f => (
                     <View key={f.id} style={[s.friendRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
                       <Avatar url={f.avatar_url} name={f.display_name || f.username} size={40} />
                       <View style={{ flex: 1 }}>
                         <Text style={[s.friendName, { color: c.text }]}>{f.display_name || f.username}</Text>
-                        <Text style={[s.friendUsername, { color: c.textMuted }]}>@{f.username}</Text>
+                        <Text style={[s.friendUsername, { color: c.textMuted }]}>{handle(f.username, f.is_remote, f.remote_instance)}</Text>
                       </View>
                       <TouchableOpacity
                         onPress={() => addMember.mutate(f.id)}
