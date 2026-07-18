@@ -227,6 +227,14 @@ export const federationApi = {
   toggleShowInFeed:         (id: string, showInFeed: boolean) => api.put(`/federation/follow/${id}/show-in-feed`, { show_in_feed: showInFeed }),
 }
 
+// ── AT Proto / Bluesky ─────────────────────────────────────────────────────
+export const atprotoApi = {
+  resolveBlueskyHandle:   (handle: string) => api.get('/atproto/lookup', { params: { handle } }),
+  followBlueskyAccount:   (actor: string)  => api.post('/atproto/follow', { actor }),
+  unfollowBlueskyAccount: (id: string)     => api.delete(`/atproto/follow/${id}`),
+  listBlueskyFollowing:   ()               => api.get('/atproto/following'),
+}
+
 // ── Instance rules ────────────────────────────────────────────────────────────
 export const rulesApi = {
   list: () => api.get('/instance/rules'),

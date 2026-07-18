@@ -276,6 +276,7 @@ export default function SettingsScreen() {
         </Text>
         <Row icon="cloud-outline" label="Bluesky (AT Protocol)"
           right={<Switch value={(user as any)?.atproto_enabled ?? true} onValueChange={() => toggleAtproto.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleAtproto.isPending} />} />
+        <Row icon="people-outline" label="Manage Bluesky follows" onPress={() => router.push('/connections?tab=bluesky' as any)} />
         <Text style={[s.section, { color: c.textMuted }]}>Data</Text>
         <Row icon="download-outline" label={exportLoading ? 'Exporting…' : 'Export my data'} onPress={exportData} />
         <Row icon="refresh-circle-outline" label="Reset feed history" onPress={() =>
