@@ -8,7 +8,7 @@ import { moderationApi, adminApi, waitlistApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
 
-type Tab = 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'invites' | 'rules' | 'settings' | 'audit'
+type Tab = 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'invites' | 'rules' | 'settings' | 'audit'
 
 // GetSettings (internal/admin/admin.go) serializes every instance_settings
 // value as a string ("true"/"false", not a JSON boolean), so `typeof value
@@ -84,7 +84,7 @@ export default function AdminScreen() {
   const { data: settingsData, isLoading: settingsLoading } = useQuery({
     queryKey: ['admin-settings'],
     queryFn: () => adminApi.getSettings().then(r => r.data),
-    enabled: tab === 'settings' || tab === 'fediverse',
+    enabled: tab === 'settings' || tab === 'fediverse' || tab === 'bluesky',
   })
 
   const { data: rulesData, isLoading: rulesLoading } = useQuery({
@@ -265,7 +265,7 @@ export default function AdminScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={[s.tabBar, { backgroundColor: c.card, borderBottomColor: c.border }]}
         contentContainerStyle={{ flexDirection: 'row' }}>
-        {(['reports', 'moderation', 'users', 'waitlist', 'fediverse', 'invites', 'rules', 'settings', 'audit'] as Tab[]).map(t => (
+        {(['reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'invites', 'rules', 'settings', 'audit'] as Tab[]).map(t => (
           <TouchableOpacity key={t} onPress={() => setTab(t)}
             style={[s.tabItem, tab === t && { borderBottomColor: c.primary }]}>
             <Text style={[s.tabText, { color: tab === t ? c.primary : c.textMuted }]}>
@@ -650,6 +650,30 @@ export default function AdminScreen() {
               </View>
             </View>
           ))}
+        </ScrollView>
+      )}
+
+      {/* Bluesky tab (AGORA-193 parity): instance-wide AT Proto toggle,
+          independent of the ActivityPub toggle above. */}
+      {tab === 'bluesky' && (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+          {settingsLoading ? <Spinner /> : (
+            <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>Bluesky (AT Protocol)</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ color: c.textMd, fontSize: 12, flex: 1, marginRight: 8 }}>
+                  Let this instance act as a Bluesky PDS — federating public posts over AT Protocol and being
+                  discoverable/followable from Bluesky. Independent of the Fediverse toggle; users can also opt out
+                  individually in their own Settings.
+                </Text>
+                <Switch
+                  value={settings.atproto_enabled === 'true'}
+                  onValueChange={v => updateSettings.mutate({ atproto_enabled: v ? 'true' : 'false' })}
+                  trackColor={{ false: c.border, true: c.primary }}
+                />
+              </View>
+            </View>
+          )}
         </ScrollView>
       )}
       {/* Invites tab (AMOBILE-69) */}
