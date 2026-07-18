@@ -31,8 +31,8 @@ export function Avatar({ url, name, size = 40, online }: { url?: string; name?: 
 // The fediverse-mention alternative must come before the bare-local one so a
 // full remote handle is captured as one token rather than just its @handle
 // portion (AGORA-163 hit the equivalent ordering bug server-side).
-const LINK_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+|@[a-zA-Z0-9_]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+|@[a-zA-Z0-9_-]+|\+[a-zA-Z0-9_-]+)/g
-const MENTION_RE = /^@[a-zA-Z0-9_-]+$|^@[a-zA-Z0-9_]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+$/
+const LINK_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+|@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+|@[a-zA-Z0-9_-]+|\+[a-zA-Z0-9_-]+)/g
+const MENTION_RE = /^@[a-zA-Z0-9_-]+$|^@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+$/
 const GROUP_TAG_RE = /^\+[a-zA-Z0-9_-]+$/
 const URL_PART_RE = /^https?:\/\//i
 
