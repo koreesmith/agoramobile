@@ -8,7 +8,7 @@ import { moderationApi, adminApi, waitlistApi, pagesApi, adminPagesApi } from '.
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
 
-type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'federation' | 'invites' | 'rules' | 'settings' | 'audit' | 'pages' | 'media'
+type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'federation' | 'relays' | 'invites' | 'rules' | 'settings' | 'audit' | 'pages' | 'media'
 
 // GetSettings (internal/admin/admin.go) serializes every instance_settings
 // value as a string ("true"/"false", not a JSON boolean), so `typeof value
@@ -42,6 +42,7 @@ export default function AdminScreen() {
   const [newInviteCreated, setNewInviteCreated] = useState<string | null>(null)
   const [auditPage, setAuditPage] = useState(0)
   const [fedDomain, setFedDomain] = useState('')
+  const [relayInboxUrl, setRelayInboxUrl] = useState('')
   const [orphanScan, setOrphanScan] = useState<{ count: number; total_bytes: number; orphans: { path: string; size: number; mod_time: string }[] } | null>(null)
   const [orphanScanning, setOrphanScanning] = useState(false)
 
@@ -108,6 +109,12 @@ export default function AdminScreen() {
     queryKey: ['admin-fed'],
     queryFn: () => adminApi.listInstances().then(r => r.data),
     enabled: tab === 'federation',
+  })
+
+  const { data: relaysData, isLoading: relaysLoading } = useQuery({
+    queryKey: ['admin-relays'],
+    queryFn: () => adminApi.listRelays().then(r => r.data),
+    enabled: tab === 'relays',
   })
 
   const { data: adminPagesData, isLoading: adminPagesLoading } = useQuery({
@@ -257,6 +264,27 @@ export default function AdminScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-fed'] }),
   })
 
+  const addRelay = useMutation({
+    mutationFn: (inboxUrl: string) => adminApi.addRelay(inboxUrl),
+    onSuccess: () => { setRelayInboxUrl(''); qc.invalidateQueries({ queryKey: ['admin-relays'] }) },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not add relay'),
+  })
+
+  const enableRelay = useMutation({
+    mutationFn: (id: string) => adminApi.enableRelay(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-relays'] }),
+  })
+
+  const disableRelay = useMutation({
+    mutationFn: (id: string) => adminApi.disableRelay(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-relays'] }),
+  })
+
+  const deleteRelay = useMutation({
+    mutationFn: (id: string) => adminApi.deleteRelay(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-relays'] }),
+  })
+
   const verifyPage = useMutation({
     mutationFn: ({ slug, v }: { slug: string; v: boolean }) => adminPagesApi.verify(slug, v),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-pages'] }),
@@ -351,6 +379,7 @@ export default function AdminScreen() {
   const settings: any = settingsData || {}
   const stats: any = statsData || {}
   const fedInstances: any[] = fedData?.instances || []
+  const relays: any[] = relaysData?.relays || []
   const adminPages: any[] = adminPagesData?.pages || []
 
   return (
@@ -365,7 +394,7 @@ export default function AdminScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={[s.tabBar, { backgroundColor: c.card, borderBottomColor: c.border }]}
         contentContainerStyle={{ flexDirection: 'row' }}>
-        {(['overview', 'reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'federation', 'invites', 'rules', 'settings', 'audit', 'pages', 'media'] as Tab[]).map(t => (
+        {(['overview', 'reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'federation', 'relays', 'invites', 'rules', 'settings', 'audit', 'pages', 'media'] as Tab[]).map(t => (
           <TouchableOpacity key={t} onPress={() => setTab(t)}
             style={[s.tabItem, tab === t && { borderBottomColor: c.primary }]}>
             <Text style={[s.tabText, { color: tab === t ? c.primary : c.textMuted }]}>
@@ -911,6 +940,84 @@ export default function AdminScreen() {
               </View>
             </View>
           ))}
+        </ScrollView>
+      )}
+
+      {/* Relays tab (AMOBILE-134): mirrors Mastodon's own admin Relays
+          screen and web's parallel implementation (AGORA-223) — a relay is
+          entered by its inbox URL directly, matching the AGORA-220 backend
+          design (no client-side actor resolution). */}
+      {tab === 'relays' && (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+          <View style={[s.actionSection, { borderColor: c.border, marginBottom: 16 }]}>
+            <Text style={[s.actionSectionTitle, { color: c.textMuted }]}>Add new relay</Text>
+            <Text style={{ color: c.textMd, fontSize: 12 }}>
+              A federation relay is an intermediary server that exchanges large volumes of public posts between
+              servers that subscribe and publish to it. It can help small and medium servers discover content
+              from the fediverse, which would otherwise require local users manually following other people on
+              remote servers.
+            </Text>
+            <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
+              placeholder="https://relay.example.com/inbox" placeholderTextColor={c.textLight}
+              autoCapitalize="none" keyboardType="url"
+              value={relayInboxUrl} onChangeText={setRelayInboxUrl} />
+            <TouchableOpacity
+              disabled={!relayInboxUrl.trim() || addRelay.isPending}
+              onPress={() => addRelay.mutate(relayInboxUrl.trim())}
+              style={[s.actionBtn, { backgroundColor: c.primary, opacity: !relayInboxUrl.trim() ? 0.5 : 1 }]}>
+              <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>
+                {addRelay.isPending ? 'Requesting…' : 'Add new relay'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[s.sectionTitle, { color: c.textMuted }]}>Relays</Text>
+          {relaysLoading ? <Spinner /> : relays.length === 0 ? (
+            <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>No relays yet.</Text>
+          ) : relays.map((relay: any) => {
+            const statusLabel: Record<string, string> = {
+              enabled: '✓ Enabled', pending: '⏳ Pending', disabled: 'Disabled', rejected: 'Rejected',
+            }
+            const statusColor: Record<string, string> = {
+              enabled: '#15803d', pending: '#a16207', disabled: c.textMuted, rejected: '#dc2626',
+            }
+            const statusBg: Record<string, string> = {
+              enabled: '#dcfce7', pending: '#fef9c3', disabled: c.bg, rejected: '#fee2e2',
+            }
+            return (
+              <View key={relay.id} style={[s.card, { backgroundColor: c.card, borderColor: c.border, opacity: relay.status === 'enabled' ? 1 : 0.7 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontFamily: 'monospace', color: c.text }} numberOfLines={1}>{relay.inbox_url}</Text>
+                    <View style={[s.violationBadge, { backgroundColor: statusBg[relay.status] || c.bg, marginTop: 4 }]}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: statusColor[relay.status] || c.textMuted }}>
+                        {statusLabel[relay.status] || relay.status}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                  {relay.status === 'enabled'
+                    ? <TouchableOpacity onPress={() => disableRelay.mutate(relay.id)}
+                        style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
+                        <Text style={{ fontSize: 12, color: c.textMd }}>Disable</Text>
+                      </TouchableOpacity>
+                    : <TouchableOpacity onPress={() => enableRelay.mutate(relay.id)}
+                        style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
+                        <Text style={{ fontSize: 12, color: '#15803d' }}>Enable</Text>
+                      </TouchableOpacity>}
+                  <TouchableOpacity
+                    onPress={() => Alert.alert('Remove relay?', relay.inbox_url, [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Delete', style: 'destructive', onPress: () => deleteRelay.mutate(relay.id) },
+                    ])}
+                    style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
+                    <Text style={{ fontSize: 12, color: c.red }}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )
+          })}
         </ScrollView>
       )}
 
