@@ -264,6 +264,12 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const [showMenu, setShowMenu] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [shareContent, setShareContent] = useState('')
+  const [shareVisibility, setShareVisibility] = useState<'public'|'friends'|'group'>('friends')
+  const [shareFriendListId, setShareFriendListId] = useState('')
+  const [showShareVisibilitySheet, setShowShareVisibilitySheet] = useState(false)
+  const [showShareListSheet, setShowShareListSheet] = useState(false)
+  const [showShareCW, setShowShareCW] = useState(false)
+  const [shareCW, setShareCW] = useState('')
   const [showEdit, setShowEdit] = useState(false)
   const [editContent, setEditContent] = useState(post.content || '')
   const [editCW, setEditCW] = useState(post.content_warning || '')
@@ -279,10 +285,11 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   const { data: friendListsData } = useQuery({
     queryKey: ['friend-lists'],
     queryFn: () => friendsApi.listFriendLists().then(r => r.data),
-    enabled: showEdit,
+    enabled: showEdit || showShare,
   })
   const editFriendLists: any[] = friendListsData?.groups || []
   const selectedEditFriendList = editFriendLists.find((g: any) => g.id === editFriendListId)
+  const selectedShareFriendList = editFriendLists.find((g: any) => g.id === shareFriendListId)
 
   const invalidate = () => qc.invalidateQueries({ queryKey })
 
@@ -297,13 +304,25 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   reactMutateRef.current = (vars) => react.mutate(vars)
 
   const repost = useMutation({
-    mutationFn: () => feedApi.repostPost(post.id, { content: shareContent, visibility: 'friends' }),
+    mutationFn: () => feedApi.repostPost(post.id, {
+      content: shareContent,
+      visibility: shareVisibility,
+      group_id: shareVisibility === 'group' ? shareFriendListId : undefined,
+      content_warning: showShareCW && shareCW.trim() ? shareCW.trim() : '',
+    }),
     onSuccess: () => {
-      setShowShare(false); setShareContent(''); trackInteraction('repost', post.id); invalidate()
+      closeShareModal(); trackInteraction('repost', post.id); invalidate()
       showToast('Shared!')
     },
     onError: (e: any) => showToast(e.response?.data?.error || 'Could not share post', 'error'),
   })
+
+  const closeShareModal = () => {
+    setShowShare(false); setShareContent('')
+    setShareVisibility('friends'); setShareFriendListId('')
+    setShowShareVisibilitySheet(false); setShowShareListSheet(false)
+    setShowShareCW(false); setShareCW('')
+  }
   const del    = useMutation({ mutationFn: () => feedApi.deletePost(post.id), onSuccess: invalidate })
   const edit   = useMutation({
     mutationFn: () => feedApi.editPost(post.id, {
@@ -891,22 +910,111 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
       </Modal>
 
       {/* ── Share modal ───────────────────────────────────────────── */}
-      <Modal visible={showShare} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowShare(false)}>
+      <Modal visible={showShare} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeShareModal}>
         <View style={[s.editModal, { backgroundColor: c.card }]}>
           <View style={[s.editHeader, { borderBottomColor: c.border }]}>
-            <TouchableOpacity onPress={() => { setShowShare(false); setShareContent('') }}>
+            <TouchableOpacity onPress={closeShareModal}>
               <Text style={{ fontSize: 16, color: c.textMuted }}>Cancel</Text>
             </TouchableOpacity>
             <Text style={[s.editTitle, { color: c.text }]}>Share post</Text>
             <TouchableOpacity
               onPress={() => repost.mutate()}
-              disabled={repost.isPending}
-              style={[s.editSaveBtn, repost.isPending && { backgroundColor: c.primaryLt }]}
+              disabled={repost.isPending || (shareVisibility === 'group' && !shareFriendListId) || (showShareCW && !shareCW.trim())}
+              style={[s.editSaveBtn, (repost.isPending || (shareVisibility === 'group' && !shareFriendListId) || (showShareCW && !shareCW.trim())) && { backgroundColor: c.primaryLt }]}
             >
               <Text style={s.editSaveBtnText}>{repost.isPending ? '…' : 'Share'}</Text>
             </TouchableOpacity>
           </View>
+
+          {/* AGORA-226: audience row, mirroring the edit modal's own */}
+          <TouchableOpacity
+            onPress={() => setShowShareVisibilitySheet(v => !v)}
+            style={[s.editAudienceRow, { borderBottomColor: c.border, backgroundColor: c.card }]}
+          >
+            <Ionicons
+              name={shareVisibility === 'public' ? 'globe-outline' : shareVisibility === 'group' ? 'people-outline' : 'person-outline'}
+              size={15}
+              color={c.primary}
+            />
+            <Text style={[s.editAudienceLabel, { color: c.primary }]}>
+              {shareVisibility === 'public' ? 'Public' : shareVisibility === 'group' ? (selectedShareFriendList?.name || 'Select a list…') : 'Friends'}
+            </Text>
+            <Ionicons name={showShareVisibilitySheet ? 'chevron-up' : 'chevron-down'} size={13} color={c.textMuted} style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
+
+          {showShareVisibilitySheet && (
+            <View style={[s.editInlinePicker, { backgroundColor: c.bg, borderBottomColor: c.border }]}>
+              {[
+                { value: 'public',  icon: 'globe-outline',  label: 'Public',      desc: 'Anyone on Agora' },
+                { value: 'friends', icon: 'person-outline', label: 'Friends',     desc: 'Only your friends' },
+                { value: 'group',   icon: 'people-outline', label: 'Friend List', desc: 'Pick a specific list' },
+              ].map(opt => (
+                <TouchableOpacity
+                  key={opt.value}
+                  onPress={() => {
+                    setShareVisibility(opt.value as any)
+                    if (opt.value !== 'group') setShareFriendListId('')
+                    setShowShareVisibilitySheet(false)
+                    if (opt.value === 'group') setShowShareListSheet(true)
+                  }}
+                  style={[s.editInlineOption, { borderBottomColor: c.border, backgroundColor: shareVisibility === opt.value ? c.primaryBg : 'transparent' }]}
+                >
+                  <Ionicons name={opt.icon as any} size={18} color={shareVisibility === opt.value ? c.primary : c.textMuted} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '500', color: shareVisibility === opt.value ? c.primary : c.text }}>{opt.label}</Text>
+                    <Text style={{ fontSize: 12, color: c.textMuted }}>{opt.desc}</Text>
+                  </View>
+                  {shareVisibility === opt.value && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {showShareListSheet && shareVisibility === 'group' && (
+            <View style={[s.editInlinePicker, { backgroundColor: c.bg, borderBottomColor: c.border }]}>
+              <TouchableOpacity onPress={() => setShowShareListSheet(false)} style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+                <Text style={{ fontSize: 12, color: c.textMuted }}>← Back to audience</Text>
+              </TouchableOpacity>
+              {editFriendLists.length === 0 ? (
+                <View style={{ padding: 16, alignItems: 'center' }}>
+                  <Text style={{ color: c.textMuted, fontSize: 13, textAlign: 'center' }}>
+                    No friend lists yet. Create one in the Friends tab.
+                  </Text>
+                </View>
+              ) : (
+                editFriendLists.map((g: any) => (
+                  <TouchableOpacity
+                    key={g.id}
+                    onPress={() => { setShareFriendListId(g.id); setShowShareListSheet(false) }}
+                    style={[s.editInlineOption, { borderBottomColor: c.border, backgroundColor: shareFriendListId === g.id ? c.primaryBg : 'transparent' }]}
+                  >
+                    <Ionicons name="people-outline" size={18} color={shareFriendListId === g.id ? c.primary : c.textMuted} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '500', color: shareFriendListId === g.id ? c.primary : c.text }}>{g.name}</Text>
+                      <Text style={{ fontSize: 12, color: c.textMuted }}>{g.member_count ?? 0} friends</Text>
+                    </View>
+                    {shareFriendListId === g.id && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          )}
+
           <View style={{ padding: 16 }}>
+            {/* AGORA-225: trigger warning for the sharer's own commentary */}
+            {showShareCW && (
+              <View style={{ borderWidth: 1, borderColor: '#fcd34d', backgroundColor: '#fffbeb', borderRadius: 10, padding: 10, marginBottom: 12 }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>⚠️ Trigger warning</Text>
+                <TextInput
+                  style={{ fontSize: 14, color: '#92400e', padding: 0 }}
+                  value={shareCW}
+                  onChangeText={setShareCW}
+                  placeholder="e.g. spoilers, violence…"
+                  placeholderTextColor="#d97706"
+                  returnKeyType="done"
+                />
+              </View>
+            )}
             <TextInput
               style={[s.editInput, { color: c.text, borderColor: c.border }]}
               value={shareContent}
@@ -916,6 +1024,12 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               placeholderTextColor={c.textLight}
               placeholder="Say something about this… (optional)"
             />
+            <TouchableOpacity
+              onPress={() => setShowShareCW(v => !v)}
+              style={[s.editCWBtn, { borderColor: showShareCW ? '#fcd34d' : c.border, backgroundColor: showShareCW ? '#fef3c7' : 'transparent' }]}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '600', color: showShareCW ? '#92400e' : c.textMuted }}>TW</Text>
+            </TouchableOpacity>
             {/* Preview of post being shared */}
             <View style={[s.sharePreview, { borderColor: c.border, backgroundColor: c.bg }]}>
               <Text style={[s.sharePreviewAuthor, { color: c.text }]}>
@@ -929,9 +1043,6 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 </Text>
               ) : null}
             </View>
-            <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 8 }}>
-              This will be shared with your friends.
-            </Text>
           </View>
         </View>
       </Modal>
