@@ -6,3 +6,6 @@ node_modules/
 
 # Google Play service account key — never commit this
 google-play-service-account.json
+
+# GCP/Firebase service account keys used for Google builds — never commit these
+agora-*.json
