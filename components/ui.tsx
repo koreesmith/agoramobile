@@ -31,9 +31,10 @@ export function Avatar({ url, name, size = 40, online }: { url?: string; name?: 
 // The fediverse-mention alternative must come before the bare-local one so a
 // full remote handle is captured as one token rather than just its @handle
 // portion (AGORA-163 hit the equivalent ordering bug server-side).
-const LINK_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+|@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+|@[a-zA-Z0-9_-]+|\+[a-zA-Z0-9_-]+)/g
+const LINK_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+|@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+|@[a-zA-Z0-9_-]+|\+[a-zA-Z0-9_-]+|#[a-zA-Z0-9_]+)/g
 const MENTION_RE = /^@[a-zA-Z0-9_-]+$|^@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+$/
 const GROUP_TAG_RE = /^\+[a-zA-Z0-9_-]+$/
+const HASHTAG_RE = /^#[a-zA-Z0-9_]+$/
 const URL_PART_RE = /^https?:\/\//i
 
 /** Renders a string with URLs, @mentions, and +group-slug tags as tappable
@@ -57,6 +58,16 @@ export function LinkedText({ text, style, linkStyle }: { text: string; style?: o
           return (
             <Text key={i} style={[{ color: '#3b82f6', fontWeight: '600' }, linkStyle]}
               onPress={() => router.push(`/group/${part.slice(1)}` as any)}>
+              {part}
+            </Text>
+          )
+        }
+        // AGORA-217: #hashtag jumps into the unified search screen, posts
+        // tab, pre-filled with the tag — mirrors web's renderContent().
+        if (HASHTAG_RE.test(part)) {
+          return (
+            <Text key={i} style={[{ color: '#3b82f6', fontWeight: '600' }, linkStyle]}
+              onPress={() => router.push(`/search?tab=posts&q=${encodeURIComponent(part)}` as any)}>
               {part}
             </Text>
           )
