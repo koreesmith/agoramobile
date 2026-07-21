@@ -555,6 +555,23 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             {post.repost_image_url ? (
               <Image source={{ uri: imgUrl(post.repost_image_url) }} style={s.quotedImage} contentFit="cover" />
             ) : null}
+            {/* AGORA-252: the quoted post's own link preview — e.g. a
+                Bluesky quote of a link-only news article has no
+                repost_image_url, only this. */}
+            {post.repost_link_url ? (
+              <TouchableOpacity onPress={() => Linking.openURL(post.repost_link_url!)} activeOpacity={0.8}
+                style={[s.quotedLinkPreview, { borderColor: c.border }]}>
+                {post.repost_link_image ? (
+                  <Image source={{ uri: imgUrl(post.repost_link_image) }} style={s.quotedLinkImage} contentFit="cover" />
+                ) : null}
+                <View style={{ flex: 1, padding: 8 }}>
+                  <Text style={[s.linkDomain, { color: c.textMuted }]}>{post.repost_link_domain}</Text>
+                  {post.repost_link_title ? (
+                    <Text style={[s.linkTitle, { color: c.text }]} numberOfLines={2}>{post.repost_link_title}</Text>
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+            ) : null}
           </TouchableOpacity>
         ) : null}
 
@@ -1110,6 +1127,8 @@ const s = StyleSheet.create({
   quotedAuthorMeta: { fontSize: 12 },
   quotedContent: { fontSize: 13, lineHeight: 19 },
   quotedImage: { width: '100%', aspectRatio: 1.4, borderRadius: 8, marginTop: 6 },
+  quotedLinkPreview: { flexDirection: 'row', marginTop: 6, borderWidth: 1, borderRadius: 8, overflow: 'hidden' },
+  quotedLinkImage: { width: 56, height: 56 },
   imageWrapper: { marginHorizontal: -14, marginVertical: 8 },
   image: { width: '100%', aspectRatio: 1 },
   imageMulti: { width: Dimensions.get('window').width * 0.72, aspectRatio: 1 },
