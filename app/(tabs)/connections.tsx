@@ -157,6 +157,10 @@ export default function ConnectionsScreen() {
     mutationFn: ({ id, notify }: { id: string; notify: boolean }) => atprotoApi.toggleFollowNotify(id, notify),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['bluesky-following'] }),
   })
+  const toggleBskyShowInFeed = useMutation({
+    mutationFn: ({ id, showInFeed }: { id: string; showInFeed: boolean }) => atprotoApi.toggleShowInFeed(id, showInFeed),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bluesky-following'] }),
+  })
   const handleBskySearch = () => {
     const trimmed = bskyHandle.trim()
     if (!trimmed) return
@@ -498,7 +502,14 @@ export default function ConnectionsScreen() {
                 <View style={{ marginTop: 8 }}>
                   {bskyFollowing.map(f => (
                     <View key={f.id} style={[s.followRow, { borderBottomColor: c.border }]}>
-                      <View style={s.followRowMain}>
+                      {/* AGORA-238: only navigable once the account has a local
+                          cached row (populated on first ingested post) — same
+                          conditional the fediverse tab's followRowMain uses. */}
+                      <TouchableOpacity
+                        style={s.followRowMain}
+                        disabled={!f.username}
+                        onPress={() => router.push(`/profile/${f.username}` as any)}
+                      >
                         <Avatar url={f.avatar_url} name={f.display_name || f.handle} size={38} />
                         <View style={{ flex: 1, marginLeft: 10 }}>
                           <Text style={[s.previewName, { color: c.text }]} numberOfLines={1}>
@@ -508,7 +519,20 @@ export default function ConnectionsScreen() {
                             @{f.handle}
                           </Text>
                         </View>
-                      </View>
+                      </TouchableOpacity>
+                      {/* AGORA-236: per-follow main-feed opt-in, mirroring the
+                          fediverse tab's show-in-feed toggle. */}
+                      <TouchableOpacity
+                        onPress={() => toggleBskyShowInFeed.mutate({ id: f.id, showInFeed: !f.show_in_feed })}
+                        disabled={toggleBskyShowInFeed.isPending}
+                        style={s.iconBtn}
+                      >
+                        <Ionicons
+                          name={f.show_in_feed ? 'home' : 'home-outline'}
+                          size={18}
+                          color={f.show_in_feed ? c.primary : c.textLight}
+                        />
+                      </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => toggleBskyNotify.mutate({ id: f.id, notify: !f.notify })}
                         disabled={toggleBskyNotify.isPending || !atprotoNotificationsEnabled}

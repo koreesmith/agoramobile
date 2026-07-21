@@ -242,6 +242,8 @@ export const atprotoApi = {
   unfollowBlueskyAccount: (id: string)     => api.delete(`/atproto/follow/${id}`),
   listBlueskyFollowing:   ()               => api.get('/atproto/following'),
   toggleFollowNotify:     (id: string, notify: boolean) => api.put(`/atproto/follow/${id}/notify`, { notify }),
+  // AGORA-236: per-follow main-feed opt-in, mirroring federationApi's own toggleShowInFeed.
+  toggleShowInFeed:       (id: string, showInFeed: boolean) => api.put(`/atproto/follow/${id}/show-in-feed`, { show_in_feed: showInFeed }),
   migrateBridgedFollow:   (apFollowingId: string) => api.post(`/atproto/bridged-follows/${apFollowingId}/migrate`),
   // AGORA-215/216: fuzzy, network-wide search — distinct from lookup's exact
   // handle/DID resolve, and from searchApi's own Agora+cached-remote search.
