@@ -17,7 +17,7 @@ import { handle } from '../utils/handle'
 import { useAuthStore } from '../store/auth'
 import { useBlockStore } from '../store/blocks'
 import { useToastStore } from '../store/toast'
-import { Avatar, LinkedText } from './ui'
+import { Avatar, LinkedText, renderName } from './ui'
 import { useC } from '../constants/ColorContext'
 import ReactorsModal from './ReactorsModal'
 
@@ -367,6 +367,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   // Author row always identifies whoever made *this* post — for a repost, that's
   // the person sharing it, not the original author (shown in the nested quote card below).
   const author   = isPagePost ? post.page_display_name : (post.author_display_name || post.display_name)
+  const authorEmojis = isPagePost ? undefined : post.author_emojis
   const pronouns = isPagePost ? undefined : post.author_pronouns
   const username = isPagePost ? post.page_slug : (post.author_username || post.username)
   const avatar   = imgUrl(isPagePost ? post.page_avatar_url : (post.author_avatar_url || post.avatar_url))
@@ -480,7 +481,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
           <Avatar url={avatar} name={author} size={40} />
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 }}>
-              <Text style={[s.authorName, { color: c.text }]}>{author}</Text>
+              <Text style={[s.authorName, { color: c.text }]}>{renderName(author, authorEmojis)}</Text>
               {post.page_is_verified && isPagePost && (
                 <Ionicons name="checkmark-circle" size={14} color={c.primary} />
               )}
@@ -529,7 +530,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         )}
 
         {(!post.content_warning || twExpanded) && content ? (
-          <LinkedText text={content} style={[s.content, { color: c.textMd }]} />
+          <LinkedText text={content} style={[s.content, { color: c.textMd }]} emojis={post.content_emojis} />
         ) : null}
 
         {/* Quoted post — the original post being shared, nested so it reads as quoted material rather than the reposter's own words */}
@@ -542,7 +543,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
               <Avatar url={post.repost_author_avatar_url} name={post.repost_author_display_name} size={22} />
               <Text style={[s.quotedAuthorName, { color: c.text }]}>
-                {post.repost_author_display_name || post.repost_author_username}
+                {post.repost_author_display_name ? renderName(post.repost_author_display_name, post.repost_author_emojis) : post.repost_author_username}
               </Text>
               {post.repost_author_pronouns ? (
                 <Text style={[s.pronouns, { color: c.textLight }]}>({post.repost_author_pronouns})</Text>
@@ -550,7 +551,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               <Text style={[s.quotedAuthorMeta, { color: c.textMuted }]}>{handle(post.repost_author_username)}</Text>
             </View>
             {post.repost_content ? (
-              <LinkedText text={post.repost_content} style={[s.quotedContent, { color: c.textMd }]} />
+              <LinkedText text={post.repost_content} style={[s.quotedContent, { color: c.textMd }]} emojis={post.repost_content_emojis} />
             ) : null}
             {post.repost_image_url ? (
               <Image source={{ uri: imgUrl(post.repost_image_url) }} style={s.quotedImage} contentFit="cover" />
@@ -1050,10 +1051,10 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             {/* Preview of post being shared */}
             <View style={[s.sharePreview, { borderColor: c.border, backgroundColor: c.bg }]}>
               <Text style={[s.sharePreviewAuthor, { color: c.text }]}>
-                {post.author_display_name || post.author_username}
+                {post.author_display_name ? renderName(post.author_display_name, post.author_emojis) : post.author_username}
                 <Text style={{ color: c.textMuted, fontWeight: '400' }}> {handle(post.author_username, post.is_remote, post.remote_instance)}</Text>
               </Text>
-              {post.content ? <Text style={[s.sharePreviewContent, { color: c.textMd }]} numberOfLines={3}>{post.content}</Text> : null}
+              {post.content ? <LinkedText text={post.content} style={[s.sharePreviewContent, { color: c.textMd }]} emojis={post.content_emojis} numberOfLines={3} /> : null}
               {(post.photo_urls?.length > 1 ? true : post.image_url) ? (
                 <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 4 }}>
                   📷 {post.photo_urls?.length > 1 ? `${post.photo_urls.length} photos` : 'Photo'}

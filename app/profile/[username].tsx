@@ -2,7 +2,7 @@ import { View, Text, ScrollView, TouchableOpacity, Image, RefreshControl, Alert,
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import { Screen, Spinner, Avatar } from '../../components/ui'
+import { Screen, Spinner, Avatar, LinkedText, renderName } from '../../components/ui'
 import PostCard from '../../components/PostCard'
 import { usersApi, friendsApi, feedApi, dmApi, imgUrl, blockApi, moderationApi, albumsApi, federationApi, atprotoApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
@@ -324,7 +324,7 @@ export default function ProfileViewScreen() {
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 6 }}>
-            <Text style={[s.name, { color: c.text }]}>{profile.display_name || profile.username}</Text>
+            <Text style={[s.name, { color: c.text }]}>{profile.display_name ? renderName(profile.display_name, profile.emojis) : profile.username}</Text>
             {profile.pronouns ? <Text style={{ fontSize: 13, color: c.textLight }}>({profile.pronouns})</Text> : null}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -338,7 +338,7 @@ export default function ProfileViewScreen() {
               </View>
             )}
           </View>
-          {profile.bio ? <Text style={[s.bio, { color: c.textMd }]}>{profile.bio}</Text> : null}
+          {profile.bio ? <LinkedText text={profile.bio} style={[s.bio, { color: c.textMd }]} emojis={profile.emojis} /> : null}
           {(profile as any).location ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
               <Ionicons name="location-outline" size={13} color={c.textMuted} />

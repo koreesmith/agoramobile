@@ -3,7 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, TextInput, RefreshControl, Aler
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { Screen, Header, Spinner, EmptyState, Avatar } from '../../components/ui'
+import { Screen, Header, Spinner, EmptyState, Avatar, renderName } from '../../components/ui'
 import { friendsApi, usersApi, instanceApi, federationApi, atprotoApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
 
@@ -40,6 +40,8 @@ interface FollowingEntry {
   instance?: string
   // AGORA-249: whether this account follows the caller back.
   follows_back?: boolean
+  // AGORA-258: custom emoji (shortcode -> image URL) for display_name.
+  emojis?: Record<string, string>
 }
 
 export default function ConnectionsScreen() {
@@ -174,7 +176,7 @@ export default function ConnectionsScreen() {
     <TouchableOpacity onPress={() => router.push(`/profile/${user.username}`)} style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
       <Avatar url={user.avatar_url} name={user.display_name || user.username} size={44} />
       <View style={{ flex: 1 }}>
-        <Text style={[s.name, { color: c.text }]}>{user.display_name || user.username}</Text>
+        <Text style={[s.name, { color: c.text }]}>{user.display_name ? renderName(user.display_name, user.emojis) : user.username}</Text>
         <Text style={[s.username, { color: c.textMuted }]}>@{user.username}</Text>
       </View>
       <View style={{ flexShrink: 0 }}>{right}</View>
@@ -353,7 +355,7 @@ export default function ConnectionsScreen() {
                         <Avatar url={f.avatar_url} name={f.display_name || f.username} size={38} />
                         <View style={{ flex: 1, marginLeft: 10 }}>
                           <Text style={[s.previewName, { color: c.text }]} numberOfLines={1}>
-                            {f.display_name || f.username || f.actor_url}
+                            {f.display_name ? renderName(f.display_name, f.emojis) : (f.username || f.actor_url)}
                           </Text>
                           {!!f.username && (
                             <Text style={[s.previewHandle, { color: c.textMuted }]} numberOfLines={1}>

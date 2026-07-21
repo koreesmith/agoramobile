@@ -3,7 +3,7 @@ import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, Linking 
 import { router, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import { Screen, Header, Spinner, Avatar } from '../components/ui'
+import { Screen, Header, Spinner, Avatar, renderName } from '../components/ui'
 import PostCard from '../components/PostCard'
 import { searchApi, pagesApi, atprotoApi, imgUrl } from '../api'
 import { useC } from '../constants/ColorContext'
@@ -102,7 +102,7 @@ export default function SearchScreen() {
       >
         <Avatar url={item.avatar_url} name={item.display_name || item.username} size={44} />
         <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={[s.displayName, { color: c.text }]}>{item.display_name || item.username}</Text>
+          <Text style={[s.displayName, { color: c.text }]}>{item.display_name ? renderName(item.display_name, item.emojis) : item.username}</Text>
           <Text style={[s.username, { color: c.textMuted }]}>{handle(item.username, item.is_remote, item.remote_instance)}</Text>
         </View>
         {label && (

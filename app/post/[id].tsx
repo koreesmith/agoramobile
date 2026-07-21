@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
 import { formatDistanceToNow } from 'date-fns'
-import { Screen, Spinner, Avatar, LinkedText } from '../../components/ui'
+import { Screen, Spinner, Avatar, LinkedText, renderName } from '../../components/ui'
 import PostCard from '../../components/PostCard'
 import ReactorsModal from '../../components/ReactorsModal'
 import { feedApi, imgUrl } from '../../api'
@@ -79,7 +79,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
         <Avatar url={comment.avatar_url} name={comment.display_name || comment.username} size={avatarSize} />
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 }}>
-            <Text style={[s.commentAuthor, { color: c.text }]}>{comment.display_name || comment.username}</Text>
+            <Text style={[s.commentAuthor, { color: c.text }]}>{comment.display_name ? renderName(comment.display_name, comment.author_emojis) : comment.username}</Text>
             {comment.pronouns ? <Text style={{ fontSize: 11, color: c.textLight }}>({comment.pronouns})</Text> : null}
             <Text style={[s.commentTime, { color: c.textLight }]}>{formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}</Text>
           </View>
@@ -103,7 +103,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
               </View>
             </View>
           ) : (
-            <Text style={[s.commentText, { color: c.textMd }]}><LinkedText text={comment.content} />{comment.edited_at ? <Text style={{ color: c.textLight, fontSize: 11 }}> (edited)</Text> : null}</Text>
+            <Text style={[s.commentText, { color: c.textMd }]}><LinkedText text={comment.content} emojis={comment.content_emojis} />{comment.edited_at ? <Text style={{ color: c.textLight, fontSize: 11 }}> (edited)</Text> : null}</Text>
           )}
           {comment.image_url ? (
             <>
