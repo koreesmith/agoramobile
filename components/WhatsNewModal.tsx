@@ -5,23 +5,34 @@ import * as SecureStore from 'expo-secure-store'
 import { Ionicons } from '@expo/vector-icons'
 import { useC } from '../constants/ColorContext'
 
-const WHATS_NEW_VERSION = '2.0.0'
+const WHATS_NEW_VERSION = '3.0.0'
 const STORAGE_KEY = 'last_seen_whats_new'
 
 const FEATURES: { icon: string; title: string; desc: string; link?: string; linkText?: string }[] = [
   {
-    icon: 'planet',
-    title: 'Fediverse (ActivityPub)',
-    desc: "Your public posts are now discoverable and followable from Mastodon and other fediverse apps, and replies go both ways. Off by default for private posts, on by default for public ones — there's a toggle in Settings → Fediverse if you'd rather opt out.",
-    link: '/connections?tab=fediverse',
-    linkText: 'Explore the Fediverse →',
+    icon: 'cloud',
+    title: 'Native Bluesky account',
+    desc: 'Every Agora account is now also a real Bluesky account — no bridge, no separate signup required. Your public posts sync both ways, and you can follow any Bluesky account natively.',
+    link: '/connections?tab=bluesky',
+    linkText: 'Explore Bluesky →',
   },
-  { icon: 'bookmark', title: 'Pages', desc: 'Follow bands, businesses, and creators. Their posts now appear in your feed.' },
-  { icon: 'videocam', title: 'Video Posts', desc: 'Share videos up to 2 minutes directly in your posts.' },
-  { icon: 'sparkles', title: 'Smart Ranking', desc: "The algorithm is always your call, never ours. Your main feed stays chronological by default — create a custom feed with Smart Ranking on if you want one that learns what you love." },
-  { icon: 'images', title: 'Up to 10 Photos', desc: 'Share more moments — attach up to 10 photos in a single post.' },
-  { icon: 'people', title: 'Group Tagging', desc: 'Use +group-name in posts and comments to tag a group.' },
-  { icon: 'chatbubble-ellipses', title: 'Quick Comments', desc: 'Comment on any post directly from your feed — no tap required.' },
+  {
+    icon: 'list',
+    title: 'Unified Connections & Friend Lists',
+    desc: 'Friends, Fediverse follows, and Bluesky follows now live together on one Connections screen — Friend Lists can include accounts from either network, not just Agora friends.',
+    link: '/connections',
+    linkText: 'See your lists →',
+  },
+  { icon: 'chatbubbles', title: 'Quote posts', desc: 'Mastodon and other fediverse apps can now quote your Agora posts, not just boost them.' },
+  { icon: 'happy', title: 'Custom emoji', desc: 'A Mastodon custom emoji like :your_team_logo: now renders as a real inline image in names, bios, and posts, instead of showing the literal shortcode text.' },
+  {
+    icon: 'search',
+    title: 'Unified search',
+    desc: 'Search now covers Agora, the Fediverse, and Bluesky in one place — accounts, posts, and hashtags.',
+    link: '/search',
+    linkText: 'Try it →',
+  },
+  { icon: 'warning', title: 'Trigger warnings on shares', desc: "Add your own content warning when sharing someone else's post, independent of the original post's own visibility." },
 ]
 
 export async function shouldShowWhatsNew(): Promise<boolean> {
@@ -64,7 +75,7 @@ export default function WhatsNewModal({ visible, onDismiss }: { visible: boolean
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleDismiss}>
       <View style={[s.container, { backgroundColor: c.card }]}>
         <View style={[s.header, { borderBottomColor: c.border }]}>
-          <Text style={[s.title, { color: c.text }]}>What's New in 2.0</Text>
+          <Text style={[s.title, { color: c.text }]}>What's New in 3.0</Text>
           <TouchableOpacity onPress={handleDismiss} style={s.closeBtn}>
             <Ionicons name="close" size={22} color={c.textMuted} />
           </TouchableOpacity>
