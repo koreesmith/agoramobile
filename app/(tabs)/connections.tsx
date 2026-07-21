@@ -38,6 +38,8 @@ interface FollowingEntry {
   display_name?: string
   avatar_url?: string
   instance?: string
+  // AGORA-249: whether this account follows the caller back.
+  follows_back?: boolean
 }
 
 export default function ConnectionsScreen() {
@@ -360,6 +362,12 @@ export default function ConnectionsScreen() {
                           )}
                         </View>
                       </TouchableOpacity>
+                      {f.accepted && f.follows_back && (
+                        <View style={s.pendingTag}>
+                          <Ionicons name="person-circle-outline" size={13} color={c.primary} />
+                          <Text style={[s.pendingText, { color: c.primary }]}>Follows you</Text>
+                        </View>
+                      )}
                       {!f.accepted && (
                         <View style={s.pendingTag}>
                           <Ionicons name="time-outline" size={13} color={c.textMuted} />
@@ -520,6 +528,13 @@ export default function ConnectionsScreen() {
                           </Text>
                         </View>
                       </TouchableOpacity>
+                      {/* AGORA-249: whether this account follows the caller back. */}
+                      {f.follows_back && (
+                        <View style={s.pendingTag}>
+                          <Ionicons name="person-circle-outline" size={13} color={c.primary} />
+                          <Text style={[s.pendingText, { color: c.primary }]}>Follows you</Text>
+                        </View>
+                      )}
                       {/* AGORA-236: per-follow main-feed opt-in, mirroring the
                           fediverse tab's show-in-feed toggle. */}
                       <TouchableOpacity
