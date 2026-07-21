@@ -24,7 +24,6 @@ const FEATURES: { icon: string; title: string; desc: string; link?: string; link
     linkText: 'See your lists →',
   },
   { icon: 'chatbubbles', title: 'Quote posts', desc: 'Mastodon and other fediverse apps can now quote your Agora posts, not just boost them.' },
-  { icon: 'happy', title: 'Custom emoji', desc: 'A Mastodon custom emoji like :your_team_logo: now renders as a real inline image in names, bios, and posts, instead of showing the literal shortcode text.' },
   {
     icon: 'search',
     title: 'Unified search',
