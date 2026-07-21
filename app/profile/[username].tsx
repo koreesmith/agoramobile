@@ -327,7 +327,17 @@ export default function ProfileViewScreen() {
             <Text style={[s.name, { color: c.text }]}>{profile.display_name || profile.username}</Text>
             {profile.pronouns ? <Text style={{ fontSize: 13, color: c.textLight }}>({profile.pronouns})</Text> : null}
           </View>
-          <Text style={[s.username, { color: c.textMuted }]}>{handle(profile.username, (profile as any).is_remote, (profile as any).remote_instance)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <Text style={[s.username, { color: c.textMuted }]}>{handle(profile.username, (profile as any).is_remote, (profile as any).remote_instance)}</Text>
+            {/* AGORA-249: fediverse/Bluesky mutual-follow indicator — meaningful
+                regardless of whether the viewer follows them back. */}
+            {(isFediverse || isBluesky) && (profile as any).follows_back && (
+              <View style={[s.followsYouTag, { backgroundColor: c.primaryBg }]}>
+                <Ionicons name="person-circle-outline" size={12} color={c.primary} />
+                <Text style={[s.followsYouText, { color: c.primary }]}>Follows you</Text>
+              </View>
+            )}
+          </View>
           {profile.bio ? <Text style={[s.bio, { color: c.textMd }]}>{profile.bio}</Text> : null}
           {(profile as any).location ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
@@ -405,6 +415,8 @@ const s = StyleSheet.create({
   primaryBtnText:{ color: 'white', fontWeight: '600', fontSize: 13 },
   name:          { fontSize: 20, fontWeight: 'bold' },
   username:      { fontSize: 14, marginTop: 2 },
+  followsYouTag: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  followsYouText:{ fontSize: 11, fontWeight: '500' },
   bio:           { fontSize: 14, marginTop: 6, lineHeight: 20 },
   friends:       { fontSize: 14, marginTop: 10 },
   albumsRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
