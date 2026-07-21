@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Spinner, Avatar } from '../../components/ui'
 import PostCard from '../../components/PostCard'
-import { usersApi, friendsApi, feedApi, dmApi, imgUrl, blockApi, moderationApi, albumsApi, federationApi } from '../../api'
+import { usersApi, friendsApi, feedApi, dmApi, imgUrl, blockApi, moderationApi, albumsApi, federationApi, atprotoApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
 import { useC } from '../../constants/ColorContext'
@@ -74,6 +74,26 @@ export default function ProfileViewScreen() {
   })
   const toggleFedNotify = useMutation({
     mutationFn: () => federationApi.toggleFollowNotify((profile as any).follow_id, !(profile as any)?.follow_notify),
+    onSuccess: inv,
+  })
+
+  // AGORA-234: native Bluesky accounts have no friending concept either —
+  // follow/notify (at_following) is the equivalent, same as the fediverse
+  // block above but against the AT Proto endpoints. profile.username is the
+  // account's Bluesky handle for these rows (getOrCreateRemoteATUser stores
+  // the handle as the username), so it doubles as the "actor" to follow.
+  const isBluesky = (profile as any)?.remote_instance === 'bsky.app'
+  const followBsky = useMutation({
+    mutationFn: () => atprotoApi.followBlueskyAccount(username!),
+    onSuccess: inv,
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not follow this account'),
+  })
+  const unfollowBsky = useMutation({
+    mutationFn: () => atprotoApi.unfollowBlueskyAccount((profile as any).follow_id),
+    onSuccess: inv,
+  })
+  const toggleBskyNotify = useMutation({
+    mutationFn: () => atprotoApi.toggleFollowNotify((profile as any).follow_id, !(profile as any)?.follow_notify),
     onSuccess: inv,
   })
 
@@ -177,6 +197,46 @@ export default function ProfileViewScreen() {
                       <TouchableOpacity
                         onPress={() => toggleFedNotify.mutate()}
                         disabled={toggleFedNotify.isPending}
+                        style={[s.actionBtn, { borderColor: (profile as any).follow_notify ? c.primary : c.border, backgroundColor: (profile as any).follow_notify ? c.primaryBg : 'transparent' }]}
+                      >
+                        <Ionicons
+                          name={(profile as any).follow_notify ? 'notifications' : 'notifications-outline'}
+                          size={15}
+                          color={(profile as any).follow_notify ? c.primary : c.textMuted}
+                        />
+                        <Text style={[s.actionBtnText, { color: (profile as any).follow_notify ? c.primary : c.textMuted }]}>
+                          {(profile as any).follow_notify ? 'Notifying' : 'Notify'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                ) : isBluesky ? (
+                  <>
+                    <TouchableOpacity
+                      onPress={() => (profile as any).following
+                        ? Alert.alert('Unfollow?', `Unfollow ${profile.display_name}?`, [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Unfollow', style: 'destructive', onPress: () => unfollowBsky.mutate() },
+                          ])
+                        : followBsky.mutate()}
+                      disabled={followBsky.isPending || unfollowBsky.isPending}
+                      style={[s.actionBtn, (profile as any).following
+                        ? { borderColor: c.border }
+                        : { borderColor: c.primary, backgroundColor: c.primary }]}
+                    >
+                      <Ionicons
+                        name={(profile as any).following ? 'checkmark' : 'person-add-outline'}
+                        size={15}
+                        color={(profile as any).following ? c.textMd : 'white'}
+                      />
+                      <Text style={[s.actionBtnText, { color: (profile as any).following ? c.textMd : 'white' }]}>
+                        {(profile as any).following ? 'Following' : 'Follow'}
+                      </Text>
+                    </TouchableOpacity>
+                    {(profile as any).following && (
+                      <TouchableOpacity
+                        onPress={() => toggleBskyNotify.mutate()}
+                        disabled={toggleBskyNotify.isPending}
                         style={[s.actionBtn, { borderColor: (profile as any).follow_notify ? c.primary : c.border, backgroundColor: (profile as any).follow_notify ? c.primaryBg : 'transparent' }]}
                       >
                         <Ionicons
