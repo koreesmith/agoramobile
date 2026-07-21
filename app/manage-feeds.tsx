@@ -7,10 +7,11 @@ import { Stack, router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Spinner, EmptyState } from '../components/ui'
-import { feedsApi, friendsApi, groupsApi, federationApi, atprotoApi } from '../api'
+import { feedsApi, friendsApi, groupsApi, federationApi, atprotoApi, pagesApi } from '../api'
 import { useC } from '../constants/ColorContext'
 
 type FilterType = 'friend_group' | 'community_group' | 'exclude_friend' | 'exclude_group' | 'fediverse_account' | 'fediverse_all' | 'atproto_account' | 'atproto_all'
+  | 'include_page' | 'exclude_page' | 'exclude_fediverse_account' | 'exclude_atproto_account'
 
 interface FilterRule {
   filter_type: FilterType
@@ -74,6 +75,13 @@ export default function ManageFeedsScreen() {
     enabled: showEditor,
   })
   const bskyAccounts: any[] = (bskyFollowingData?.following || []).filter((f: any) => f.user_id)
+
+  const { data: myPagesData } = useQuery({
+    queryKey: ['pages-mine'],
+    queryFn: () => pagesApi.mine().then(r => r.data),
+    enabled: showEditor,
+  })
+  const myPages: any[] = myPagesData?.pages || []
 
   const openCreate = () => {
     setEditingId(null)
@@ -231,6 +239,12 @@ export default function ManageFeedsScreen() {
               <FilterSection title="INCLUDE FROM FRIEND LISTS" items={friendLists} type="friend_group" labelKey="name" />
               <FilterSection title="INCLUDE FROM COMMUNITIES" items={joinedGroups} type="community_group" labelKey="name" />
               <FilterSection
+                title="INCLUDE FROM PAGES"
+                items={myPages.map((p: any) => ({ id: p.id, name: p.display_name || p.slug }))}
+                type="include_page"
+                labelKey="name"
+              />
+              <FilterSection
                 title="INCLUDE FROM THE FEDIVERSE"
                 items={[{ id: 'true', name: 'Everyone I follow on the fediverse' }]}
                 type="fediverse_all"
@@ -260,6 +274,28 @@ export default function ManageFeedsScreen() {
               )}
               <FilterSection title="EXCLUDE FRIENDS" items={friends} type="exclude_friend" labelKey="display_name" />
               <FilterSection title="EXCLUDE COMMUNITIES" items={joinedGroups} type="exclude_group" labelKey="name" />
+              <FilterSection
+                title="EXCLUDE PAGES"
+                items={myPages.map((p: any) => ({ id: p.id, name: p.display_name || p.slug }))}
+                type="exclude_page"
+                labelKey="name"
+              />
+              {fediverseAccounts.length > 0 && (
+                <FilterSection
+                  title="EXCLUDE ONE FEDIVERSE ACCOUNT"
+                  items={fediverseAccounts.map((f: any) => ({ id: f.user_id, name: f.display_name || f.username || f.actor_url }))}
+                  type="exclude_fediverse_account"
+                  labelKey="name"
+                />
+              )}
+              {bskyAccounts.length > 0 && (
+                <FilterSection
+                  title="EXCLUDE ONE BLUESKY ACCOUNT"
+                  items={bskyAccounts.map((f: any) => ({ id: f.user_id, name: f.display_name || f.handle }))}
+                  type="exclude_atproto_account"
+                  labelKey="name"
+                />
+              )}
 
               {showEditor && friendLists.length === 0 && joinedGroups.length === 0 && friends.length === 0 && (
                 <Text style={[s.hint, { color: c.textMuted }]}>
