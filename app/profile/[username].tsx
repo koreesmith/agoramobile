@@ -351,9 +351,27 @@ export default function ProfileViewScreen() {
               <Text style={{ fontSize: 13, color: c.primary }}>{(profile as any).website}</Text>
             </View>
           ) : null}
-          <Text style={[s.friends, { color: c.textMuted }]}>
-            <Text style={{ fontWeight: 'bold', color: c.text }}>{profile.friend_count || 0}</Text> friends
-          </Text>
+          {/* AGORA-253: a remote account's own post/follower/following
+              counts, same layout Bluesky itself shows on a profile — in
+              place of "friends", which Agora has no concept of for an
+              account it doesn't actually track the social graph of. */}
+          {(isFediverse || isBluesky) && (profile as any).remote_follower_count != null ? (
+            <View style={{ flexDirection: 'row', gap: 16, marginTop: 10 }}>
+              <Text style={{ fontSize: 14, color: c.textMuted }}>
+                <Text style={{ fontWeight: 'bold', color: c.text }}>{(profile as any).remote_post_count ?? 0}</Text> posts
+              </Text>
+              <Text style={{ fontSize: 14, color: c.textMuted }}>
+                <Text style={{ fontWeight: 'bold', color: c.text }}>{(profile as any).remote_follower_count ?? 0}</Text> followers
+              </Text>
+              <Text style={{ fontSize: 14, color: c.textMuted }}>
+                <Text style={{ fontWeight: 'bold', color: c.text }}>{(profile as any).remote_following_count ?? 0}</Text> following
+              </Text>
+            </View>
+          ) : (
+            <Text style={[s.friends, { color: c.textMuted }]}>
+              <Text style={{ fontWeight: 'bold', color: c.text }}>{profile.friend_count || 0}</Text> friends
+            </Text>
+          )}
           {showAlbums && (
             <TouchableOpacity
               onPress={() => router.push(`/albums/${username}`)}
