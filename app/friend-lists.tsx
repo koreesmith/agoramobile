@@ -16,7 +16,7 @@ import { Stack, router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Avatar, Spinner, EmptyState } from '../components/ui'
-import { friendsApi, federationApi } from '../api'
+import { friendsApi, federationApi, atprotoApi } from '../api'
 import { handle } from '../utils/handle'
 import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
@@ -62,13 +62,20 @@ function MemberDetailModal({
     enabled: !!list?.id && visible,
   })
 
-  // AGORA-182: an accepted fediverse follow (with a resolved cached user
-  // row) can join a list too, same as a friend — merged here so the rest of
-  // this modal doesn't need to know there are two underlying relationship
-  // types.
+  // AGORA-182/AGORA-257: an accepted fediverse follow, or a native Bluesky
+  // follow (no "accepted" concept there, AT Proto follows are unilateral),
+  // each with a resolved cached user row, can join a list too, same as a
+  // friend — merged here so the rest of this modal doesn't need to know
+  // there are three underlying relationship types.
   const { data: followingData, isLoading: followingLoading } = useQuery({
     queryKey: ['fediverse-following'],
     queryFn: () => federationApi.listFollowing().then(r => r.data),
+    enabled: !!list?.id && visible,
+  })
+
+  const { data: bskyFollowingData, isLoading: bskyFollowingLoading } = useQuery({
+    queryKey: ['bluesky-following'],
+    queryFn: () => atprotoApi.listBlueskyFollowing().then(r => r.data),
     enabled: !!list?.id && visible,
   })
 
@@ -77,8 +84,11 @@ function MemberDetailModal({
   const fediverseConnections: Friend[] = (followingData?.following || [])
     .filter((f: any) => f.accepted && f.user_id)
     .map((f: any) => ({ id: f.user_id, username: f.username, display_name: f.display_name, avatar_url: f.avatar_url, is_remote: true, remote_instance: f.instance }))
+  const bskyConnections: Friend[] = (bskyFollowingData?.following || [])
+    .filter((f: any) => f.user_id)
+    .map((f: any) => ({ id: f.user_id, username: f.username, display_name: f.display_name, avatar_url: f.avatar_url, is_remote: true, remote_instance: 'bsky.app' }))
   const memberIds = new Set(members.map(m => m.id))
-  const addableFriends = [...allFriends, ...fediverseConnections].filter(f => !memberIds.has(f.id))
+  const addableFriends = [...allFriends, ...fediverseConnections, ...bskyConnections].filter(f => !memberIds.has(f.id))
 
   const removeMember = useMutation({
     mutationFn: (friendId: string) => friendsApi.removeFriendFromList(list!.id, friendId),
@@ -109,7 +119,7 @@ function MemberDetailModal({
     )
   }
 
-  const isLoading = membersLoading || friendsLoading || followingLoading
+  const isLoading = membersLoading || friendsLoading || followingLoading || bskyFollowingLoading
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
