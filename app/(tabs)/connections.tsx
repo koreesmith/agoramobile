@@ -537,6 +537,14 @@ export default function ConnectionsScreen() {
                           <Text style={[s.pendingText, { color: c.primary }]}>Follows you</Text>
                         </View>
                       )}
+                      {f.user_id && (
+                        <TouchableOpacity
+                          onPress={() => router.push('/friend-lists' as any)}
+                          style={s.iconBtn}
+                        >
+                          <Ionicons name="list-outline" size={18} color={c.textLight} />
+                        </TouchableOpacity>
+                      )}
                       {/* AGORA-236: per-follow main-feed opt-in, mirroring the
                           fediverse tab's show-in-feed toggle. */}
                       <TouchableOpacity
