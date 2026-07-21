@@ -15,7 +15,7 @@ import {
 import { Stack, router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import { Screen, Avatar, Spinner, EmptyState } from '../components/ui'
+import { Screen, Avatar, Spinner, EmptyState, renderName } from '../components/ui'
 import { friendsApi, federationApi, atprotoApi } from '../api'
 import { handle } from '../utils/handle'
 import { C } from '../constants/colors'
@@ -35,6 +35,7 @@ interface Friend {
   avatar_url?: string
   is_remote?: boolean
   remote_instance?: string
+  emojis?: Record<string, string>
 }
 
 // ── Member Detail Modal ───────────────────────────────────────────────────────
@@ -83,7 +84,7 @@ function MemberDetailModal({
   const allFriends: Friend[] = friendsData?.friends || []
   const fediverseConnections: Friend[] = (followingData?.following || [])
     .filter((f: any) => f.accepted && f.user_id)
-    .map((f: any) => ({ id: f.user_id, username: f.username, display_name: f.display_name, avatar_url: f.avatar_url, is_remote: true, remote_instance: f.instance }))
+    .map((f: any) => ({ id: f.user_id, username: f.username, display_name: f.display_name, avatar_url: f.avatar_url, is_remote: true, remote_instance: f.instance, emojis: f.emojis }))
   const bskyConnections: Friend[] = (bskyFollowingData?.following || [])
     .filter((f: any) => f.user_id)
     .map((f: any) => ({ id: f.user_id, username: f.username, display_name: f.display_name, avatar_url: f.avatar_url, is_remote: true, remote_instance: 'bsky.app' }))
@@ -151,7 +152,7 @@ function MemberDetailModal({
                   <View style={[s.friendRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
                     <Avatar url={item.avatar_url} name={item.display_name || item.username} size={40} />
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.friendName, { color: c.text }]}>{item.display_name || item.username}</Text>
+                      <Text style={[s.friendName, { color: c.text }]}>{item.display_name ? renderName(item.display_name, item.emojis) : item.username}</Text>
                       <Text style={[s.friendUsername, { color: c.textMuted }]}>{handle(item.username, item.is_remote, item.remote_instance)}</Text>
                     </View>
                     <TouchableOpacity
@@ -181,7 +182,7 @@ function MemberDetailModal({
                     <View key={f.id} style={[s.friendRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
                       <Avatar url={f.avatar_url} name={f.display_name || f.username} size={40} />
                       <View style={{ flex: 1 }}>
-                        <Text style={[s.friendName, { color: c.text }]}>{f.display_name || f.username}</Text>
+                        <Text style={[s.friendName, { color: c.text }]}>{f.display_name ? renderName(f.display_name, f.emojis) : f.username}</Text>
                         <Text style={[s.friendUsername, { color: c.textMuted }]}>{handle(f.username, f.is_remote, f.remote_instance)}</Text>
                       </View>
                       <TouchableOpacity

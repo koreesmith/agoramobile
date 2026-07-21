@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { feedApi } from '../api'
 import { useC } from '../constants/ColorContext'
-import { Avatar } from './ui'
+import { Avatar, renderName } from './ui'
 import { Ionicons } from '@expo/vector-icons'
 
 const REACTIONS = [
@@ -32,7 +32,7 @@ export default function ReactorsModal({ postId, visible, onClose, initialTab = '
     enabled: visible,
   })
 
-  const reactors: Array<{ user_id: string; username: string; display_name: string; avatar_url: string; type: string }> = data?.reactions ?? []
+  const reactors: Array<{ user_id: string; username: string; display_name: string; avatar_url: string; type: string; emojis?: Record<string, string> }> = data?.reactions ?? []
 
   const tabs = [
     { key: 'all', label: 'All' },
@@ -87,7 +87,7 @@ export default function ReactorsModal({ postId, visible, onClose, initialTab = '
                   >
                     <Avatar url={item.avatar_url} name={item.display_name || item.username} size={38} />
                     <View style={s.userInfo}>
-                      <Text style={[s.displayName, { color: c.text }]}>{item.display_name || item.username}</Text>
+                      <Text style={[s.displayName, { color: c.text }]}>{item.display_name ? renderName(item.display_name, item.emojis) : item.username}</Text>
                       {item.username && (
                         <Text style={[s.username, { color: c.textMuted }]}>@{item.username}</Text>
                       )}

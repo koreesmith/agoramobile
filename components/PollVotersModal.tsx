@@ -4,13 +4,14 @@ import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { pollApi } from '../api'
 import { useC } from '../constants/ColorContext'
-import { Avatar } from './ui'
+import { Avatar, renderName } from './ui'
 
 interface Voter {
   id: string
   username: string
   display_name: string
   avatar_url: string
+  emojis?: Record<string, string>
 }
 interface OptionVoters {
   option_id: string
@@ -73,7 +74,7 @@ export default function PollVotersModal({ postId, visible, onClose }: Props) {
                       <Avatar url={v.avatar_url} name={v.display_name || v.username} size={30} />
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={[s.displayName, { color: c.text }]} numberOfLines={1}>
-                          {v.display_name || v.username}
+                          {v.display_name ? renderName(v.display_name, v.emojis) : v.username}
                         </Text>
                         <Text style={[s.username, { color: c.textMuted }]} numberOfLines={1}>@{v.username}</Text>
                       </View>
