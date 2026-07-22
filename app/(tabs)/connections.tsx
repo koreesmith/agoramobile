@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Spinner, EmptyState, Avatar, renderName } from '../../components/ui'
+import FriendListPickerModal from '../../components/FriendListPickerModal'
 import { friendsApi, usersApi, instanceApi, federationApi, atprotoApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
 
@@ -51,6 +52,11 @@ export default function ConnectionsScreen() {
   const params = useLocalSearchParams<{ tab?: string }>()
   const [tab, setTab] = useState<Tab>((params.tab as Tab) || 'friends')
   const [search, setSearch] = useState('')
+  // AGORA-262: the list icon on a Fediverse/Bluesky follow row used to just
+  // navigate to the standalone Friend Lists screen with no idea which
+  // account it was tapped for — this opens a per-account add/remove picker
+  // instead, mirroring web's FriendListModal.
+  const [listPickerFriend, setListPickerFriend] = useState<{ id: string; username: string; display_name?: string; avatar_url?: string; emojis?: Record<string, string> } | null>(null)
 
   const { data: friendsData, isLoading: fl, refetch: rf, isRefetching: rfr } = useQuery({ queryKey: ['friends'], queryFn: () => friendsApi.listFriends().then(r => r.data) })
   const { data: reqData, refetch: rr } = useQuery({ queryKey: ['requests'], queryFn: () => friendsApi.listRequests().then(r => r.data) })
@@ -387,7 +393,7 @@ export default function ConnectionsScreen() {
                       )}
                       {f.accepted && f.user_id && (
                         <TouchableOpacity
-                          onPress={() => router.push('/friend-lists' as any)}
+                          onPress={() => setListPickerFriend({ id: f.user_id!, username: f.username!, display_name: f.display_name, avatar_url: f.avatar_url, emojis: f.emojis })}
                           style={s.iconBtn}
                         >
                           <Ionicons name="list-outline" size={18} color={c.textLight} />
@@ -539,7 +545,7 @@ export default function ConnectionsScreen() {
                       )}
                       {f.user_id && (
                         <TouchableOpacity
-                          onPress={() => router.push('/friend-lists' as any)}
+                          onPress={() => setListPickerFriend({ id: f.user_id, username: f.username, display_name: f.display_name, avatar_url: f.avatar_url })}
                           style={s.iconBtn}
                         >
                           <Ionicons name="list-outline" size={18} color={c.textLight} />
@@ -607,6 +613,12 @@ export default function ConnectionsScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      <FriendListPickerModal
+        friend={listPickerFriend}
+        visible={!!listPickerFriend}
+        onClose={() => setListPickerFriend(null)}
+      />
     </Screen>
   )
 }
