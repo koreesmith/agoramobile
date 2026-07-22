@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, StyleSheet,
 import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import { Screen, Spinner } from '../components/ui'
+import { Screen, Header, Spinner } from '../components/ui'
 import { moderationApi, adminApi, waitlistApi, pagesApi, adminPagesApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
@@ -49,7 +49,8 @@ export default function AdminScreen() {
   if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
     return (
       <Screen>
-        <Stack.Screen options={{ headerShown: true, headerTitle: 'Admin', headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary }} />
+        <Stack.Screen options={{ headerShown: false }} />
+        <Header title="Admin" back />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ color: c.textMuted }}>Access denied</Text>
         </View>
@@ -384,11 +385,8 @@ export default function AdminScreen() {
 
   return (
     <Screen>
-      <Stack.Screen options={{
-        headerShown: true, headerTitle: 'Admin Panel',
-        headerBackTitle: 'Back',
-        headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
-      }} />
+      <Stack.Screen options={{ headerShown: false }} />
+      <Header title="Admin Panel" back />
 
       {/* Tab bar — scrollable to fit all tabs */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
