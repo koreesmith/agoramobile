@@ -384,7 +384,7 @@ function BlueskyPostRow({ post: p, c }: { post: any, c: any }) {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
         <Avatar url={p.author_avatar_url} name={p.author_display_name || p.author_handle} size={28} />
-        <Text style={[s.displayName, { color: c.text, marginLeft: 8, fontSize: 14 }]}>
+        <Text style={[s.displayName, { color: c.text, marginLeft: 8, fontSize: 16 }]}>
           {p.author_display_name || p.author_handle}
         </Text>
         <Text style={[s.username, { color: c.textMuted, marginLeft: 4 }]}>@{p.author_handle}</Text>
@@ -392,7 +392,7 @@ function BlueskyPostRow({ post: p, c }: { post: any, c: any }) {
           {formatDistanceToNow(new Date(p.created_at), { addSuffix: true })}
         </Text>
       </View>
-      <Text style={{ color: c.text, fontSize: 14 }} numberOfLines={3}>{p.text}</Text>
+      <Text style={{ color: c.text, fontSize: 16 }} numberOfLines={3}>{p.text}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
         <Ionicons name="heart-outline" size={14} color={c.textMuted} />
         <Text style={[s.username, { color: c.textMuted, marginLeft: 4, marginRight: 12 }]}>{p.like_count}</Text>
@@ -405,7 +405,7 @@ function BlueskyPostRow({ post: p, c }: { post: any, c: any }) {
 
 const s = StyleSheet.create({
   groupTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
@@ -420,7 +420,7 @@ const s = StyleSheet.create({
   },
   followBtnText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
   bskyPost: {
@@ -437,7 +437,7 @@ const s = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 18,
     padding: 0,
   },
   tabs: {
@@ -452,7 +452,7 @@ const s = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabText: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '600',
   },
   userRow: {
@@ -463,11 +463,11 @@ const s = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   displayName: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '600',
   },
   username: {
-    fontSize: 13,
+    fontSize: 15,
     marginTop: 1,
   },
   badge: {
@@ -477,7 +477,7 @@ const s = StyleSheet.create({
     paddingVertical: 3,
   },
   badgeText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
   emptyState: {
@@ -488,13 +488,13 @@ const s = StyleSheet.create({
     paddingVertical: 64,
   },
   emptyTitle: {
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: 4,
   },
   emptySub: {
-    fontSize: 14,
+    fontSize: 16,
     textAlign: 'center',
   },
   federatedHint: {
@@ -507,7 +507,7 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
   federatedText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '500',
     flex: 1,
   },

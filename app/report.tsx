@@ -54,8 +54,8 @@ export default function ReportScreen() {
       <Stack.Screen options={{ headerShown: true, headerTitle: 'Report', headerBackTitle: 'Back', headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary }} />
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
         <Ionicons name="checkmark-circle" size={56} color="#22c55e" />
-        <Text style={{ fontSize: 20, fontWeight: '700', color: c.text, marginTop: 16, marginBottom: 8 }}>Report submitted</Text>
-        <Text style={{ fontSize: 14, color: c.textMuted, textAlign: 'center', lineHeight: 20 }}>
+        <Text style={{ fontSize: 22, fontWeight: '700', color: c.text, marginTop: 16, marginBottom: 8 }}>Report submitted</Text>
+        <Text style={{ fontSize: 16, color: c.textMuted, textAlign: 'center', lineHeight: 20 }}>
           Thank you. Our moderators will review this shortly.
         </Text>
         <TouchableOpacity onPress={() => router.back()} style={[s.btn, { backgroundColor: c.primary, marginTop: 24 }]}>
@@ -164,18 +164,18 @@ export default function ReportScreen() {
 }
 
 const s = StyleSheet.create({
-  stepTitle:    { fontSize: 20, fontWeight: '700', marginBottom: 4 },
-  stepSub:      { fontSize: 14, marginBottom: 16, lineHeight: 20 },
+  stepTitle:    { fontSize: 22, fontWeight: '700', marginBottom: 4 },
+  stepSub:      { fontSize: 16, marginBottom: 16, lineHeight: 20 },
   option:       { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 8 },
-  optionLabel:  { fontSize: 15, fontWeight: '600', marginBottom: 2 },
-  optionDesc:   { fontSize: 12, lineHeight: 17 },
-  ruleNum:      { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 4, flexShrink: 0 },
+  optionLabel:  { fontSize: 17, fontWeight: '600', marginBottom: 2 },
+  optionDesc:   { fontSize: 13, lineHeight: 17 },
+  ruleNum:      { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 4, flexShrink: 0 },
   summary:      { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 20 },
-  summaryLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  summaryValue: { fontSize: 16, fontWeight: '700' },
-  summaryRule:  { fontSize: 13, marginTop: 4, lineHeight: 18 },
-  label:        { fontSize: 14, fontWeight: '500', marginBottom: 8 },
-  input:        { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 14, minHeight: 100, marginBottom: 12 },
+  summaryLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  summaryValue: { fontSize: 18, fontWeight: '700' },
+  summaryRule:  { fontSize: 15, marginTop: 4, lineHeight: 18 },
+  label:        { fontSize: 16, fontWeight: '500', marginBottom: 8 },
+  input:        { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 16, minHeight: 100, marginBottom: 12 },
   btn:          { borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  btnText:      { color: 'white', fontWeight: '700', fontSize: 16 },
+  btnText:      { color: 'white', fontWeight: '700', fontSize: 18 },
 })

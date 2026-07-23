@@ -80,7 +80,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 }}>
             <Text style={[s.commentAuthor, { color: c.text }]}>{comment.display_name ? renderName(comment.display_name, comment.author_emojis) : comment.username}</Text>
-            {comment.pronouns ? <Text style={{ fontSize: 11, color: c.textLight }}>({comment.pronouns})</Text> : null}
+            {comment.pronouns ? <Text style={{ fontSize: 12, color: c.textLight }}>({comment.pronouns})</Text> : null}
             <Text style={[s.commentTime, { color: c.textLight }]}>{formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}</Text>
           </View>
           {isEditing ? (
@@ -95,15 +95,15 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
                 <TouchableOpacity onPress={() => edit.mutate()} disabled={!editContent.trim() || edit.isPending}
                   style={[s.actionBtn, { backgroundColor: c.primary, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6 }]}>
-                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>{edit.isPending ? 'Saving…' : 'Save'}</Text>
+                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>{edit.isPending ? 'Saving…' : 'Save'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => { setIsEditing(false); setEditContent(comment.content) }} style={[s.actionBtn, { paddingHorizontal: 12, paddingVertical: 5 }]}>
-                  <Text style={{ color: c.textMuted, fontSize: 13 }}>Cancel</Text>
+                  <Text style={{ color: c.textMuted, fontSize: 15 }}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </View>
           ) : (
-            <Text style={[s.commentText, { color: c.textMd }]}><LinkedText text={comment.content} emojis={comment.content_emojis} />{comment.edited_at ? <Text style={{ color: c.textLight, fontSize: 11 }}> (edited)</Text> : null}</Text>
+            <Text style={[s.commentText, { color: c.textMd }]}><LinkedText text={comment.content} emojis={comment.content_emojis} />{comment.edited_at ? <Text style={{ color: c.textLight, fontSize: 12 }}> (edited)</Text> : null}</Text>
           )}
           {comment.image_url ? (
             <>
@@ -118,7 +118,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
                     height={screenHeight * 0.8}
                     onClose={() => setShowCommentLightbox(false)}
                   />
-                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 16 }}>✕ tap to close · pinch to zoom</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 15, marginTop: 16 }}>✕ tap to close · pinch to zoom</Text>
                 </View>
               </Modal>
             </>
@@ -133,8 +133,8 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
                 return (
                   <TouchableOpacity key={type} onPress={() => { setReactorsTab(type); setShowReactors(true) }}
                     style={[s.reactionChip, { borderColor: isActive ? c.primaryLt : c.border, backgroundColor: isActive ? c.primaryBg : c.bg }]}>
-                    <Text style={{ fontSize: 13 }}>{emoji}</Text>
-                    <Text style={{ fontSize: 12, color: isActive ? c.primary : c.textMuted }}>{count as number}</Text>
+                    <Text style={{ fontSize: 15 }}>{emoji}</Text>
+                    <Text style={{ fontSize: 13, color: isActive ? c.primary : c.textMuted }}>{count as number}</Text>
                   </TouchableOpacity>
                 )
               })}
@@ -160,7 +160,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
                 }}
                 delayLongPress={400}
               >
-                <Text style={{ fontSize: 14 }}>{myEmoji ?? '🤍'}</Text>
+                <Text style={{ fontSize: 16 }}>{myEmoji ?? '🤍'}</Text>
                 <Text style={[s.actionBtnText, { color: c.textLight }]}>React</Text>
               </TouchableOpacity>
             </View>
@@ -179,7 +179,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
                           comment.my_reaction === r.type && { backgroundColor: c.primaryBg },
                         ]}
                       >
-                        <Text style={{ fontSize: 24 }}>{r.emoji}</Text>
+                        <Text style={{ fontSize: 27 }}>{r.emoji}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -403,23 +403,23 @@ export default function PostScreen() {
 }
 
 const s = StyleSheet.create({
-  commentsHeader:  { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, paddingVertical: 12 },
+  commentsHeader:  { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, paddingVertical: 12 },
   comment:         { flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: 1 },
-  commentAuthor:   { fontWeight: '600', fontSize: 13 },
-  commentTime:     { fontSize: 11 },
-  commentText:     { fontSize: 14, marginTop: 2, lineHeight: 20 },
+  commentAuthor:   { fontWeight: '600', fontSize: 15 },
+  commentTime:     { fontSize: 12 },
+  commentText:     { fontSize: 16, marginTop: 2, lineHeight: 20 },
   reactionChip:    { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, borderWidth: 1 },
   actionBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  actionBtnText:   { fontSize: 12 },
+  actionBtnText:   { fontSize: 13 },
   pickerModal:     { position: 'absolute', borderWidth: 1, borderRadius: 24, padding: 8, flexDirection: 'row', gap: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10 },
   pickerItem:      { borderRadius: 8, padding: 3 },
   composerWrap:    { borderTopWidth: 1 },
   replyBanner:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1 },
-  replyBannerText: { fontSize: 13 },
+  replyBannerText: { fontSize: 15 },
   composer:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10 },
-  commentInput:    { flex: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, maxHeight: 80 },
+  commentInput:    { flex: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 16, maxHeight: 80 },
   menuOverlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   menuSheet:       { borderRadius: 16, margin: 12, borderWidth: 1, overflow: 'hidden' },
   menuItem:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 16 },
-  menuItemText:    { fontSize: 15, fontWeight: '500' },
+  menuItemText:    { fontSize: 17, fontWeight: '500' },
 })

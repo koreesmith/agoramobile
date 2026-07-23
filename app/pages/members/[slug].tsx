@@ -158,7 +158,7 @@ export default function PageMembersScreen() {
         <View style={[s.inviteModal, { backgroundColor: c.card }]}>
           <View style={[s.inviteHeader, { borderBottomColor: c.border }]}>
             <TouchableOpacity onPress={() => setShowInvite(false)}>
-              <Text style={{ color: c.textMuted, fontSize: 16 }}>Cancel</Text>
+              <Text style={{ color: c.textMuted, fontSize: 18 }}>Cancel</Text>
             </TouchableOpacity>
             <Text style={[s.inviteTitle, { color: c.text }]}>Invite member</Text>
             <TouchableOpacity
@@ -167,7 +167,7 @@ export default function PageMembersScreen() {
             >
               {invite.isPending
                 ? <ActivityIndicator size="small" color={c.primary} />
-                : <Text style={{ color: !inviteUsername.trim() ? c.textLight : c.primary, fontSize: 16, fontWeight: '600' }}>Send</Text>
+                : <Text style={{ color: !inviteUsername.trim() ? c.textLight : c.primary, fontSize: 18, fontWeight: '600' }}>Send</Text>
               }
             </TouchableOpacity>
           </View>
@@ -215,18 +215,18 @@ export default function PageMembersScreen() {
 
 const s = StyleSheet.create({
   memberRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  memberName:   { fontSize: 14, fontWeight: '600' },
-  memberUsername:{ fontSize: 12 },
+  memberName:   { fontSize: 16, fontWeight: '600' },
+  memberUsername:{ fontSize: 13 },
   chip:         { borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  chipText:     { fontSize: 11, fontWeight: '600' },
+  chipText:     { fontSize: 12, fontWeight: '600' },
   empty:        { alignItems: 'center', padding: 60, gap: 10 },
-  emptyText:    { fontSize: 14 },
+  emptyText:    { fontSize: 16 },
   inviteModal:  { flex: 1 },
   inviteHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
-  inviteTitle:  { fontSize: 16, fontWeight: '700' },
-  inviteLabel:  { fontSize: 13, fontWeight: '600', marginBottom: 8 },
-  inviteInput:  { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15 },
+  inviteTitle:  { fontSize: 18, fontWeight: '700' },
+  inviteLabel:  { fontSize: 15, fontWeight: '600', marginBottom: 8 },
+  inviteInput:  { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 17 },
   roleBtn:      { borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 18, paddingVertical: 10 },
-  roleBtnText:  { fontSize: 14, fontWeight: '600' },
-  roleDesc:     { fontSize: 12, marginTop: 8 },
+  roleBtnText:  { fontSize: 16, fontWeight: '600' },
+  roleDesc:     { fontSize: 13, marginTop: 8 },
 })

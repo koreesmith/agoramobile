@@ -80,7 +80,7 @@ export default function ExploreScreen() {
                 {showCW ? (
                   <TouchableOpacity onPress={() => setRevealedCW(v => ({ ...v, [item.id]: true }))} style={[s.cwBanner, { borderColor: c.border, backgroundColor: c.bg }]}>
                     <Ionicons name="warning-outline" size={14} color={c.textMuted} />
-                    <Text style={{ color: c.textMuted, fontSize: 13, flex: 1 }}>{item.content_warning} — tap to view</Text>
+                    <Text style={{ color: c.textMuted, fontSize: 15, flex: 1 }}>{item.content_warning} — tap to view</Text>
                   </TouchableOpacity>
                 ) : (
                   <>
@@ -110,21 +110,21 @@ export default function ExploreScreen() {
 }
 
 const s = StyleSheet.create({
-  intro:         { fontSize: 13, marginBottom: 12, paddingHorizontal: 2 },
+  intro:         { fontSize: 15, marginBottom: 12, paddingHorizontal: 2 },
   card:          { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 10 },
   header:        { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   avatar:        { width: 36, height: 36, borderRadius: 18 },
   avatarFallback:{ alignItems: 'center', justifyContent: 'center' },
-  name:          { fontWeight: '600', fontSize: 14 },
-  handle:        { fontSize: 12, marginTop: 1 },
-  content:       { fontSize: 14, lineHeight: 20 },
+  name:          { fontWeight: '600', fontSize: 16 },
+  handle:        { fontSize: 13, marginTop: 1 },
+  content:       { fontSize: 16, lineHeight: 20 },
   postImage:     { width: '100%', height: 200, borderRadius: 10, marginTop: 8 },
   cwBanner:      { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 8, padding: 10 },
   metaRow:       { flexDirection: 'row', gap: 16, marginTop: 10 },
-  metaText:      { fontSize: 12 },
+  metaText:      { fontSize: 13 },
   empty:         { alignItems: 'center', paddingVertical: 64 },
-  emptyTitle:    { fontSize: 15, fontWeight: '600' },
+  emptyTitle:    { fontSize: 17, fontWeight: '600' },
   footer:        { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, padding: 12 },
   signInBtn:     { paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
-  signInText:    { color: 'white', fontWeight: '700', fontSize: 15 },
+  signInText:    { color: 'white', fontWeight: '700', fontSize: 17 },
 })

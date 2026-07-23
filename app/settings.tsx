@@ -260,7 +260,7 @@ export default function SettingsScreen() {
                 style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1,
                   borderColor: currentMsgPerm === opt.value ? c.primary : c.border,
                   backgroundColor: currentMsgPerm === opt.value ? c.primaryBg : 'transparent' }}>
-                <Text style={{ fontSize: 12, fontWeight: '500', color: currentMsgPerm === opt.value ? c.primary : c.textMuted }}>{opt.label}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '500', color: currentMsgPerm === opt.value ? c.primary : c.textMuted }}>{opt.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -332,17 +332,17 @@ export default function SettingsScreen() {
 }
 
 const s = StyleSheet.create({
-  section: { fontSize: 11, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 6 },
-  sectionHint: { fontSize: 12, lineHeight: 17, paddingHorizontal: 16, paddingBottom: 10 },
+  section: { fontSize: 12, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 6 },
+  sectionHint: { fontSize: 13, lineHeight: 17, paddingHorizontal: 16, paddingBottom: 10 },
   themeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
   themePicker: { flexDirection: 'row', borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
   themeOption: { paddingHorizontal: 12, paddingVertical: 6 },
-  themeOptionText: { fontSize: 13, fontWeight: '500' },
+  themeOptionText: { fontSize: 15, fontWeight: '500' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
   rowIcon: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  rowLabel: { flex: 1, fontSize: 15, color: C.text },
-  label: { fontSize: 14, fontWeight: '500', color: C.textMd, marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, color: C.text, backgroundColor: C.card },
+  rowLabel: { flex: 1, fontSize: 17, color: C.text },
+  label: { fontSize: 16, fontWeight: '500', color: C.textMd, marginBottom: 6 },
+  input: { borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 17, color: C.text, backgroundColor: C.card },
   btn: { backgroundColor: C.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  btnText: { color: 'white', fontWeight: '600', fontSize: 16 },
+  btnText: { color: 'white', fontWeight: '600', fontSize: 18 },
 })

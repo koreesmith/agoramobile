@@ -122,7 +122,7 @@ export default function NotificationsScreen() {
     <Screen>
       <Header title="Notifications" right={hasUnread ? (
         <TouchableOpacity onPress={() => markAll.mutate()}>
-          <Text style={{ color: c.primary, fontSize: 14, fontWeight: '500' }}>Mark all read</Text>
+          <Text style={{ color: c.primary, fontSize: 16, fontWeight: '500' }}>Mark all read</Text>
         </TouchableOpacity>
       ) : undefined} />
       {isLoading ? <Spinner /> : (
@@ -145,10 +145,10 @@ export default function NotificationsScreen() {
                 {n.type === 'friend_request' && n.friend_status !== 'accepted' && n.friend_status !== 'declined' && (
                   <View style={s.friendActions}>
                     <TouchableOpacity onPress={() => accept.mutate(n.actor_id)} style={s.acceptBtn}>
-                      <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>Accept</Text>
+                      <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>Accept</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => decline.mutate(n.actor_id)} style={s.declineBtn}>
-                      <Text style={{ color: c.textMuted, fontSize: 12, fontWeight: '600' }}>Decline</Text>
+                      <Text style={{ color: c.textMuted, fontSize: 13, fontWeight: '600' }}>Decline</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -166,8 +166,8 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
   rowUnread: { backgroundColor: '#f0f4f8' },
   icon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  notifText: { fontSize: 14, color: '#1f2937' },
-  notifTime: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  notifText: { fontSize: 16, color: '#1f2937' },
+  notifTime: { fontSize: 13, color: '#9ca3af', marginTop: 2 },
   friendActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   acceptBtn: { backgroundColor: '#486581', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   declineBtn: { backgroundColor: '#f3f4f6', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },

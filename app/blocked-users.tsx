@@ -81,7 +81,7 @@ export default function BlockedUsersScreen() {
                 disabled={unblock.isPending}
                 style={[s.unblockBtn, { borderColor: c.border, backgroundColor: c.bg }]}
               >
-                <Text style={{ fontSize: 12, fontWeight: '600', color: c.textMd }}>Unblock</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: c.textMd }}>Unblock</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -92,9 +92,9 @@ export default function BlockedUsersScreen() {
 }
 
 const s = StyleSheet.create({
-  intro:      { fontSize: 13, padding: 16, paddingBottom: 8 },
+  intro:      { fontSize: 15, padding: 16, paddingBottom: 8 },
   row:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
-  name:       { fontWeight: '600', fontSize: 15 },
-  username:   { fontSize: 13, marginTop: 1 },
+  name:       { fontWeight: '600', fontSize: 17 },
+  username:   { fontSize: 15, marginTop: 1 },
   unblockBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
 })

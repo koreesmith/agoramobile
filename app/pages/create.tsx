@@ -112,7 +112,7 @@ export default function CreatePageScreen() {
         }
         right={
           <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
-            <Text style={{ color: c.textMuted, fontSize: 15 }}>Cancel</Text>
+            <Text style={{ color: c.textMuted, fontSize: 17 }}>Cancel</Text>
           </TouchableOpacity>
         }
       />
@@ -164,7 +164,7 @@ export default function CreatePageScreen() {
                 maxLength={300}
                 autoFocus
               />
-              <Text style={[{ color: c.textLight, fontSize: 12, textAlign: 'right', marginTop: 4 }]}>{bio.length}/300</Text>
+              <Text style={[{ color: c.textLight, fontSize: 13, textAlign: 'right', marginTop: 4 }]}>{bio.length}/300</Text>
             </View>
           )}
 
@@ -300,30 +300,30 @@ export default function CreatePageScreen() {
 const s = StyleSheet.create({
   progressWrap:   { height: 4, marginHorizontal: 16, borderRadius: 2, overflow: 'hidden', marginTop: 8 },
   progressFill:   { height: 4, borderRadius: 2 },
-  stepLabel:      { fontSize: 12, textAlign: 'center', marginTop: 6, marginBottom: 4 },
+  stepLabel:      { fontSize: 13, textAlign: 'center', marginTop: 6, marginBottom: 4 },
   body:           { padding: 20, paddingBottom: 40 },
-  stepTitle:      { fontSize: 22, fontWeight: '700', marginBottom: 6 },
-  stepDesc:       { fontSize: 14, marginBottom: 18, lineHeight: 20 },
-  input:          { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 },
+  stepTitle:      { fontSize: 25, fontWeight: '700', marginBottom: 6 },
+  stepDesc:       { fontSize: 16, marginBottom: 18, lineHeight: 20 },
+  input:          { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 18 },
   inputMulti:     { minHeight: 100, textAlignVertical: 'top' },
   slugPreview:    { marginTop: 12, borderWidth: 1, borderRadius: 10, padding: 12 },
-  slugLabel:      { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
-  slugValue:      { fontSize: 14, fontWeight: '500' },
+  slugLabel:      { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
+  slugValue:      { fontSize: 16, fontWeight: '500' },
   typeCard:       { flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1.5, borderRadius: 14, padding: 14 },
   typeIcon:       { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  typeLabel:      { fontSize: 15, fontWeight: '700', marginBottom: 2 },
-  typeDesc:       { fontSize: 12 },
+  typeLabel:      { fontSize: 17, fontWeight: '700', marginBottom: 2 },
+  typeDesc:       { fontSize: 13 },
   photoCard:      { borderWidth: 1, borderRadius: 14, padding: 14, gap: 10 },
-  photoCardLabel: { fontSize: 14, fontWeight: '600' },
+  photoCardLabel: { fontSize: 16, fontWeight: '600' },
   avatarPreview:  { width: 72, height: 72, borderRadius: 36 },
   coverPreview:   { width: '100%', height: 100, borderRadius: 10 },
   uploadBtn:      { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, alignSelf: 'flex-start' },
-  uploadBtnText:  { fontSize: 14, fontWeight: '600' },
+  uploadBtnText:  { fontSize: 16, fontWeight: '600' },
   reviewCard:     { borderWidth: 1, borderRadius: 14, padding: 16, gap: 12 },
   reviewAvatar:   { width: 64, height: 64, borderRadius: 32 },
-  reviewLabel:    { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
-  reviewValue:    { fontSize: 15, fontWeight: '500' },
+  reviewLabel:    { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
+  reviewValue:    { fontSize: 17, fontWeight: '500' },
   footer:         { padding: 16, borderTopWidth: StyleSheet.hairlineWidth },
   nextBtn:        { borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
-  nextBtnText:    { color: 'white', fontSize: 16, fontWeight: '700' },
+  nextBtnText:    { color: 'white', fontSize: 18, fontWeight: '700' },
 })
