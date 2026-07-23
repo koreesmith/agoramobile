@@ -52,7 +52,7 @@ export default function ConnectionsScreen() {
   const params = useLocalSearchParams<{ tab?: string }>()
   const [tab, setTab] = useState<Tab>((params.tab as Tab) || 'friends')
   const [search, setSearch] = useState('')
-  // AGORA-262: the list icon on a Fediverse/Bluesky follow row used to just
+  // AMOBILE-145: the list icon on a Fediverse/Bluesky follow row used to just
   // navigate to the standalone Friend Lists screen with no idea which
   // account it was tapped for — this opens a per-account add/remove picker
   // instead, mirroring web's FriendListModal.

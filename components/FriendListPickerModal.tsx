@@ -14,7 +14,7 @@ interface PickerFriend {
   emojis?: Record<string, string>
 }
 
-// AGORA-262: mobile parity for web's FriendListModal — previously the list
+// AMOBILE-145: mobile parity for web's FriendListModal — previously the list
 // icon on a Fediverse/Bluesky follow row just navigated to the standalone
 // Friend Lists screen with no idea which account it was tapped for, so
 // there was no way to actually add that specific account to a list from
