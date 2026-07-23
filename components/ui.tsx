@@ -167,7 +167,7 @@ export function EmptyState({ icon, title, subtitle }: { icon: string; title: str
   const c = useC()
   return (
     <View style={lay.emptyState}>
-      <Text style={{ fontSize: 48, marginBottom: 12 }}>{icon}</Text>
+      <Text style={{ fontSize: 54, marginBottom: 12 }}>{icon}</Text>
       <Text style={[lay.emptyTitle, { color: c.textMd }]}>{title}</Text>
       {subtitle && <Text style={[lay.emptySubtitle, { color: c.textLight }]}>{subtitle}</Text>}
     </View>
@@ -204,18 +204,18 @@ const lay = StyleSheet.create({
   statusDot: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#22c55e', borderWidth: 2, borderColor: '#ffffff' },
   screen: { flex: 1 },
   header: { borderBottomWidth: 1, paddingHorizontal: 16, paddingTop: 56, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  headerTitle: { fontSize: 22, fontWeight: 'bold' },
   headerBack: { marginRight: 8, marginLeft: -4 },
   card: { borderRadius: 16, marginHorizontal: 12, marginVertical: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
   button: { borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontWeight: '600', fontSize: 15 },
+  buttonText: { fontWeight: '600', fontSize: 17 },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 64 },
-  emptyTitle: { fontSize: 17, fontWeight: '600', textAlign: 'center' },
-  emptySubtitle: { textAlign: 'center', marginTop: 4, fontSize: 14 },
+  emptyTitle: { fontSize: 19, fontWeight: '600', textAlign: 'center' },
+  emptySubtitle: { textAlign: 'center', marginTop: 4, fontSize: 16 },
   spinner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   divider: { height: 1, marginHorizontal: 16 },
   uploadOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },
   uploadBox: { borderRadius: 16, padding: 28, alignItems: 'center', marginHorizontal: 40, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 },
-  uploadBoxTitle: { fontSize: 17, fontWeight: '600', marginBottom: 6 },
-  uploadBoxSub: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  uploadBoxTitle: { fontSize: 19, fontWeight: '600', marginBottom: 6 },
+  uploadBoxSub: { fontSize: 16, textAlign: 'center', lineHeight: 20 },
 })

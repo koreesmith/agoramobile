@@ -154,12 +154,12 @@ export default function PagesDiscoveryScreen() {
 
 const s = StyleSheet.create({
   row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  name:         { fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  meta:         { fontSize: 12 },
-  bio:          { fontSize: 12, marginTop: 2 },
+  name:         { fontSize: 17, fontWeight: '600', flexShrink: 1 },
+  meta:         { fontSize: 13 },
+  bio:          { fontSize: 13, marginTop: 2 },
   typeBadge:    { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
-  typeBadgeText:{ fontSize: 11, fontWeight: '600' },
+  typeBadgeText:{ fontSize: 12, fontWeight: '600' },
   subBtn:       { borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 },
-  subBtnText:   { fontSize: 12, fontWeight: '600' },
-  sectionHeader:{ fontSize: 12, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', paddingHorizontal: 16, paddingVertical: 8 },
+  subBtnText:   { fontSize: 13, fontWeight: '600' },
+  sectionHeader:{ fontSize: 13, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', paddingHorizontal: 16, paddingVertical: 8 },
 })

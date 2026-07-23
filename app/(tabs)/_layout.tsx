@@ -61,7 +61,7 @@ export default function TabsLayout() {
       },
       tabBarActiveTintColor: c.primary,
       tabBarInactiveTintColor: c.textLight,
-      tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
+      tabBarLabelStyle: { fontSize: 12, fontWeight: '500' },
     }}>
       <Tabs.Screen name="index" options={{ title: 'Feed', tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} /> }} />
       <Tabs.Screen name="notifications" options={{ title: 'Alerts', tabBarIcon: ({ color, size }) => <Ionicons name="notifications-outline" size={size} color={color} />, tabBarBadge: unread > 0 ? (unread > 9 ? '9+' : unread) : undefined }} />

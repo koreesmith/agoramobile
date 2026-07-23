@@ -240,7 +240,7 @@ export default function ConnectionsScreen() {
                   <TouchableOpacity onPress={() => accept.mutate(f.id)} style={[s.acceptBtn, { backgroundColor: c.primary }]}><Text style={s.acceptBtnText}>Accept</Text></TouchableOpacity>
                   <TouchableOpacity onPress={() => decline.mutate(f.id)} style={[s.declineBtn, { backgroundColor: c.bg, borderColor: c.border }]}><Text style={[s.declineBtnText, { color: c.textMd }]}>Decline</Text></TouchableOpacity>
                 </View>
-              ) : <Text style={{ fontSize: 12, color: c.textMuted }}>Pending</Text>
+              ) : <Text style={{ fontSize: 13, color: c.textMuted }}>Pending</Text>
             } />}
           />
         )}
@@ -252,8 +252,8 @@ export default function ConnectionsScreen() {
               ListEmptyComponent={<EmptyState icon="🔍" title="No suggestions" />}
               ListFooterComponent={invitesEnabled ? <View style={{ height: 88 }} /> : null}
               renderItem={({ item: u }) => <PersonRow user={u} right={
-                u.friend_status === 'pending' ? <Text style={{ fontSize: 12, color: c.textMuted }}>Sent</Text>
-                : u.friend_status === 'accepted' ? <Text style={{ fontSize: 12, color: '#22c55e', fontWeight: '500' }}>Friends</Text>
+                u.friend_status === 'pending' ? <Text style={{ fontSize: 13, color: c.textMuted }}>Sent</Text>
+                : u.friend_status === 'accepted' ? <Text style={{ fontSize: 13, color: '#22c55e', fontWeight: '500' }}>Friends</Text>
                 : <TouchableOpacity onPress={() => sendReq.mutate(u.id)} style={[s.acceptBtn, { backgroundColor: c.primary }]}><Text style={s.acceptBtnText}>Add</Text></TouchableOpacity>
               } />}
             />
@@ -626,16 +626,16 @@ export default function ConnectionsScreen() {
 const s = StyleSheet.create({
   tabBar:        { flexDirection: 'row', borderBottomWidth: 1 },
   tabItem:       { paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabText:       { fontSize: 13, fontWeight: '500', textTransform: 'capitalize' },
+  tabText:       { fontSize: 15, fontWeight: '500', textTransform: 'capitalize' },
   searchWrap:    { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
-  searchInput:   { flex: 1, fontSize: 14 },
+  searchInput:   { flex: 1, fontSize: 16 },
   row:           { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
-  name:          { fontWeight: '600', fontSize: 14 },
-  username:      { fontSize: 12 },
+  name:          { fontWeight: '600', fontSize: 16 },
+  username:      { fontSize: 13 },
   acceptBtn:     { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  acceptBtnText: { color: 'white', fontSize: 12, fontWeight: '600' },
+  acceptBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },
   declineBtn:    { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  declineBtnText:{ fontSize: 12, fontWeight: '600' },
+  declineBtnText:{ fontSize: 13, fontWeight: '600' },
   fab: {
     position: 'absolute',
     bottom: 20,
@@ -652,27 +652,27 @@ const s = StyleSheet.create({
     shadowRadius: 6,
     elevation: 6,
   },
-  fabText: { color: 'white', fontWeight: '700', fontSize: 15 },
+  fabText: { color: 'white', fontWeight: '700', fontSize: 17 },
   // ── Fediverse tab ──
   card: { borderRadius: 12, padding: 16, marginBottom: 16 },
-  cardTitle: { fontSize: 15, fontWeight: '600' },
-  cardSubtitle: { fontSize: 12, marginTop: 4, lineHeight: 17 },
+  cardTitle: { fontSize: 17, fontWeight: '600' },
+  cardSubtitle: { fontSize: 13, marginTop: 4, lineHeight: 17 },
   searchRow: { flexDirection: 'row', gap: 8 },
-  input: { flex: 1, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14 },
+  input: { flex: 1, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 16 },
   searchBtn: { width: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  error: { fontSize: 13, marginTop: 10 },
+  error: { fontSize: 15, marginTop: 10 },
   previewRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 14 },
-  previewName: { fontSize: 14, fontWeight: '600' },
-  previewHandle: { fontSize: 12, marginTop: 1 },
-  previewSummary: { fontSize: 12, marginTop: 4 },
+  previewName: { fontSize: 16, fontWeight: '600' },
+  previewHandle: { fontSize: 13, marginTop: 1 },
+  previewSummary: { fontSize: 13, marginTop: 4 },
   followBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, marginLeft: 8 },
-  followBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },
-  emptyText: { fontSize: 13, fontStyle: 'italic', textAlign: 'center', paddingVertical: 20, marginTop: 10, borderWidth: 1, borderStyle: 'dashed', borderRadius: 10 },
+  followBtnText: { color: 'white', fontSize: 15, fontWeight: '600' },
+  emptyText: { fontSize: 15, fontStyle: 'italic', textAlign: 'center', paddingVertical: 20, marginTop: 10, borderWidth: 1, borderStyle: 'dashed', borderRadius: 10 },
   followRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   followRowMain: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   pendingTag: { flexDirection: 'row', alignItems: 'center', gap: 3, marginRight: 4 },
-  pendingText: { fontSize: 11 },
+  pendingText: { fontSize: 12 },
   iconBtn: { padding: 6, marginLeft: 2 },
-  hintLink: { fontSize: 12, textAlign: 'center', marginTop: 4, lineHeight: 17 },
-  hintText: { fontSize: 11, marginTop: 10, lineHeight: 15 },
+  hintLink: { fontSize: 13, textAlign: 'center', marginTop: 4, lineHeight: 17 },
+  hintText: { fontSize: 12, marginTop: 10, lineHeight: 15 },
 })

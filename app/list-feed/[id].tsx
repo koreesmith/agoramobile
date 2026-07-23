@@ -61,6 +61,6 @@ export default function ListFeedScreen() {
 
 const s = StyleSheet.create({
   empty:      { alignItems: 'center', paddingVertical: 64, paddingHorizontal: 32 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', marginBottom: 6 },
-  emptySub:   { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { fontSize: 18, fontWeight: '600', marginBottom: 6 },
+  emptySub:   { fontSize: 16, textAlign: 'center', lineHeight: 20 },
 })

@@ -64,18 +64,18 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
   return (
     <View style={{ marginTop: 10, gap: 6 }}>
       {isExpired && (
-        <Text style={{ fontSize: 12, color: c.textMuted }}>🔒 This poll has ended</Text>
+        <Text style={{ fontSize: 13, color: c.textMuted }}>🔒 This poll has ended</Text>
       )}
       {!isExpired && isRemote && (
-        <Text style={{ fontSize: 12, color: c.textMuted }}>📡 Results from the fediverse — voting happens on the original post</Text>
+        <Text style={{ fontSize: 13, color: c.textMuted }}>📡 Results from the fediverse — voting happens on the original post</Text>
       )}
       {!isExpired && !isRemote && post.poll_expires_at && (
-        <Text style={{ fontSize: 12, color: c.textMuted }}>
+        <Text style={{ fontSize: 13, color: c.textMuted }}>
           ⏱ Closes {new Date(post.poll_expires_at).toLocaleString()}
         </Text>
       )}
       {post.poll_multiple_choice && canVote && !hasVoted && (
-        <Text style={{ fontSize: 11, color: c.textMuted }}>Select all that apply</Text>
+        <Text style={{ fontSize: 12, color: c.textMuted }}>Select all that apply</Text>
       )}
 
       {opts.map((opt: any) => {
@@ -115,7 +115,7 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
 
       {totalVotes > 0 && (
         <TouchableOpacity onPress={() => setShowVoters(true)}>
-          <Text style={{ fontSize: 12, color: c.textMuted, textDecorationLine: 'underline' }}>
+          <Text style={{ fontSize: 13, color: c.textMuted, textDecorationLine: 'underline' }}>
             {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
           </Text>
         </TouchableOpacity>
@@ -150,7 +150,7 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
             disabled={!newOptionText.trim() || addOption.isPending}
             style={[pw.addBtn, { backgroundColor: c.primary }]}
           >
-            <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>
+            <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>
               {addOption.isPending ? '…' : 'Add'}
             </Text>
           </TouchableOpacity>
@@ -158,7 +158,7 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
             onPress={() => { setShowAddOption(false); setNewOptionText('') }}
             style={[pw.addBtn, { backgroundColor: c.bg, borderWidth: 1, borderColor: c.border }]}
           >
-            <Text style={{ color: c.textMuted, fontSize: 13 }}>✕</Text>
+            <Text style={{ color: c.textMuted, fontSize: 15 }}>✕</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -169,7 +169,7 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
         </Text>
         {hasVoted && canVote && (
           <TouchableOpacity onPress={() => vote.mutate(null)}>
-            <Text style={{ fontSize: 11, color: c.primary, textDecorationLine: 'underline' }}>Remove vote</Text>
+            <Text style={{ fontSize: 12, color: c.primary, textDecorationLine: 'underline' }}>Remove vote</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -181,15 +181,15 @@ const pw = StyleSheet.create({
   resultRow:    { borderWidth: 1, borderRadius: 10, overflow: 'hidden', position: 'relative', marginBottom: 2 },
   resultFill:   { position: 'absolute', top: 0, bottom: 0, left: 0 },
   resultContent:{ flexDirection: 'row', justifyContent: 'space-between', padding: 10, alignItems: 'center' },
-  resultText:   { fontSize: 13, flex: 1 },
-  resultPct:    { fontSize: 12, flexShrink: 0 },
+  resultText:   { fontSize: 15, flex: 1 },
+  resultPct:    { fontSize: 13, flexShrink: 0 },
   optionRow:    { borderWidth: 1, borderRadius: 10, padding: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
-  optionText:   { fontSize: 13 },
+  optionText:   { fontSize: 15 },
   addOptionBtn: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  addOptionText:{ fontSize: 13 },
-  addOptionInput:{ borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13 },
+  addOptionText:{ fontSize: 15 },
+  addOptionInput:{ borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 15 },
   addBtn:       { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', justifyContent: 'center' },
-  voteCount:    { fontSize: 11 },
+  voteCount:    { fontSize: 12 },
 })
 
 export default function PostCard({ post, queryKey }: { post: any; queryKey: any[] }) {
@@ -515,16 +515,16 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             </View>
             <TouchableOpacity onPress={() => setTwExpanded(true)}
               style={{ borderWidth: 1, borderColor: '#fde68a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
-              <Text style={{ fontSize: 12, color: '#92400e', fontWeight: '500' }}>Show post</Text>
+              <Text style={{ fontSize: 13, color: '#92400e', fontWeight: '500' }}>Show post</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {post.content_warning && twExpanded && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-            <Text style={{ fontSize: 12, color: '#b45309' }}>⚠️ {post.content_warning}</Text>
+            <Text style={{ fontSize: 13, color: '#b45309' }}>⚠️ {post.content_warning}</Text>
             <TouchableOpacity onPress={() => setTwExpanded(false)} style={{ marginLeft: 'auto' }}>
-              <Text style={{ fontSize: 11, color: c.textMuted }}>Hide</Text>
+              <Text style={{ fontSize: 12, color: c.textMuted }}>Hide</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -682,7 +682,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               return (
                 <TouchableOpacity key={type} onPress={() => { setReactorsTab(type); setShowReactors(true) }}
                   style={[s.chip, { borderColor: isActive ? c.primaryLt : c.border, backgroundColor: isActive ? c.primaryBg : c.bg }]}>
-                  <Text style={{ fontSize: 12 }}>{emoji}</Text>
+                  <Text style={{ fontSize: 13 }}>{emoji}</Text>
                   <Text style={[s.chipCount, { color: isActive ? c.primary : c.textMuted }]}>{count}</Text>
                 </TouchableOpacity>
               )
@@ -693,7 +693,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         <View style={[s.actions, { borderTopColor: c.border }]}>
           <View ref={wrapperRef}>
             <View style={s.actionBtn} {...panResponder.panHandlers}>
-              <Text style={{ fontSize: 19 }}>{myReactionEmoji ?? '🤍'}</Text>
+              <Text style={{ fontSize: 21 }}>{myReactionEmoji ?? '🤍'}</Text>
               {totalReactions > 0 && <Text style={[s.actionCount, { color: c.textMuted }]}>{totalReactions}</Text>}
             </View>
           </View>
@@ -807,7 +807,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         <View style={[s.editModal, { backgroundColor: c.card }]}>
           <View style={[s.editHeader, { borderBottomColor: c.border }]}>
             <TouchableOpacity onPress={() => setShowEdit(false)}>
-              <Text style={{ fontSize: 16, color: c.textMuted }}>Cancel</Text>
+              <Text style={{ fontSize: 18, color: c.textMuted }}>Cancel</Text>
             </TouchableOpacity>
             <Text style={[s.editTitle, { color: c.text }]}>Edit post</Text>
             <TouchableOpacity
@@ -854,8 +854,8 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 >
                   <Ionicons name={opt.icon as any} size={18} color={editVisibility === opt.value ? c.primary : c.textMuted} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '500', color: editVisibility === opt.value ? c.primary : c.text }}>{opt.label}</Text>
-                    <Text style={{ fontSize: 12, color: c.textMuted }}>{opt.desc}</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '500', color: editVisibility === opt.value ? c.primary : c.text }}>{opt.label}</Text>
+                    <Text style={{ fontSize: 13, color: c.textMuted }}>{opt.desc}</Text>
                   </View>
                   {editVisibility === opt.value && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
                 </TouchableOpacity>
@@ -867,11 +867,11 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
           {showEditListSheet && editVisibility === 'group' && (
             <View style={[s.editInlinePicker, { backgroundColor: c.bg, borderBottomColor: c.border }]}>
               <TouchableOpacity onPress={() => setShowEditListSheet(false)} style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
-                <Text style={{ fontSize: 12, color: c.textMuted }}>← Back to audience</Text>
+                <Text style={{ fontSize: 13, color: c.textMuted }}>← Back to audience</Text>
               </TouchableOpacity>
               {editFriendLists.length === 0 ? (
                 <View style={{ padding: 16, alignItems: 'center' }}>
-                  <Text style={{ color: c.textMuted, fontSize: 13, textAlign: 'center' }}>
+                  <Text style={{ color: c.textMuted, fontSize: 15, textAlign: 'center' }}>
                     No friend lists yet. Create one in the Friends tab.
                   </Text>
                 </View>
@@ -884,8 +884,8 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                   >
                     <Ionicons name="people-outline" size={18} color={editFriendListId === g.id ? c.primary : c.textMuted} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '500', color: editFriendListId === g.id ? c.primary : c.text }}>{g.name}</Text>
-                      <Text style={{ fontSize: 12, color: c.textMuted }}>{g.member_count ?? 0} friends</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '500', color: editFriendListId === g.id ? c.primary : c.text }}>{g.name}</Text>
+                      <Text style={{ fontSize: 13, color: c.textMuted }}>{g.member_count ?? 0} friends</Text>
                     </View>
                     {editFriendListId === g.id && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
                   </TouchableOpacity>
@@ -897,9 +897,9 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
           <View style={{ padding: 16 }}>
             {showEditCW && (
               <View style={{ borderWidth: 1, borderColor: '#fcd34d', backgroundColor: '#fffbeb', borderRadius: 10, padding: 10, marginBottom: 12 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>⚠️ Trigger warning</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>⚠️ Trigger warning</Text>
                 <TextInput
-                  style={{ fontSize: 14, color: '#92400e', padding: 0 }}
+                  style={{ fontSize: 16, color: '#92400e', padding: 0 }}
                   value={editCW}
                   onChangeText={setEditCW}
                   placeholder="e.g. spoilers, violence…"
@@ -921,7 +921,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               onPress={() => setShowEditCW(v => !v)}
               style={[s.editCWBtn, { borderColor: showEditCW ? '#fcd34d' : c.border, backgroundColor: showEditCW ? '#fef3c7' : 'transparent' }]}
             >
-              <Text style={{ fontSize: 12, fontWeight: '600', color: showEditCW ? '#92400e' : c.textMuted }}>TW</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: showEditCW ? '#92400e' : c.textMuted }}>TW</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -932,7 +932,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         <View style={[s.editModal, { backgroundColor: c.card }]}>
           <View style={[s.editHeader, { borderBottomColor: c.border }]}>
             <TouchableOpacity onPress={closeShareModal}>
-              <Text style={{ fontSize: 16, color: c.textMuted }}>Cancel</Text>
+              <Text style={{ fontSize: 18, color: c.textMuted }}>Cancel</Text>
             </TouchableOpacity>
             <Text style={[s.editTitle, { color: c.text }]}>Share post</Text>
             <TouchableOpacity
@@ -979,8 +979,8 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 >
                   <Ionicons name={opt.icon as any} size={18} color={shareVisibility === opt.value ? c.primary : c.textMuted} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '500', color: shareVisibility === opt.value ? c.primary : c.text }}>{opt.label}</Text>
-                    <Text style={{ fontSize: 12, color: c.textMuted }}>{opt.desc}</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '500', color: shareVisibility === opt.value ? c.primary : c.text }}>{opt.label}</Text>
+                    <Text style={{ fontSize: 13, color: c.textMuted }}>{opt.desc}</Text>
                   </View>
                   {shareVisibility === opt.value && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
                 </TouchableOpacity>
@@ -991,11 +991,11 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
           {showShareListSheet && shareVisibility === 'group' && (
             <View style={[s.editInlinePicker, { backgroundColor: c.bg, borderBottomColor: c.border }]}>
               <TouchableOpacity onPress={() => setShowShareListSheet(false)} style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
-                <Text style={{ fontSize: 12, color: c.textMuted }}>← Back to audience</Text>
+                <Text style={{ fontSize: 13, color: c.textMuted }}>← Back to audience</Text>
               </TouchableOpacity>
               {editFriendLists.length === 0 ? (
                 <View style={{ padding: 16, alignItems: 'center' }}>
-                  <Text style={{ color: c.textMuted, fontSize: 13, textAlign: 'center' }}>
+                  <Text style={{ color: c.textMuted, fontSize: 15, textAlign: 'center' }}>
                     No friend lists yet. Create one in the Friends tab.
                   </Text>
                 </View>
@@ -1008,8 +1008,8 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                   >
                     <Ionicons name="people-outline" size={18} color={shareFriendListId === g.id ? c.primary : c.textMuted} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '500', color: shareFriendListId === g.id ? c.primary : c.text }}>{g.name}</Text>
-                      <Text style={{ fontSize: 12, color: c.textMuted }}>{g.member_count ?? 0} friends</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '500', color: shareFriendListId === g.id ? c.primary : c.text }}>{g.name}</Text>
+                      <Text style={{ fontSize: 13, color: c.textMuted }}>{g.member_count ?? 0} friends</Text>
                     </View>
                     {shareFriendListId === g.id && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
                   </TouchableOpacity>
@@ -1022,9 +1022,9 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             {/* AGORA-225: trigger warning for the sharer's own commentary */}
             {showShareCW && (
               <View style={{ borderWidth: 1, borderColor: '#fcd34d', backgroundColor: '#fffbeb', borderRadius: 10, padding: 10, marginBottom: 12 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>⚠️ Trigger warning</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>⚠️ Trigger warning</Text>
                 <TextInput
-                  style={{ fontSize: 14, color: '#92400e', padding: 0 }}
+                  style={{ fontSize: 16, color: '#92400e', padding: 0 }}
                   value={shareCW}
                   onChangeText={setShareCW}
                   placeholder="e.g. spoilers, violence…"
@@ -1046,7 +1046,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               onPress={() => setShowShareCW(v => !v)}
               style={[s.editCWBtn, { borderColor: showShareCW ? '#fcd34d' : c.border, backgroundColor: showShareCW ? '#fef3c7' : 'transparent' }]}
             >
-              <Text style={{ fontSize: 12, fontWeight: '600', color: showShareCW ? '#92400e' : c.textMuted }}>TW</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: showShareCW ? '#92400e' : c.textMuted }}>TW</Text>
             </TouchableOpacity>
             {/* Preview of post being shared */}
             <View style={[s.sharePreview, { borderColor: c.border, backgroundColor: c.bg }]}>
@@ -1056,7 +1056,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               </Text>
               {post.content ? <LinkedText text={post.content} style={[s.sharePreviewContent, { color: c.textMd }]} emojis={post.content_emojis} numberOfLines={3} /> : null}
               {(post.photo_urls?.length > 1 ? true : post.image_url) ? (
-                <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 4 }}>
+                <Text style={{ fontSize: 13, color: c.textMuted, marginTop: 4 }}>
                   📷 {post.photo_urls?.length > 1 ? `${post.photo_urls.length} photos` : 'Photo'}
                 </Text>
               ) : null}
@@ -1096,7 +1096,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                     hoveredReaction === r.type && { transform: [{ scale: 1.25 }] },
                   ]}
                 >
-                  <Text style={{ fontSize: 24 }}>{r.emoji}</Text>
+                  <Text style={{ fontSize: 27 }}>{r.emoji}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -1111,22 +1111,22 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
 const s = StyleSheet.create({
   card: { borderRadius: 16, marginHorizontal: 12, marginVertical: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2, overflow: 'hidden' },
   groupBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
-  groupBadgeText: { fontSize: 12, fontWeight: '600' },
-  groupBadgeArrow: { fontSize: 11 },
+  groupBadgeText: { fontSize: 13, fontWeight: '600' },
+  groupBadgeArrow: { fontSize: 12 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 },
-  bannerText: { fontSize: 12 },
+  bannerText: { fontSize: 13 },
   body: { padding: 14 },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  authorName: { fontWeight: '600', fontSize: 14 },
-  pronouns:   { fontSize: 12, fontWeight: '400' },
-  authorMeta: { fontSize: 12, marginTop: 1 },
+  authorName: { fontWeight: '600', fontSize: 16 },
+  pronouns:   { fontSize: 13, fontWeight: '400' },
+  authorMeta: { fontSize: 13, marginTop: 1 },
   cw: { backgroundColor: '#fefce8', borderWidth: 1, borderColor: '#fde68a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8 },
-  cwText: { fontSize: 12, color: '#92400e', fontWeight: '500' },
-  content: { fontSize: 14, lineHeight: 21, marginBottom: 8 },
+  cwText: { fontSize: 13, color: '#92400e', fontWeight: '500' },
+  content: { fontSize: 16, lineHeight: 21, marginBottom: 8 },
   quotedPost: { borderWidth: 1, borderRadius: 12, padding: 10, marginBottom: 8 },
-  quotedAuthorName: { fontWeight: '600', fontSize: 13 },
-  quotedAuthorMeta: { fontSize: 12 },
-  quotedContent: { fontSize: 13, lineHeight: 19 },
+  quotedAuthorName: { fontWeight: '600', fontSize: 15 },
+  quotedAuthorMeta: { fontSize: 13 },
+  quotedContent: { fontSize: 15, lineHeight: 19 },
   quotedImage: { width: '100%', aspectRatio: 1.4, borderRadius: 8, marginTop: 6 },
   quotedLinkPreview: { flexDirection: 'row', marginTop: 6, borderWidth: 1, borderRadius: 8, overflow: 'hidden' },
   quotedLinkImage: { width: 56, height: 56 },
@@ -1135,44 +1135,44 @@ const s = StyleSheet.create({
   imageMulti: { width: Dimensions.get('window').width * 0.72, aspectRatio: 1 },
   lightboxNav: { flexDirection: 'row', alignItems: 'center', gap: 24, marginTop: 12 },
   lightboxNavBtn: { padding: 8 },
-  lightboxNavText: { color: 'white', fontSize: 36, lineHeight: 40 },
-  lightboxCounter: { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
+  lightboxNavText: { color: 'white', fontSize: 40, lineHeight: 40 },
+  lightboxCounter: { color: 'rgba(255,255,255,0.7)', fontSize: 16 },
   linkPreview: { marginTop: 8, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
-  linkDomain: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3 },
-  linkTitle: { fontSize: 13, fontWeight: '600', marginTop: 2 },
-  linkDesc: { fontSize: 12, marginTop: 2 },
+  linkDomain: { fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.3 },
+  linkTitle: { fontSize: 15, fontWeight: '600', marginTop: 2 },
+  linkDesc: { fontSize: 13, marginTop: 2 },
   reactionCounts: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 8 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 14, borderWidth: 1 },
-  chipCount: { fontSize: 13 },
+  chipCount: { fontSize: 15 },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  actionCount: { fontSize: 12 },
+  actionCount: { fontSize: 13 },
   picker: { position: 'absolute', bottom: 40, left: 0, borderWidth: 1, borderRadius: 24, padding: 8, flexDirection: 'row', gap: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10, zIndex: 99 },
   pickerModal: { position: 'absolute', borderWidth: 1, borderRadius: 24, padding: 8, flexDirection: 'row', gap: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10 },
   pickerItem: { borderRadius: 10, padding: 3 },
   pickerItemActive: { borderRadius: 10 },
   lightboxBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' },
-  lightboxClose: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 16 },
+  lightboxClose: { color: 'rgba(255,255,255,0.5)', fontSize: 15, marginTop: 16 },
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
   menuSheet: { borderRadius: 16, borderWidth: 1, overflow: 'hidden', minWidth: 220 },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16 },
-  menuItemText: { fontSize: 16 },
+  menuItemText: { fontSize: 18 },
   menuDivider: { height: 1 },
   editModal: { flex: 1 },
   editHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12, borderBottomWidth: 1 },
-  editTitle: { fontWeight: '600', fontSize: 16 },
+  editTitle: { fontWeight: '600', fontSize: 18 },
   editSaveBtn: { backgroundColor: '#486581', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 6 },
   editSaveBtnText: { color: 'white', fontWeight: '600' },
-  editInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15, minHeight: 120, textAlignVertical: 'top', marginBottom: 12 },
+  editInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 17, minHeight: 120, textAlignVertical: 'top', marginBottom: 12 },
   editCWBtn: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   editAudienceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
-  editAudienceLabel: { fontSize: 13, fontWeight: '600' },
+  editAudienceLabel: { fontSize: 15, fontWeight: '600' },
   editInlinePicker: { borderBottomWidth: 1 },
   editInlineOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   sharePreview:        { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12 },
-  sharePreviewAuthor:  { fontSize: 13, fontWeight: '600', marginBottom: 4 },
-  sharePreviewContent: { fontSize: 13, lineHeight: 19 },
+  sharePreviewAuthor:  { fontSize: 15, fontWeight: '600', marginBottom: 4 },
+  sharePreviewContent: { fontSize: 15, lineHeight: 19 },
   playBtn: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   inlineComment: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10, paddingHorizontal: 14, paddingBottom: 10, borderTopWidth: StyleSheet.hairlineWidth },
-  inlineCommentInput: { flex: 1, borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, fontSize: 13, maxHeight: 80 },
+  inlineCommentInput: { flex: 1, borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, fontSize: 15, maxHeight: 80 },
 })

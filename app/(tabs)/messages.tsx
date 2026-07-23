@@ -81,12 +81,12 @@ export default function MessagesScreen() {
 
 const s = StyleSheet.create({
   searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border, paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
-  searchInput: { flex: 1, fontSize: 14, color: '#111827' },
+  searchInput: { flex: 1, fontSize: 16, color: '#111827' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
   badge: { position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: 10, backgroundColor: '#486581', alignItems: 'center', justifyContent: 'center' },
-  badgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
-  name: { fontSize: 14, fontWeight: '500', color: '#374151' },
-  time: { fontSize: 12, color: '#9ca3af' },
-  preview: { fontSize: 13, color: '#9ca3af', marginTop: 2 },
+  badgeText: { color: 'white', fontSize: 11, fontWeight: 'bold' },
+  name: { fontSize: 16, fontWeight: '500', color: '#374151' },
+  time: { fontSize: 13, color: '#9ca3af' },
+  preview: { fontSize: 15, color: '#9ca3af', marginTop: 2 },
 })
 

@@ -143,8 +143,8 @@ export default function GroupsScreen() {
 
             <View style={[s.privacyRow, { borderColor: c.border }]}>
               <View style={{ flex: 1 }}>
-                <Text style={[{ fontSize: 14, fontWeight: '600', color: c.text }]}>Private</Text>
-                <Text style={[{ fontSize: 12, color: c.textMuted, marginTop: 2 }]}>
+                <Text style={[{ fontSize: 16, fontWeight: '600', color: c.text }]}>Private</Text>
+                <Text style={[{ fontSize: 13, color: c.textMuted, marginTop: 2 }]}>
                   {newPrivate ? 'Invite-only / approval required' : 'Anyone can join'}
                 </Text>
               </View>
@@ -180,20 +180,20 @@ export default function GroupsScreen() {
 
 const s = StyleSheet.create({
   searchWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1 },
-  searchInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 16, paddingVertical: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
   groupIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#d9e2ec', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  groupLetter: { color: '#486581', fontWeight: 'bold', fontSize: 20 },
-  name: { fontWeight: '600', color: '#111827', fontSize: 14 },
-  meta: { fontSize: 12, color: '#6b7280', marginTop: 2 },
+  groupLetter: { color: '#486581', fontWeight: 'bold', fontSize: 22 },
+  name: { fontWeight: '600', color: '#111827', fontSize: 16 },
+  meta: { fontSize: 13, color: '#6b7280', marginTop: 2 },
   joinBtn: { backgroundColor: '#486581', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  joinBtnText: { color: 'white', fontSize: 12, fontWeight: '600' },
-  sectionHeader: { fontSize: 11, fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
+  joinBtnText: { color: 'white', fontSize: 13, fontWeight: '600' },
+  sectionHeader: { fontSize: 12, fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   modalCard: { width: '100%', borderRadius: 16, padding: 20, gap: 6 },
-  modalTitle: { fontSize: 17, fontWeight: '700', marginBottom: 6 },
-  fieldLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 8, marginBottom: 4 },
-  fieldInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
+  modalTitle: { fontSize: 19, fontWeight: '700', marginBottom: 6 },
+  fieldLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 8, marginBottom: 4 },
+  fieldInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16 },
   fieldMultiline: { minHeight: 60, textAlignVertical: 'top' },
   privacyRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, padding: 12, marginTop: 8 },
   modalBtn: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },

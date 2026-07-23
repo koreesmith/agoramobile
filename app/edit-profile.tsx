@@ -135,7 +135,7 @@ export default function EditProfileScreen() {
           <TouchableOpacity onPress={() => save.mutate()} disabled={save.isPending}>
             {save.isPending
               ? <ActivityIndicator size="small" color={c.primary} />
-              : <Text style={{ color: c.primary, fontWeight: '600', fontSize: 16 }}>Save</Text>}
+              : <Text style={{ color: c.primary, fontWeight: '600', fontSize: 18 }}>Save</Text>}
           </TouchableOpacity>
         ),
       }} />
@@ -157,14 +157,14 @@ export default function EditProfileScreen() {
             <View style={[f.coverWrap, { backgroundColor: c.primaryBg }]}>
               {coverUrl
                 ? <Image source={{ uri: imgUrl(coverUrl) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                : <Text style={{ color: c.textMuted, fontSize: 13 }}>Tap to add cover photo</Text>}
+                : <Text style={{ color: c.textMuted, fontSize: 15 }}>Tap to add cover photo</Text>}
               {uploadingCover && (
                 <View style={f.coverOverlay}>
                   <ActivityIndicator color="white" />
                 </View>
               )}
               <View style={f.coverEditBadge}>
-                <Text style={{ color: 'white', fontSize: 11, fontWeight: '600' }}>EDIT</Text>
+                <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>EDIT</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -177,11 +177,11 @@ export default function EditProfileScreen() {
                 <View style={[f.editBadge, { backgroundColor: c.primary }]}>
                   {uploadingAvatar
                     ? <ActivityIndicator size="small" color="white" />
-                    : <Text style={{ color: 'white', fontSize: 14 }}>✏️</Text>}
+                    : <Text style={{ color: 'white', fontSize: 16 }}>✏️</Text>}
                 </View>
               </View>
             </TouchableOpacity>
-            <Text style={{ color: c.primary, fontSize: 13, marginTop: 6 }}>Change photo</Text>
+            <Text style={{ color: c.primary, fontSize: 15, marginTop: 6 }}>Change photo</Text>
           </View>
 
           {/* Profile fields */}
@@ -196,8 +196,8 @@ export default function EditProfileScreen() {
           <Text style={[f.sectionLabel, { color: c.textMuted, marginTop: 8 }]}>Notifications</Text>
           <View style={[f.toggleRow, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, color: c.text, fontWeight: '500' }}>Email notifications</Text>
-              <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 2 }}>Receive emails for likes, comments, friend requests</Text>
+              <Text style={{ fontSize: 17, color: c.text, fontWeight: '500' }}>Email notifications</Text>
+              <Text style={{ fontSize: 13, color: c.textMuted, marginTop: 2 }}>Receive emails for likes, comments, friend requests</Text>
             </View>
             <Switch
               value={emailEnabled}
@@ -211,8 +211,8 @@ export default function EditProfileScreen() {
           <Text style={[f.sectionLabel, { color: c.textMuted, marginTop: 8 }]}>Privacy</Text>
           <View style={[f.toggleRow, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, color: c.text, fontWeight: '500' }}>Private profile</Text>
-              <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 2 }}>Only friends can see your profile and timeline</Text>
+              <Text style={{ fontSize: 17, color: c.text, fontWeight: '500' }}>Private profile</Text>
+              <Text style={{ fontSize: 13, color: c.textMuted, marginTop: 2 }}>Only friends can see your profile and timeline</Text>
             </View>
             <Switch
               value={!!(user as any)?.profile_private}
@@ -223,8 +223,8 @@ export default function EditProfileScreen() {
           </View>
           <View style={[f.toggleRow, { backgroundColor: c.card, borderColor: c.border, marginTop: 8 }]}>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, color: c.text, fontWeight: '500' }}>Hide timeline</Text>
-              <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 2 }}>Nobody can browse your posts on your profile — posts still appear in friends' feeds</Text>
+              <Text style={{ fontSize: 17, color: c.text, fontWeight: '500' }}>Hide timeline</Text>
+              <Text style={{ fontSize: 13, color: c.textMuted, marginTop: 2 }}>Nobody can browse your posts on your profile — posts still appear in friends' feeds</Text>
             </View>
             <Switch
               value={!!(user as any)?.hide_timeline}
@@ -249,9 +249,9 @@ export default function EditProfileScreen() {
 }
 
 const f = StyleSheet.create({
-  sectionLabel:  { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 12, marginTop: 8 },
-  label:         { fontSize: 14, fontWeight: '500', marginBottom: 6 },
-  input:         { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15 },
+  sectionLabel:  { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 12, marginTop: 8 },
+  label:         { fontSize: 16, fontWeight: '500', marginBottom: 6 },
+  input:         { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 17 },
   avatarSection: { alignItems: 'center', marginBottom: 24 },
   editBadge:     { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'white' },
   coverWrap:     { width: '100%', height: 120, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
@@ -259,5 +259,5 @@ const f = StyleSheet.create({
   coverEditBadge:{ position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   toggleRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 16 },
   saveBtn:       { borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
-  saveBtnText:   { color: 'white', fontWeight: '600', fontSize: 16 },
+  saveBtnText:   { color: 'white', fontWeight: '600', fontSize: 18 },
 })

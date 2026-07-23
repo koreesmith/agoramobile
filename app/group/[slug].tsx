@@ -134,8 +134,8 @@ export default function GroupScreen() {
                   <>
                     {showCW && (
                       <View style={{ borderWidth: 1, borderColor: '#fcd34d', backgroundColor: '#fffbeb', borderRadius: 8, padding: 8, marginBottom: 8 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>⚠️ Trigger warning</Text>
-                        <TextInput style={{ fontSize: 13, color: '#92400e', padding: 0 }} placeholder="e.g. spoilers, violence…" placeholderTextColor="#d97706"
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>⚠️ Trigger warning</Text>
+                        <TextInput style={{ fontSize: 15, color: '#92400e', padding: 0 }} placeholder="e.g. spoilers, violence…" placeholderTextColor="#d97706"
                           value={cwLabel} onChangeText={setCwLabel} returnKeyType="done" />
                       </View>
                     )}
@@ -172,12 +172,12 @@ export default function GroupScreen() {
                             ? <ActivityIndicator size="small" color={c.primary} />
                             : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                                 <Ionicons name="image-outline" size={20} color={imageUrls.length >= MAX_IMAGES ? c.border : c.primary} />
-                                {imageUrls.length > 0 && <Text style={{ fontSize: 11, color: c.primary, fontWeight: '600' }}>{imageUrls.length}/{MAX_IMAGES}</Text>}
+                                {imageUrls.length > 0 && <Text style={{ fontSize: 12, color: c.primary, fontWeight: '600' }}>{imageUrls.length}/{MAX_IMAGES}</Text>}
                               </View>}
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setShowCW(v => !v)}
                           style={{ borderWidth: 1, borderColor: showCW ? '#fcd34d' : c.border, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: showCW ? '#fef3c7' : 'transparent' }}>
-                          <Text style={{ fontSize: 11, fontWeight: '600', color: showCW ? '#92400e' : c.textMuted }}>TW</Text>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: showCW ? '#92400e' : c.textMuted }}>TW</Text>
                         </TouchableOpacity>
                       </View>
                       <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -212,22 +212,22 @@ const s = StyleSheet.create({
   groupCard: { backgroundColor: C.card, paddingHorizontal: 16, paddingBottom: 16 },
   groupHeaderRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: -32 },
   groupIcon: { width: 64, height: 64, borderRadius: 12, backgroundColor: C.primaryBg, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: C.card },
-  groupLetter: { color: C.primary, fontWeight: 'bold', fontSize: 26 },
+  groupLetter: { color: C.primary, fontWeight: 'bold', fontSize: 29 },
   joinBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8, marginTop: 32 },
   joinBtnText: { color: 'white', fontWeight: '600' },
-  groupName: { fontSize: 20, fontWeight: 'bold', color: C.text, marginTop: 10 },
-  groupMeta: { fontSize: 12, color: C.textMuted, marginTop: 2, textTransform: 'capitalize' },
-  groupDesc: { fontSize: 14, color: C.textMd, marginTop: 6 },
+  groupName: { fontSize: 22, fontWeight: 'bold', color: C.text, marginTop: 10 },
+  groupMeta: { fontSize: 13, color: C.textMuted, marginTop: 2, textTransform: 'capitalize' },
+  groupDesc: { fontSize: 16, color: C.textMd, marginTop: 6 },
   composer: { backgroundColor: C.card, marginHorizontal: 12, marginTop: 12, borderRadius: 14, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
   composerPrompt: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  composerText: { color: C.textLight, fontSize: 14 },
-  composeInput: { fontSize: 14, color: C.text, minHeight: 60 },
+  composerText: { color: C.textLight, fontSize: 16 },
+  composeInput: { fontSize: 16, color: C.text, minHeight: 60 },
   composeActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: C.border },
   cancelBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  cancelBtnText: { fontSize: 13, color: C.textMd },
+  cancelBtnText: { fontSize: 15, color: C.textMd },
   postBtn: { backgroundColor: C.primary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
-  postBtnText: { color: 'white', fontWeight: '600', fontSize: 13 },
+  postBtnText: { color: 'white', fontWeight: '600', fontSize: 15 },
   removeImg: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
-  postsHeader: { fontSize: 11, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
-  empty: { textAlign: 'center', color: C.textLight, fontSize: 14, paddingVertical: 32 },
+  postsHeader: { fontSize: 12, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
+  empty: { textAlign: 'center', color: C.textLight, fontSize: 16, paddingVertical: 32 },
 })

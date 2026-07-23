@@ -274,7 +274,7 @@ export default function ProfileViewScreen() {
                     )}
                     {status === 'pending' && (
                       <View style={[s.actionBtn, { borderColor: c.border }]}>
-                        <Text style={{ fontSize: 13, color: c.textMuted }}>Pending</Text>
+                        <Text style={{ fontSize: 15, color: c.textMuted }}>Pending</Text>
                       </View>
                     )}
                     {status === 'pending_incoming' && (
@@ -325,7 +325,7 @@ export default function ProfileViewScreen() {
 
           <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 6 }}>
             <Text style={[s.name, { color: c.text }]}>{profile.display_name ? renderName(profile.display_name, profile.emojis) : profile.username}</Text>
-            {profile.pronouns ? <Text style={{ fontSize: 13, color: c.textLight }}>({profile.pronouns})</Text> : null}
+            {profile.pronouns ? <Text style={{ fontSize: 15, color: c.textLight }}>({profile.pronouns})</Text> : null}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <Text style={[s.username, { color: c.textMuted }]}>{handle(profile.username, (profile as any).is_remote, (profile as any).remote_instance)}</Text>
@@ -342,13 +342,13 @@ export default function ProfileViewScreen() {
           {(profile as any).location ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
               <Ionicons name="location-outline" size={13} color={c.textMuted} />
-              <Text style={{ fontSize: 13, color: c.textMuted }}>{(profile as any).location}</Text>
+              <Text style={{ fontSize: 15, color: c.textMuted }}>{(profile as any).location}</Text>
             </View>
           ) : null}
           {(profile as any).website ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
               <Ionicons name="link-outline" size={13} color={c.primary} />
-              <Text style={{ fontSize: 13, color: c.primary }}>{(profile as any).website}</Text>
+              <Text style={{ fontSize: 15, color: c.primary }}>{(profile as any).website}</Text>
             </View>
           ) : null}
           {/* AGORA-253: a remote account's own post/follower/following
@@ -357,13 +357,13 @@ export default function ProfileViewScreen() {
               account it doesn't actually track the social graph of. */}
           {(isFediverse || isBluesky) && (profile as any).remote_follower_count != null ? (
             <View style={{ flexDirection: 'row', gap: 16, marginTop: 10 }}>
-              <Text style={{ fontSize: 14, color: c.textMuted }}>
+              <Text style={{ fontSize: 16, color: c.textMuted }}>
                 <Text style={{ fontWeight: 'bold', color: c.text }}>{(profile as any).remote_post_count ?? 0}</Text> posts
               </Text>
-              <Text style={{ fontSize: 14, color: c.textMuted }}>
+              <Text style={{ fontSize: 16, color: c.textMuted }}>
                 <Text style={{ fontWeight: 'bold', color: c.text }}>{(profile as any).remote_follower_count ?? 0}</Text> followers
               </Text>
-              <Text style={{ fontSize: 14, color: c.textMuted }}>
+              <Text style={{ fontSize: 16, color: c.textMuted }}>
                 <Text style={{ fontWeight: 'bold', color: c.text }}>{(profile as any).remote_following_count ?? 0}</Text> following
               </Text>
             </View>
@@ -428,19 +428,19 @@ const s = StyleSheet.create({
   avatarBorder:  { borderWidth: 4, borderRadius: 40 },
   actions:       { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 36 },
   actionBtn:     { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
-  actionBtnText: { fontSize: 13, fontWeight: '500' },
+  actionBtnText: { fontSize: 15, fontWeight: '500' },
   primaryBtn:    { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
-  primaryBtnText:{ color: 'white', fontWeight: '600', fontSize: 13 },
-  name:          { fontSize: 20, fontWeight: 'bold' },
-  username:      { fontSize: 14, marginTop: 2 },
+  primaryBtnText:{ color: 'white', fontWeight: '600', fontSize: 15 },
+  name:          { fontSize: 22, fontWeight: 'bold' },
+  username:      { fontSize: 16, marginTop: 2 },
   followsYouTag: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  followsYouText:{ fontSize: 11, fontWeight: '500' },
-  bio:           { fontSize: 14, marginTop: 6, lineHeight: 20 },
-  friends:       { fontSize: 14, marginTop: 10 },
+  followsYouText:{ fontSize: 12, fontWeight: '500' },
+  bio:           { fontSize: 16, marginTop: 6, lineHeight: 20 },
+  friends:       { fontSize: 16, marginTop: 10 },
   albumsRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  albumsText:    { fontSize: 14, fontWeight: '500' },
+  albumsText:    { fontSize: 16, fontWeight: '500' },
   private:       { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 32, marginHorizontal: 12, borderRadius: 16 },
-  privateTitle:  { fontSize: 16, fontWeight: '600', marginTop: 12 },
-  privateText:   { fontSize: 14, textAlign: 'center', marginTop: 4 },
-  noPosts:       { textAlign: 'center', fontSize: 14, paddingVertical: 48 },
+  privateTitle:  { fontSize: 18, fontWeight: '600', marginTop: 12 },
+  privateText:   { fontSize: 16, textAlign: 'center', marginTop: 4 },
+  noPosts:       { textAlign: 'center', fontSize: 16, paddingVertical: 48 },
 })
