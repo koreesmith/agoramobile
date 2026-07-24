@@ -115,7 +115,7 @@ export default function GroupScreen() {
             <View style={[s.groupCard, { backgroundColor: c.card }]}>
               <View style={s.groupHeaderRow}>
                 <View style={[s.groupIcon, { backgroundColor: c.primaryBg, borderColor: c.card }]}>
-                  {group.avatar_url ? <Image source={{ uri: imgUrl(group.avatar_url) }} style={{ width: 64, height: 64 }} /> : <Text style={[s.groupLetter, { color: c.primary }]}>{group.name[0]}</Text>}
+                  {group.avatar_url ? <Image source={{ uri: imgUrl(group.avatar_url) }} style={{ width: 64, height: 64 }} /> : <Text style={[s.groupLetter, { color: c.primary }]}>{(group.name || '?')[0]}</Text>}
                 </View>
                 {!group.is_member && (
                   <TouchableOpacity onPress={() => join.mutate()} disabled={join.isPending} style={[s.joinBtn, { backgroundColor: c.primary }]}>

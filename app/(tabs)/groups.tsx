@@ -53,7 +53,7 @@ export default function GroupsScreen() {
   const GroupRow = ({ group }: { group: any }) => (
     <TouchableOpacity onPress={() => router.push(`/group/${group.slug}`)} style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
       <View style={s.groupIcon}>
-        {group.avatar_url ? <Image source={{ uri: group.avatar_url }} style={{ width: 48, height: 48 }} /> : <Text style={s.groupLetter}>{group.name[0]}</Text>}
+        {group.avatar_url ? <Image source={{ uri: group.avatar_url }} style={{ width: 48, height: 48 }} /> : <Text style={s.groupLetter}>{(group.name || '?')[0]}</Text>}
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[s.name, { color: c.text }]}>{group.name}</Text>
