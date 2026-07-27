@@ -22,22 +22,24 @@
 import { Alert } from 'react-native'
 import { File, Paths } from 'expo-file-system'
 
+// Written by the patched RCTTurboModule.mm (withTurboModuleVoidExceptionGuard).
 const LOG_FILENAME = 'turbomodule_exceptions.log'
+
+// Written by IOS26TerminateLogger.mm (withIOS26ClassPrewarm) when an exception
+// reaches std::terminate. In build 112 this handler ran and aborted, so it holds
+// the name and reason of the exception that is actually killing the app.
+const TERMINATE_LOG_FILENAME = 'ios26_crash.log'
 
 // Keep alerts readable — the native log includes a full symbolicated stack.
 const MAX_ALERT_CHARS = 1200
 
-function logFile(): File {
-  return new File(Paths.document, LOG_FILENAME)
+function logFile(name: string = LOG_FILENAME): File {
+  return new File(Paths.document, name)
 }
 
-/**
- * Contents of the native void-TurboModule exception log, or null if nothing has
- * been recorded. Never throws — diagnostics must not become a failure mode.
- */
-export function readNativeExceptionLog(): string | null {
+function readLog(name: string): string | null {
   try {
-    const file = logFile()
+    const file = logFile(name)
     if (!file.exists) return null
     const text = file.textSync()
     return text.trim().length > 0 ? text : null
@@ -46,35 +48,61 @@ export function readNativeExceptionLog(): string | null {
   }
 }
 
+/**
+ * Contents of the native void-TurboModule exception log, or null if nothing has
+ * been recorded. Never throws — diagnostics must not become a failure mode.
+ */
+export function readNativeExceptionLog(): string | null {
+  return readLog(LOG_FILENAME)
+}
+
+export function readTerminateLog(): string | null {
+  return readLog(TERMINATE_LOG_FILENAME)
+}
+
 export function clearNativeExceptionLog(): void {
-  try {
-    const file = logFile()
-    if (file.exists) file.delete()
-  } catch {
-    // Nothing useful to do — the log is best-effort.
+  for (const name of [LOG_FILENAME, TERMINATE_LOG_FILENAME]) {
+    try {
+      const file = logFile(name)
+      if (file.exists) file.delete()
+    } catch {
+      // Nothing useful to do — the logs are best-effort.
+    }
   }
 }
 
 /**
- * Shows any native exception recorded since the last launch, then clears it so
- * the same one isn't reported twice.
+ * Shows anything the native handlers recorded since the last launch.
+ *
+ * Both logs also live in the app's Documents folder, which is exposed to the
+ * Files app (UIFileSharingEnabled) — that is the reliable way to retrieve them,
+ * since an alert disappears with the process if the app dies again.
  */
 export function reportNativeExceptionLog(): void {
-  const log = readNativeExceptionLog()
-  if (!log) return
+  const terminate = readTerminateLog()
+  const voidException = readNativeExceptionLog()
+  if (!terminate && !voidException) return
 
-  // Most recent entry first — the file is appended to across launches.
-  const entries = log.split('[turbomodule-void-exception]').filter(e => e.trim())
-  const latest = entries[entries.length - 1] ?? log
+  const parts: string[] = []
+  if (terminate) parts.push(`— std::terminate —\n${latestEntry(terminate, '[ios26]')}`)
+  if (voidException) {
+    parts.push(`— void TurboModule —\n${latestEntry(voidException, '[turbomodule-void-exception]')}`)
+  }
 
   Alert.alert(
     'Native exception recorded',
-    truncate(latest.trim()),
+    truncate(parts.join('\n\n')),
     [
-      { text: 'Keep log', style: 'cancel' },
+      { text: 'Keep (also in Files app)', style: 'cancel' },
       { text: 'Clear', style: 'destructive', onPress: clearNativeExceptionLog },
     ],
   )
+}
+
+/** Logs are appended across launches — show the most recent entry. */
+function latestEntry(log: string, delimiter: string): string {
+  const entries = log.split(delimiter).filter(e => e.trim())
+  return (entries[entries.length - 1] ?? log).trim()
 }
 
 /**
