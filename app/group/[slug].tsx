@@ -36,7 +36,10 @@ export default function GroupScreen() {
     initialPageParam: 0,
   })
 
-  const posts = data?.pages.flatMap(p => p.posts) ?? []
+  // A page has no `posts` key when the group feed is empty or you're not a member,
+  // so flatMap must not spread `undefined` into the list — FlatList's keyExtractor
+  // would then dereference it and throw. (getNextPageParam above already guards.)
+  const posts = (data?.pages.flatMap(p => p?.posts ?? []) ?? []).filter(Boolean)
   const group = groupData?.group || groupData
 
   const join = useMutation({ mutationFn: () => groupsApi.join(slug!), onSuccess: () => { qc.invalidateQueries({ queryKey: ['group', slug] }); qc.invalidateQueries({ queryKey: ['groups'] }) } })
@@ -100,7 +103,7 @@ export default function GroupScreen() {
       }} />
       <FlatList
         data={posts}
-        keyExtractor={p => p.id}
+        keyExtractor={(p, i) => String(p?.id ?? i)}
         renderItem={({ item }) => <PostCard post={item} queryKey={['group-feed', slug]} />}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { rg(); rf() }} tintColor={c.primary} />}
         onEndReached={() => hasNextPage && fetchNextPage()}

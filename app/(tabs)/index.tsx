@@ -223,8 +223,8 @@ export default function FeedScreen() {
     initialPageParam: 0,
   })
 
-  const posts = (data?.pages.flatMap(p => p.posts) ?? [])
-    .filter((p: any) => !blockedIds.includes(p.author_id))
+  const posts = (data?.pages.flatMap(p => p?.posts ?? []) ?? [])
+    .filter((p: any) => p && !blockedIds.includes(p.author_id))
 
   const postData = {
     content,
