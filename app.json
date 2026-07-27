@@ -20,7 +20,9 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Used to take photos for posts and your profile.",
         "NSPhotoLibraryUsageDescription": "Used to choose photos for posts and your profile.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIFileSharingEnabled": true,
+        "LSSupportsOpeningDocumentsInPlace": true
       }
     },
     "android": {

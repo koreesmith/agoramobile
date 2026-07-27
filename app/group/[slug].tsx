@@ -79,28 +79,49 @@ export default function GroupScreen() {
     finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploading(false) }
   }
 
-  if (gl || !group) return <Screen><Stack.Screen options={{ headerShown: true, headerTitle: 'Group', headerTintColor: c.primary }} /><Spinner /></Screen>
+  // AMOBILE-147: one stable header config, rendered identically in the loading and
+  // loaded branches. Previously the loading branch declared a different set of
+  // options and `headerRight` returned null until the group loaded, so finishing
+  // the fetch made react-native-screens tear down a header subview. That path
+  // (RNSScreenStackHeaderConfig unmountChildComponentView ->
+  // replaceNavigationBarViewsWithSnapshotOfSubview) takes a synchronous
+  // CARenderServer snapshot on the main thread, which is where the main thread sat
+  // in the build-112 crash. Keeping the subview mounted and only changing its
+  // contents avoids the unmount entirely.
+  const isMember = !!group?.is_member
+  const canManage = group?.my_role === 'admin' || group?.is_admin
 
-  return (
-    <Screen>
-      <UploadingModal visible={showUploadModal} />
-      <Stack.Screen options={{
-        headerShown: true, headerTitle: group.name, headerBackTitle: 'Groups',
-        headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
-        headerRight: () => group.is_member ? (
-          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-            {(group.my_role === 'admin' || group.is_admin) && (
-              <TouchableOpacity onPress={() => router.push(`/group/manage/${slug}`)}>
-                <Ionicons name="settings-outline" size={22} color={c.primary} />
-              </TouchableOpacity>
-            )}
+  const headerConfig = (
+    <Stack.Screen options={{
+      headerShown: true,
+      headerTitle: group?.name || 'Group',
+      headerBackTitle: 'Groups',
+      headerStyle: { backgroundColor: c.card },
+      headerTintColor: c.primary,
+      headerRight: () => (
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+          {isMember && canManage ? (
+            <TouchableOpacity onPress={() => router.push(`/group/manage/${slug}`)}>
+              <Ionicons name="settings-outline" size={22} color={c.primary} />
+            </TouchableOpacity>
+          ) : null}
+          {isMember ? (
             <TouchableOpacity onPress={() => Alert.alert('Leave group?', undefined, [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Leave', style: 'destructive', onPress: () => leave.mutate() },
             ])}><Ionicons name="exit-outline" size={22} color={c.red} /></TouchableOpacity>
-          </View>
-        ) : null,
-      }} />
+          ) : null}
+        </View>
+      ),
+    }} />
+  )
+
+  if (gl || !group) return <Screen>{headerConfig}<Spinner /></Screen>
+
+  return (
+    <Screen>
+      <UploadingModal visible={showUploadModal} />
+      {headerConfig}
       <FlatList
         data={posts}
         keyExtractor={(p, i) => String(p?.id ?? i)}

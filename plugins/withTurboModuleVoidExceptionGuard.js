@@ -82,46 +82,70 @@ const HELPER_ANCHOR = `void ObjCTurboModule::performVoidMethodInvocation(`
 const HELPER = `// ${MARKER} AMOBILE-148
 // Records an NSException raised by a void TurboModule method without touching the
 // JS runtime. Safe to call from any thread: it only uses Foundation.
+//
+// Deliberately does NOT read exception.callStackSymbols. That property calls
+// backtrace_symbols -> dladdr, which takes the dyld loader lock and walks the
+// symbol table. Every crash log in this investigation (109, 110, 111 and 112)
+// had a thread sitting in exactly that call, and in build 112 the exception
+// escaped this handler via objc_exception_rethrow — i.e. the logger itself threw.
+// Module + method + name + reason is all we actually need to identify the caller.
+//
+// The whole body is guarded, including a catch-all: this function must never be
+// able to propagate an exception, or it turns a contained fault into a crash.
 static void RCTLogTurboModuleVoidException(const char *moduleName, const char *methodName, NSException *exception)
 {
-  @autoreleasepool {
-    NSString *entry = [NSString stringWithFormat:
-      @"[turbomodule-void-exception] %@\\n"
-       "  Module : %s\\n"
-       "  Method : %s\\n"
-       "  Name   : %@\\n"
-       "  Reason : %@\\n"
-       "  Stack  :\\n%@\\n\\n",
-      [NSDate date],
-      moduleName ?: "(null)",
-      methodName ?: "(null)",
-      exception.name ?: @"(nil)",
-      exception.reason ?: @"(nil)",
-      [exception.callStackSymbols componentsJoinedByString:@"\\n"] ?: @"(none)"];
-
-    NSLog(@"%@", entry);
-
-    NSURL *docs = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory
-                                                          inDomains:NSUserDomainMask] firstObject];
-    if (docs == nil) {
-      return;
-    }
-    NSURL *url = [docs URLByAppendingPathComponent:@"turbomodule_exceptions.log"];
-    NSData *data = [entry dataUsingEncoding:NSUTF8StringEncoding];
-
-    NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:url.path];
-    if (handle != nil) {
+  @try {
+    @autoreleasepool {
+      NSString *name = @"(nil)";
+      NSString *reason = @"(nil)";
       @try {
-        [handle seekToEndOfFile];
-        [handle writeData:data];
-      } @catch (NSException *ignored) {
-        // Never let the logger itself take the process down.
-      } @finally {
-        [handle closeFile];
+        if (exception.name != nil) {
+          name = exception.name;
+        }
+        if (exception.reason != nil) {
+          reason = exception.reason;
+        }
+      } @catch (...) {
+        // Leave the defaults.
       }
-    } else {
-      [data writeToURL:url atomically:YES];
+
+      NSString *entry = [NSString stringWithFormat:
+        @"[turbomodule-void-exception] %@\\n"
+         "  Module : %s\\n"
+         "  Method : %s\\n"
+         "  Name   : %@\\n"
+         "  Reason : %@\\n\\n",
+        [NSDate date],
+        moduleName ?: "(null)",
+        methodName ?: "(null)",
+        name,
+        reason];
+
+      NSLog(@"%@", entry);
+
+      NSURL *docs = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory
+                                                            inDomains:NSUserDomainMask] firstObject];
+      if (docs == nil) {
+        return;
+      }
+      NSURL *url = [docs URLByAppendingPathComponent:@"turbomodule_exceptions.log"];
+      NSData *data = [entry dataUsingEncoding:NSUTF8StringEncoding];
+
+      NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:url.path];
+      if (handle != nil) {
+        @try {
+          [handle seekToEndOfFile];
+          [handle writeData:data];
+        } @finally {
+          [handle closeFile];
+        }
+      } else {
+        [data writeToURL:url atomically:YES];
+      }
     }
+  } @catch (...) {
+    // Never let the logger take the process down. There is nothing useful to do
+    // here — NSLog itself may be what failed.
   }
 }
 
