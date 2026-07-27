@@ -13,6 +13,11 @@ import { useThemeStore } from '../store/theme'
 import { useBlockStore } from '../store/blocks'
 import SplashScreen from '../components/SplashScreen'
 import Toast from '../components/Toast'
+import { installJSErrorHandler, reportNativeExceptionLog } from '../utils/crashDiagnostics'
+
+// AMOBILE-148: take over the global JS error handler before any screen mounts, so
+// an uncaught JS error is shown rather than routed into RN's native fatal path.
+installJSErrorHandler()
 
 // Map notification type to the route to navigate to
 function getRouteForNotification(data: Record<string, string>): string | null {
@@ -68,6 +73,13 @@ function AppContent() {
     loadFromStorage()
     loadPreference()
     loadBlocked()
+  }, [])
+
+  // AMOBILE-148: surface any native void-TurboModule exception recorded by the
+  // previous run. Deferred so it lands after the splash screen finishes.
+  useEffect(() => {
+    const t = setTimeout(reportNativeExceptionLog, 2500)
+    return () => clearTimeout(t)
   }, [])
 
   useEffect(() => {
