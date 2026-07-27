@@ -1354,7 +1354,7 @@ export default function AdminScreen() {
 }
 
 const s = StyleSheet.create({
-  tabBar:           { borderBottomWidth: 1 },
+  tabBar:           { height: 46, flexGrow: 0, flexShrink: 0, borderBottomWidth: 1 },
   tabItem:          { paddingHorizontal: 14, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabText:          { fontSize: 15, fontWeight: '600' },
   statusChip:       { borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
