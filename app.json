@@ -42,6 +42,7 @@
     },
     "plugins": [
       "./plugins/withIOS26ClassPrewarm",
+      "./plugins/withTurboModuleVoidExceptionGuard",
       "expo-router",
       "expo-secure-store",
       "expo-notifications",
