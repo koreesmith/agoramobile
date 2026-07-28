@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { View, Text, FlatList, TouchableOpacity, TextInput, RefreshControl, StyleSheet } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import { router } from 'expo-router'
-import { formatDistanceToNow } from 'date-fns'
+import { timeAgo } from '../../utils/handle'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Spinner, EmptyState, Avatar } from '../../components/ui'
 import { dmApi } from '../../api'
@@ -64,7 +64,7 @@ export default function MessagesScreen() {
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={[s.name, conv.unread_count > 0 && { fontWeight: '700' }]}>{o.display_name || o.username}</Text>
-                    {conv.last_message && <Text style={[s.time, { color: c.textLight }]}>{formatDistanceToNow(new Date(conv.last_message.created_at), { addSuffix: false })}</Text>}
+                    {conv.last_message && <Text style={[s.time, { color: c.textLight }]}>{timeAgo(conv.last_message.created_at, false)}</Text>}
                   </View>
                   <Text style={[s.preview, conv.unread_count > 0 && { color: '#374151', fontWeight: '500' }]} numberOfLines={1}>
                     {!conv.is_accepted ? '⚠️ Message request' : preview}
