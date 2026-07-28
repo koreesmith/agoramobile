@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
-import { formatDistanceToNow } from 'date-fns'
+import { timeAgo } from '../../utils/handle'
 import { Screen, Spinner, Avatar, UploadingModal, LinkedText } from '../../components/ui'
 import { dmApi, feedApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
@@ -129,7 +129,7 @@ export default function ConversationScreen() {
                     {msg.content ? <LinkedText text={msg.content} style={[s.bubbleText, isOwn && { color: 'white' }]} linkStyle={isOwn ? { color: 'rgba(255,255,255,0.9)' } : undefined} /> : null}
                     {msg.image_url ? <Image source={{ uri: msg.image_url }} style={s.bubbleImage} resizeMode="cover" /> : null}
                     <Text style={[s.bubbleTime, isOwn && { color: 'rgba(255,255,255,0.7)' }]}>
-                      {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
+                      {timeAgo(msg.created_at)}
                     </Text>
                   </TouchableOpacity>
                   {myReaction && (

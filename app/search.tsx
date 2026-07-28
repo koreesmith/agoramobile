@@ -7,8 +7,7 @@ import { Screen, Header, Spinner, Avatar, renderName } from '../components/ui'
 import PostCard from '../components/PostCard'
 import { searchApi, pagesApi, atprotoApi, imgUrl } from '../api'
 import { useC } from '../constants/ColorContext'
-import { handle } from '../utils/handle'
-import { formatDistanceToNow } from 'date-fns'
+import { handle, timeAgo } from '../utils/handle'
 
 type Tab = 'users' | 'posts' | 'pages'
 
@@ -389,7 +388,7 @@ function BlueskyPostRow({ post: p, c }: { post: any, c: any }) {
         </Text>
         <Text style={[s.username, { color: c.textMuted, marginLeft: 4 }]}>@{p.author_handle}</Text>
         <Text style={[s.username, { color: c.textMuted, marginLeft: 'auto' }]}>
-          {formatDistanceToNow(new Date(p.created_at), { addSuffix: true })}
+          {timeAgo(p.created_at)}
         </Text>
       </View>
       <Text style={{ color: c.text, fontSize: 16 }} numberOfLines={3}>{p.text}</Text>

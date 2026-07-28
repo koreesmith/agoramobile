@@ -2,7 +2,7 @@ import { View, Text, FlatList, TouchableOpacity, RefreshControl, StyleSheet } fr
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { formatDistanceToNow } from 'date-fns'
+import { timeAgo } from '../../utils/handle'
 import { Screen, Header, Spinner, EmptyState } from '../../components/ui'
 import { notificationsApi, friendsApi } from '../../api'
 
@@ -141,7 +141,7 @@ export default function NotificationsScreen() {
                   <Text style={{ fontWeight: '600' }}>{formatActorLabel(n)}</Text>
                   {' '}{TEXT[n.type] || 'did something'}
                 </Text>
-                <Text style={[s.notifTime, { color: c.textLight }]}>{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</Text>
+                <Text style={[s.notifTime, { color: c.textLight }]}>{timeAgo(n.created_at)}</Text>
                 {n.type === 'friend_request' && n.friend_status !== 'accepted' && n.friend_status !== 'declined' && (
                   <View style={s.friendActions}>
                     <TouchableOpacity onPress={() => accept.mutate(n.actor_id)} style={s.acceptBtn}>
