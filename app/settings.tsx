@@ -16,6 +16,8 @@ import { useToastStore } from '../store/toast'
 import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
 import { useThemeStore, ThemePreference } from '../store/theme'
+import { useDiagnosticsStore } from '../store/diagnostics'
+import { readNativeExceptionLog, readTerminateLog, clearNativeExceptionLog } from '../utils/crashDiagnostics'
 
 export default function SettingsScreen() {
   const c = useC()
@@ -23,6 +25,7 @@ export default function SettingsScreen() {
   const showToast = useToastStore(s => s.show)
   const { user, updateUser, logout } = useAuthStore()
   const { preference, setPreference } = useThemeStore()
+  const { enabled: diagnostics, setEnabled: setDiagnostics } = useDiagnosticsStore()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [section, setSection] = useState<'main' | 'password' | 'email'>('main')
@@ -162,6 +165,33 @@ export default function SettingsScreen() {
       {right ?? <Ionicons name="chevron-forward" size={16} color={c.textLight} />}
     </TouchableOpacity>
   )
+
+  // AMOBILE-148: read the stored native exception logs on demand, rather than
+  // only when the startup report fires.
+  const showCrashLog = () => {
+    const terminate = readTerminateLog()
+    const voidException = readNativeExceptionLog()
+    if (!terminate && !voidException) {
+      Alert.alert('Crash log', 'No native exceptions have been recorded.')
+      return
+    }
+    const body = [
+      terminate ? `— std::terminate —\n${terminate}` : null,
+      voidException ? `— void TurboModule —\n${voidException}` : null,
+    ].filter(Boolean).join('\n\n')
+    Alert.alert(
+      'Crash log',
+      body.length > 1500 ? `${body.slice(0, 1500)}\n…(truncated — full text via the Files app)` : body,
+      [
+        { text: 'Close', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: () => { clearNativeExceptionLog(); showToast('Crash log cleared') },
+        },
+      ],
+    )
+  }
 
   const headerOpts = (title: string, back: string) => ({
     headerShown: true, headerTitle: title, headerBackTitle: back,
@@ -316,6 +346,15 @@ export default function SettingsScreen() {
             router.back()
           })
         }} />
+        <Text style={[s.section, { color: c.textMuted }]}>Advanced</Text>
+        <Text style={[s.sectionHint, { color: c.textMuted }]}>
+          Shows unhandled errors on screen as they happen. Useful when reproducing a bug —
+          leave this off for normal use. Errors are always written to the crash log either way.
+        </Text>
+        <Row icon="bug-outline" label="Crash diagnostics"
+          right={<Switch value={diagnostics} onValueChange={setDiagnostics} trackColor={{ false: c.border, true: c.primary }} />} />
+        <Row icon="document-text-outline" label="View crash log" onPress={showCrashLog} />
+
         <Text style={[s.section, { color: c.textMuted }]}>About</Text>
         <Row icon="person-circle-outline" label={`Signed in as @${user?.username}`} onPress={() => {}} right={<View />} />
         <Row icon="server-outline" label={`Instance: ${useAuthStore.getState().instanceUrl?.replace(/^https?:\/\//, '')}`} onPress={() => {}} right={<View />} />
