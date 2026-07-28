@@ -10,10 +10,9 @@ import * as MediaLibrary from 'expo-media-library'
 import * as FileSystem from 'expo-file-system'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import { formatDistanceToNow } from 'date-fns'
 import { feedApi, imgUrl, blockApi, moderationApi, friendsApi, pagesApi } from '../api'
 import { trackInteraction } from '../utils/interactions'
-import { handle } from '../utils/handle'
+import { handle, timeAgo } from '../utils/handle'
 import { useAuthStore } from '../store/auth'
 import { useBlockStore } from '../store/blocks'
 import { useToastStore } from '../store/toast'
@@ -489,7 +488,10 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={[s.authorMeta, { color: c.textMuted }]}>
-                {isPagePost ? post.page_type || 'Page' : handle(username, post.is_remote, post.remote_instance)} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                {[
+                  isPagePost ? (post.page_type || 'Page') : handle(username, post.is_remote, post.remote_instance),
+                  timeAgo(post.created_at),
+                ].filter(Boolean).join(' · ')}
               </Text>
               <Ionicons
                 name={
