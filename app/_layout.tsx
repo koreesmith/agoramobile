@@ -11,6 +11,7 @@ import { usersApi } from '../api'
 import { ColorProvider } from '../constants/ColorContext'
 import { useThemeStore } from '../store/theme'
 import { useBlockStore } from '../store/blocks'
+import { useDiagnosticsStore } from '../store/diagnostics'
 import SplashScreen from '../components/SplashScreen'
 import Toast from '../components/Toast'
 import { installJSErrorHandler, reportNativeExceptionLog } from '../utils/crashDiagnostics'
@@ -63,6 +64,7 @@ function AppContent() {
   const { isAuthenticated, loadFromStorage } = useAuthStore()
   const { loadPreference } = useThemeStore()
   const { loadBlocked } = useBlockStore()
+  const { loadPreference: loadDiagnosticsPreference } = useDiagnosticsStore()
   const scheme = useColorScheme()
   const notifListener = useRef<any>()
   const responseListener = useRef<any>()
@@ -73,6 +75,8 @@ function AppContent() {
     loadFromStorage()
     loadPreference()
     loadBlocked()
+    // Read before the deferred report below fires, so it sees the real setting.
+    loadDiagnosticsPreference()
   }, [])
 
   // AMOBILE-148: surface any native void-TurboModule exception recorded by the

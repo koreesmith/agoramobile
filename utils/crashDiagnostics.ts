@@ -21,6 +21,7 @@
 
 import { Alert } from 'react-native'
 import { File, Paths } from 'expo-file-system'
+import { diagnosticsEnabled } from '../store/diagnostics'
 
 // Written by the patched RCTTurboModule.mm (withTurboModuleVoidExceptionGuard).
 const LOG_FILENAME = 'turbomodule_exceptions.log'
@@ -89,6 +90,14 @@ export function reportNativeExceptionLog(): void {
     parts.push(`— void TurboModule —\n${latestEntry(voidException, '[turbomodule-void-exception]')}`)
   }
 
+  if (!diagnosticsEnabled()) {
+    // Still note it in the console, and leave both files in place so turning the
+    // setting on later — or opening the Files app — recovers the detail.
+    console.warn(`[crash-diagnostics] native exception log present (${parts.length} source(s)); ` +
+      'enable Settings > Advanced > Crash diagnostics to display it')
+    return
+  }
+
   Alert.alert(
     'Native exception recorded',
     truncate(parts.join('\n\n')),
@@ -106,8 +115,13 @@ function latestEntry(log: string, delimiter: string): string {
 }
 
 /**
- * Takes over RN's global JS error handler so an uncaught JS error surfaces as an
- * alert instead of reaching the native fatal path.
+ * Takes over RN's global JS error handler so an uncaught JS error never reaches
+ * the native fatal path.
+ *
+ * Always installed — that interception is what stops a JS bug becoming an
+ * unsymbolicated native crash, and it must be in place before any screen mounts.
+ * Only the on-screen alert is gated behind the Settings toggle; the error is
+ * written to the console either way.
  */
 export function installJSErrorHandler(): void {
   const globalAny = global as any
@@ -123,10 +137,12 @@ export function installJSErrorHandler(): void {
 
     console.error(`[js-error] fatal=${!!isFatal} ${name}: ${message}\n${stack}`)
 
-    Alert.alert(
-      isFatal ? 'Unhandled JS error (fatal)' : 'Unhandled JS error',
-      truncate(`${name}: ${message}\n\n${stack}`),
-    )
+    if (diagnosticsEnabled()) {
+      Alert.alert(
+        isFatal ? 'Unhandled JS error (fatal)' : 'Unhandled JS error',
+        truncate(`${name}: ${message}\n\n${stack}`),
+      )
+    }
 
     // Deliberately not delegating to `previous` for fatals: RN's handler is the
     // path that reaches reportFatalException. Non-fatals are safe to pass along.
