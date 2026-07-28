@@ -12,11 +12,12 @@ import {
   RefreshControl,
   StyleSheet,
 } from 'react-native'
-import { Stack } from 'expo-router'
+import { Stack, router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import { Screen, Avatar, Spinner, EmptyState } from '../components/ui'
-import { friendsApi } from '../api'
+import { Screen, Avatar, Spinner, EmptyState, renderName } from '../components/ui'
+import { friendsApi, federationApi, atprotoApi } from '../api'
+import { handle } from '../utils/handle'
 import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
 
@@ -32,6 +33,9 @@ interface Friend {
   username: string
   display_name?: string
   avatar_url?: string
+  is_remote?: boolean
+  remote_instance?: string
+  emojis?: Record<string, string>
 }
 
 // ── Member Detail Modal ───────────────────────────────────────────────────────
@@ -59,10 +63,33 @@ function MemberDetailModal({
     enabled: !!list?.id && visible,
   })
 
+  // AGORA-182/AGORA-257: an accepted fediverse follow, or a native Bluesky
+  // follow (no "accepted" concept there, AT Proto follows are unilateral),
+  // each with a resolved cached user row, can join a list too, same as a
+  // friend — merged here so the rest of this modal doesn't need to know
+  // there are three underlying relationship types.
+  const { data: followingData, isLoading: followingLoading } = useQuery({
+    queryKey: ['fediverse-following'],
+    queryFn: () => federationApi.listFollowing().then(r => r.data),
+    enabled: !!list?.id && visible,
+  })
+
+  const { data: bskyFollowingData, isLoading: bskyFollowingLoading } = useQuery({
+    queryKey: ['bluesky-following'],
+    queryFn: () => atprotoApi.listBlueskyFollowing().then(r => r.data),
+    enabled: !!list?.id && visible,
+  })
+
   const members: Friend[] = membersData?.members || []
   const allFriends: Friend[] = friendsData?.friends || []
+  const fediverseConnections: Friend[] = (followingData?.following || [])
+    .filter((f: any) => f.accepted && f.user_id)
+    .map((f: any) => ({ id: f.user_id, username: f.username, display_name: f.display_name, avatar_url: f.avatar_url, is_remote: true, remote_instance: f.instance, emojis: f.emojis }))
+  const bskyConnections: Friend[] = (bskyFollowingData?.following || [])
+    .filter((f: any) => f.user_id)
+    .map((f: any) => ({ id: f.user_id, username: f.username, display_name: f.display_name, avatar_url: f.avatar_url, is_remote: true, remote_instance: 'bsky.app' }))
   const memberIds = new Set(members.map(m => m.id))
-  const addableFriends = allFriends.filter(f => !memberIds.has(f.id))
+  const addableFriends = [...allFriends, ...fediverseConnections, ...bskyConnections].filter(f => !memberIds.has(f.id))
 
   const removeMember = useMutation({
     mutationFn: (friendId: string) => friendsApi.removeFriendFromList(list!.id, friendId),
@@ -93,7 +120,7 @@ function MemberDetailModal({
     )
   }
 
-  const isLoading = membersLoading || friendsLoading
+  const isLoading = membersLoading || friendsLoading || followingLoading || bskyFollowingLoading
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -125,8 +152,8 @@ function MemberDetailModal({
                   <View style={[s.friendRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
                     <Avatar url={item.avatar_url} name={item.display_name || item.username} size={40} />
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.friendName, { color: c.text }]}>{item.display_name || item.username}</Text>
-                      <Text style={[s.friendUsername, { color: c.textMuted }]}>@{item.username}</Text>
+                      <Text style={[s.friendName, { color: c.text }]}>{item.display_name ? renderName(item.display_name, item.emojis) : item.username}</Text>
+                      <Text style={[s.friendUsername, { color: c.textMuted }]}>{handle(item.username, item.is_remote, item.remote_instance)}</Text>
                     </View>
                     <TouchableOpacity
                       onPress={() => confirmRemove(item)}
@@ -150,13 +177,13 @@ function MemberDetailModal({
             ListFooterComponent={
               addableFriends.length > 0 ? (
                 <>
-                  <Text style={[s.sectionLabel, { color: c.textMuted }]}>Add friends</Text>
+                  <Text style={[s.sectionLabel, { color: c.textMuted }]}>Add people</Text>
                   {addableFriends.map(f => (
                     <View key={f.id} style={[s.friendRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
                       <Avatar url={f.avatar_url} name={f.display_name || f.username} size={40} />
                       <View style={{ flex: 1 }}>
-                        <Text style={[s.friendName, { color: c.text }]}>{f.display_name || f.username}</Text>
-                        <Text style={[s.friendUsername, { color: c.textMuted }]}>@{f.username}</Text>
+                        <Text style={[s.friendName, { color: c.text }]}>{f.display_name ? renderName(f.display_name, f.emojis) : f.username}</Text>
+                        <Text style={[s.friendUsername, { color: c.textMuted }]}>{handle(f.username, f.is_remote, f.remote_instance)}</Text>
                       </View>
                       <TouchableOpacity
                         onPress={() => addMember.mutate(f.id)}
@@ -298,6 +325,13 @@ export default function FriendListsScreen() {
                 )}
               </View>
               <TouchableOpacity
+                onPress={() => router.push(`/list-feed/${item.id}`)}
+                style={s.viewFeedBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={[s.viewFeedText, { color: c.primary }]}>View feed</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 onPress={() => confirmDelete(item)}
                 style={s.deleteBtn}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -321,23 +355,25 @@ export default function FriendListsScreen() {
 
 const s = StyleSheet.create({
   createRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
-  createInput: { flex: 1, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 15 },
+  createInput: { flex: 1, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 17 },
   createBtn: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 10 },
-  createBtnText: { color: 'white', fontWeight: '600', fontSize: 14 },
+  createBtnText: { color: 'white', fontWeight: '600', fontSize: 16 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
   listIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  listName: { fontWeight: '600', fontSize: 15 },
-  listMeta: { fontSize: 12, marginTop: 2 },
+  listName: { fontWeight: '600', fontSize: 17 },
+  listMeta: { fontSize: 13, marginTop: 2 },
   deleteBtn: { padding: 4 },
+  viewFeedBtn: { paddingHorizontal: 6, paddingVertical: 4 },
+  viewFeedText: { fontSize: 13, fontWeight: '600' },
   // Modal
   modalContainer: { flex: 1 },
   modalHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
-  modalTitle: { flex: 1, fontSize: 17, fontWeight: '600' },
+  modalTitle: { flex: 1, fontSize: 19, fontWeight: '600' },
   modalClose: { padding: 4 },
-  sectionLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
+  sectionLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
   friendRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
-  friendName: { fontWeight: '600', fontSize: 15 },
-  friendUsername: { fontSize: 13, marginTop: 1 },
+  friendName: { fontWeight: '600', fontSize: 17 },
+  friendUsername: { fontSize: 15, marginTop: 1 },
   removeBtn: { padding: 4 },
   addBtn: { padding: 4 },
 })

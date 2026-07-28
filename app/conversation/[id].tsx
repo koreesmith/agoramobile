@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
-import { formatDistanceToNow } from 'date-fns'
+import { timeAgo } from '../../utils/handle'
 import { Screen, Spinner, Avatar, UploadingModal, LinkedText } from '../../components/ui'
 import { dmApi, feedApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
@@ -129,12 +129,12 @@ export default function ConversationScreen() {
                     {msg.content ? <LinkedText text={msg.content} style={[s.bubbleText, isOwn && { color: 'white' }]} linkStyle={isOwn ? { color: 'rgba(255,255,255,0.9)' } : undefined} /> : null}
                     {msg.image_url ? <Image source={{ uri: msg.image_url }} style={s.bubbleImage} resizeMode="cover" /> : null}
                     <Text style={[s.bubbleTime, isOwn && { color: 'rgba(255,255,255,0.7)' }]}>
-                      {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
+                      {timeAgo(msg.created_at)}
                     </Text>
                   </TouchableOpacity>
                   {myReaction && (
                     <TouchableOpacity onPress={() => unreact.mutate(msg.id)} style={s.msgReaction}>
-                      <Text style={{ fontSize: 14 }}>{myReaction}</Text>
+                      <Text style={{ fontSize: 16 }}>{myReaction}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -159,7 +159,7 @@ export default function ConversationScreen() {
               {QUICK_REACTIONS.map(emoji => (
                 <TouchableOpacity key={emoji} onPress={() => reactionTarget && react.mutate({ msgId: reactionTarget, emoji })}
                   style={s.reactionBtn}>
-                  <Text style={{ fontSize: 26 }}>{emoji}</Text>
+                  <Text style={{ fontSize: 29 }}>{emoji}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -189,19 +189,19 @@ const s = StyleSheet.create({
   reactionBtn:     { padding: 6 },
   msgReaction:     { marginTop: 3, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: 'rgba(0,0,0,0.07)', borderRadius: 12 },
   requestBanner: { margin: 12, padding: 12, backgroundColor: '#fefce8', borderWidth: 1, borderColor: '#fde68a', borderRadius: 12 },
-  requestTitle: { fontSize: 14, fontWeight: '600', color: '#92400e' },
-  requestSub: { fontSize: 12, color: '#b45309', marginBottom: 8 },
+  requestTitle: { fontSize: 16, fontWeight: '600', color: '#92400e' },
+  requestSub: { fontSize: 13, color: '#b45309', marginBottom: 8 },
   acceptBtn: { backgroundColor: C.primary, borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
-  acceptBtnText: { color: 'white', fontWeight: '600', fontSize: 14 },
+  acceptBtnText: { color: 'white', fontWeight: '600', fontSize: 16 },
   bubbleRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginVertical: 2 },
   bubble: { maxWidth: '75%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
   bubbleOwn: { backgroundColor: C.primary, borderBottomRightRadius: 4 },
   bubbleOther: { backgroundColor: C.bg, borderBottomLeftRadius: 4 },
-  bubbleText: { fontSize: 14, color: C.text },
-  bubbleTime: { fontSize: 10, color: C.textLight, marginTop: 3 },
+  bubbleText: { fontSize: 16, color: C.text },
+  bubbleTime: { fontSize: 11, color: C.textLight, marginTop: 3 },
   bubbleImage: { width: 180, height: 140, borderRadius: 8, marginTop: 4 },
-  deleted: { fontSize: 12, color: C.textLight, fontStyle: 'italic', paddingHorizontal: 12, paddingVertical: 6 },
+  deleted: { fontSize: 13, color: C.textLight, fontStyle: 'italic', paddingHorizontal: 12, paddingVertical: 6 },
   removeImg: { position: 'absolute', top: 6, right: -2, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.card },
-  input: { flex: 1, backgroundColor: C.bg, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, color: C.text, maxHeight: 100 },
+  input: { flex: 1, backgroundColor: C.bg, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 16, color: C.text, maxHeight: 100 },
 })

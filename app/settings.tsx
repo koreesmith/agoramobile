@@ -16,6 +16,8 @@ import { useToastStore } from '../store/toast'
 import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
 import { useThemeStore, ThemePreference } from '../store/theme'
+import { useDiagnosticsStore } from '../store/diagnostics'
+import { readNativeExceptionLog, readTerminateLog, clearNativeExceptionLog } from '../utils/crashDiagnostics'
 
 export default function SettingsScreen() {
   const c = useC()
@@ -23,6 +25,7 @@ export default function SettingsScreen() {
   const showToast = useToastStore(s => s.show)
   const { user, updateUser, logout } = useAuthStore()
   const { preference, setPreference } = useThemeStore()
+  const { enabled: diagnostics, setEnabled: setDiagnostics } = useDiagnosticsStore()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [section, setSection] = useState<'main' | 'password' | 'email'>('main')
@@ -52,6 +55,16 @@ export default function SettingsScreen() {
   const toggleFediverseNotifications = useMutation({
     mutationFn: () => usersApi.updateProfile({ fediverse_notifications_enabled: !(user as any)?.fediverse_notifications_enabled }),
     onSuccess: () => updateUser({ fediverse_notifications_enabled: !(user as any)?.fediverse_notifications_enabled } as any),
+  })
+
+  const toggleAtproto = useMutation({
+    mutationFn: () => usersApi.updateProfile({ atproto_enabled: !(user as any)?.atproto_enabled }),
+    onSuccess: () => updateUser({ atproto_enabled: !(user as any)?.atproto_enabled } as any),
+  })
+
+  const toggleAtprotoNotifications = useMutation({
+    mutationFn: () => usersApi.updateProfile({ atproto_notifications_enabled: !(user as any)?.atproto_notifications_enabled }),
+    onSuccess: () => updateUser({ atproto_notifications_enabled: !(user as any)?.atproto_notifications_enabled } as any),
   })
 
   const MESSAGE_PERM_OPTIONS = [
@@ -153,6 +166,33 @@ export default function SettingsScreen() {
     </TouchableOpacity>
   )
 
+  // AMOBILE-148: read the stored native exception logs on demand, rather than
+  // only when the startup report fires.
+  const showCrashLog = () => {
+    const terminate = readTerminateLog()
+    const voidException = readNativeExceptionLog()
+    if (!terminate && !voidException) {
+      Alert.alert('Crash log', 'No native exceptions have been recorded.')
+      return
+    }
+    const body = [
+      terminate ? `— std::terminate —\n${terminate}` : null,
+      voidException ? `— void TurboModule —\n${voidException}` : null,
+    ].filter(Boolean).join('\n\n')
+    Alert.alert(
+      'Crash log',
+      body.length > 1500 ? `${body.slice(0, 1500)}\n…(truncated — full text via the Files app)` : body,
+      [
+        { text: 'Close', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: () => { clearNativeExceptionLog(); showToast('Crash log cleared') },
+        },
+      ],
+    )
+  }
+
   const headerOpts = (title: string, back: string) => ({
     headerShown: true, headerTitle: title, headerBackTitle: back,
     headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
@@ -203,7 +243,7 @@ export default function SettingsScreen() {
         <Text style={[s.section, { color: c.textMuted }]}>Account</Text>
         <Row icon="person-outline" label="Edit profile" onPress={() => router.push('/edit-profile')} />
         <Row icon="people-outline" label="Friend lists" onPress={() => router.push('/friend-lists')} />
-        <Row icon="planet-outline" label="Fediverse" onPress={() => router.push('/fediverse')} />
+        <Row icon="ban-outline" label="Blocked users" onPress={() => router.push('/blocked-users')} />
         <Row icon="mail-outline" label="Change email" onPress={() => setSection('email')} />
         <Row icon="key-outline" label="Change password" onPress={() => setSection('password')} />
         {invitesEnabled && (
@@ -239,10 +279,6 @@ export default function SettingsScreen() {
           right={<Switch value={!!(user as any)?.hide_timeline} onValueChange={() => toggleHideTimeline.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleHideTimeline.isPending} />} />
         <Row icon="checkmark-circle-outline" label="Approve wall posts"
           right={<Switch value={!!(user as any)?.approve_wall_posts} onValueChange={() => toggleApproveWallPosts.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleApproveWallPosts.isPending} />} />
-        <Row icon="planet-outline" label="Fediverse (ActivityPub)"
-          right={<Switch value={(user as any)?.activitypub_enabled ?? true} onValueChange={() => toggleActivityPub.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleActivityPub.isPending} />} />
-        <Row icon="notifications-outline" label="Fediverse post notifications"
-          right={<Switch value={(user as any)?.fediverse_notifications_enabled ?? true} onValueChange={() => toggleFediverseNotifications.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleFediverseNotifications.isPending} />} />
         <View style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
           <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
             <Ionicons name="chatbubble-ellipses-outline" size={18} color={c.primary} />
@@ -254,11 +290,31 @@ export default function SettingsScreen() {
                 style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1,
                   borderColor: currentMsgPerm === opt.value ? c.primary : c.border,
                   backgroundColor: currentMsgPerm === opt.value ? c.primaryBg : 'transparent' }}>
-                <Text style={{ fontSize: 12, fontWeight: '500', color: currentMsgPerm === opt.value ? c.primary : c.textMuted }}>{opt.label}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '500', color: currentMsgPerm === opt.value ? c.primary : c.textMuted }}>{opt.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
+        <Text style={[s.section, { color: c.textMuted }]}>Fediverse</Text>
+        <Text style={[s.sectionHint, { color: c.textMuted }]}>
+          Agora can talk to Mastodon and the rest of the fediverse over ActivityPub. Turning this on lets people
+          out there find, follow, and see your public posts. Private and friends-only posts are never federated.
+        </Text>
+        <Row icon="planet-outline" label="Fediverse (ActivityPub)"
+          right={<Switch value={(user as any)?.activitypub_enabled ?? true} onValueChange={() => toggleActivityPub.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleActivityPub.isPending} />} />
+        <Row icon="notifications-outline" label="Fediverse post notifications"
+          right={<Switch value={(user as any)?.fediverse_notifications_enabled ?? true} onValueChange={() => toggleFediverseNotifications.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleFediverseNotifications.isPending} />} />
+        <Row icon="people-outline" label="Manage fediverse follows" onPress={() => router.push('/connections?tab=fediverse' as any)} />
+        <Text style={[s.section, { color: c.textMuted }]}>Bluesky</Text>
+        <Text style={[s.sectionHint, { color: c.textMuted }]}>
+          Agora can also talk to Bluesky over AT Protocol, a separate network from the fediverse. Turning this on
+          lets people on Bluesky find, follow, and see your public posts.
+        </Text>
+        <Row icon="cloud-outline" label="Bluesky (AT Protocol)"
+          right={<Switch value={(user as any)?.atproto_enabled ?? true} onValueChange={() => toggleAtproto.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleAtproto.isPending} />} />
+        <Row icon="notifications-outline" label="Bluesky post notifications"
+          right={<Switch value={(user as any)?.atproto_notifications_enabled ?? true} onValueChange={() => toggleAtprotoNotifications.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleAtprotoNotifications.isPending} />} />
+        <Row icon="people-outline" label="Manage Bluesky follows" onPress={() => router.push('/connections?tab=bluesky' as any)} />
         <Text style={[s.section, { color: c.textMuted }]}>Data</Text>
         <Row icon="download-outline" label={exportLoading ? 'Exporting…' : 'Export my data'} onPress={exportData} />
         <Row icon="refresh-circle-outline" label="Reset feed history" onPress={() =>
@@ -290,6 +346,15 @@ export default function SettingsScreen() {
             router.back()
           })
         }} />
+        <Text style={[s.section, { color: c.textMuted }]}>Advanced</Text>
+        <Text style={[s.sectionHint, { color: c.textMuted }]}>
+          Shows unhandled errors on screen as they happen. Useful when reproducing a bug —
+          leave this off for normal use. Errors are always written to the crash log either way.
+        </Text>
+        <Row icon="bug-outline" label="Crash diagnostics"
+          right={<Switch value={diagnostics} onValueChange={setDiagnostics} trackColor={{ false: c.border, true: c.primary }} />} />
+        <Row icon="document-text-outline" label="View crash log" onPress={showCrashLog} />
+
         <Text style={[s.section, { color: c.textMuted }]}>About</Text>
         <Row icon="person-circle-outline" label={`Signed in as @${user?.username}`} onPress={() => {}} right={<View />} />
         <Row icon="server-outline" label={`Instance: ${useAuthStore.getState().instanceUrl?.replace(/^https?:\/\//, '')}`} onPress={() => {}} right={<View />} />
@@ -306,16 +371,17 @@ export default function SettingsScreen() {
 }
 
 const s = StyleSheet.create({
-  section: { fontSize: 11, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 6 },
+  section: { fontSize: 12, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 6 },
+  sectionHint: { fontSize: 13, lineHeight: 17, paddingHorizontal: 16, paddingBottom: 10 },
   themeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
   themePicker: { flexDirection: 'row', borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
   themeOption: { paddingHorizontal: 12, paddingVertical: 6 },
-  themeOptionText: { fontSize: 13, fontWeight: '500' },
+  themeOptionText: { fontSize: 15, fontWeight: '500' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
   rowIcon: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  rowLabel: { flex: 1, fontSize: 15, color: C.text },
-  label: { fontSize: 14, fontWeight: '500', color: C.textMd, marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, color: C.text, backgroundColor: C.card },
+  rowLabel: { flex: 1, fontSize: 17, color: C.text },
+  label: { fontSize: 16, fontWeight: '500', color: C.textMd, marginBottom: 6 },
+  input: { borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 17, color: C.text, backgroundColor: C.card },
   btn: { backgroundColor: C.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  btnText: { color: 'white', fontWeight: '600', fontSize: 16 },
+  btnText: { color: 'white', fontWeight: '600', fontSize: 18 },
 })

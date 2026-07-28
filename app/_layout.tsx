@@ -11,8 +11,14 @@ import { usersApi } from '../api'
 import { ColorProvider } from '../constants/ColorContext'
 import { useThemeStore } from '../store/theme'
 import { useBlockStore } from '../store/blocks'
+import { useDiagnosticsStore } from '../store/diagnostics'
 import SplashScreen from '../components/SplashScreen'
 import Toast from '../components/Toast'
+import { installJSErrorHandler, reportNativeExceptionLog } from '../utils/crashDiagnostics'
+
+// AMOBILE-148: take over the global JS error handler before any screen mounts, so
+// an uncaught JS error is shown rather than routed into RN's native fatal path.
+installJSErrorHandler()
 
 // Map notification type to the route to navigate to
 function getRouteForNotification(data: Record<string, string>): string | null {
@@ -27,10 +33,11 @@ function getRouteForNotification(data: Record<string, string>): string | null {
     case 'wall_post':
     case 'wall_post_pending':
     case 'fediverse_post':
+    case 'atproto_post':
       return post_id ? `/post/${post_id}` : null
     case 'friend_request':
     case 'friend_accepted':
-      return actor_username ? `/profile/${actor_username}` : '/(tabs)/friends'
+      return actor_username ? `/profile/${actor_username}` : '/(tabs)/connections'
     case 'group_join_request':
     case 'group_join_approved':
       return '/(tabs)/notifications'
@@ -57,6 +64,7 @@ function AppContent() {
   const { isAuthenticated, loadFromStorage } = useAuthStore()
   const { loadPreference } = useThemeStore()
   const { loadBlocked } = useBlockStore()
+  const { loadPreference: loadDiagnosticsPreference } = useDiagnosticsStore()
   const scheme = useColorScheme()
   const notifListener = useRef<any>()
   const responseListener = useRef<any>()
@@ -67,6 +75,15 @@ function AppContent() {
     loadFromStorage()
     loadPreference()
     loadBlocked()
+    // Read before the deferred report below fires, so it sees the real setting.
+    loadDiagnosticsPreference()
+  }, [])
+
+  // AMOBILE-148: surface any native void-TurboModule exception recorded by the
+  // previous run. Deferred so it lands after the splash screen finishes.
+  useEffect(() => {
+    const t = setTimeout(reportNativeExceptionLog, 2500)
+    return () => clearTimeout(t)
   }, [])
 
   useEffect(() => {

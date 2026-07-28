@@ -1,21 +1,26 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet } from 'react-native'
-import { router } from 'expo-router'
-import { useQuery } from '@tanstack/react-query'
+import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { router, useLocalSearchParams } from 'expo-router'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import { Screen, Header, Spinner, Avatar } from '../components/ui'
+import { Screen, Header, Spinner, Avatar, renderName } from '../components/ui'
 import PostCard from '../components/PostCard'
-import { searchApi, pagesApi, imgUrl } from '../api'
+import { searchApi, pagesApi, atprotoApi, imgUrl } from '../api'
 import { useC } from '../constants/ColorContext'
-import { handle } from '../utils/handle'
+import { handle, timeAgo } from '../utils/handle'
 
 type Tab = 'users' | 'posts' | 'pages'
 
 export default function SearchScreen() {
   const c = useC()
-  const [inputValue, setInputValue] = useState('')
-  const [query, setQuery] = useState('')
-  const [activeTab, setActiveTab] = useState<Tab>('users')
+  // AGORA-217: a hashtag tap elsewhere (LinkedText) navigates here as
+  // /search?tab=posts&q=%23tag — pre-fill from route params on mount.
+  const params = useLocalSearchParams<{ tab?: string; q?: string }>()
+  const [inputValue, setInputValue] = useState(params.q || '')
+  const [query, setQuery] = useState(params.q || '')
+  const [activeTab, setActiveTab] = useState<Tab>(
+    params.tab === 'posts' || params.tab === 'pages' ? (params.tab as Tab) : 'users'
+  )
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -44,9 +49,39 @@ export default function SearchScreen() {
     enabled: query.length >= 2,
   })
 
+  // AGORA-215/216: real, live, network-wide Bluesky results — kept separate
+  // from searchApi's own Agora+cached-remote rows so the UI can label
+  // coverage honestly per source (AGORA-217).
+  const { data: bskyActorsData, isLoading: bskyActorsLoading } = useQuery({
+    queryKey: ['search-bsky-actors', query],
+    queryFn: () => atprotoApi.searchBlueskyActors(query).then(r => r.data),
+    enabled: query.length >= 2,
+  })
+  const { data: bskyPostsData, isLoading: bskyPostsLoading } = useQuery({
+    queryKey: ['search-bsky-posts', query],
+    queryFn: () => atprotoApi.searchBlueskyPosts(query).then(r => r.data),
+    enabled: query.length >= 2,
+  })
+  const followBluesky = useMutation({
+    mutationFn: (actor: string) => atprotoApi.followBlueskyAccount(actor),
+  })
+
   const users: any[] = usersData?.users || []
   const posts: any[] = postsData?.posts || []
   const pages: any[] = pagesData?.pages || []
+
+  // 'bsky.app' is the remote_instance marker AGORA-197's own ingestion
+  // stamps on Bluesky-origin rows (never used by fediverse ingestion), so it
+  // cleanly separates "on the fediverse" from "on Bluesky" within the same
+  // already-cached users/posts result sets.
+  const agoraUsers = users.filter(u => !u.is_remote)
+  const fediverseUsers = users.filter(u => u.is_remote && u.remote_instance !== 'bsky.app')
+  const bskyActors: any[] = bskyActorsData?.disabled ? [] : (bskyActorsData?.actors || [])
+
+  const agoraPosts = posts.filter(p => !p.is_remote)
+  const fediversePosts = posts.filter(p => p.is_remote && p.remote_instance !== 'bsky.app')
+  const cachedBskyPosts = posts.filter(p => p.is_remote && p.remote_instance === 'bsky.app')
+  const liveBskyPosts: any[] = bskyPostsData?.disabled ? [] : (bskyPostsData?.posts || [])
 
   const friendStatusLabel = (status: string | undefined) => {
     if (!status || status === 'none') return null
@@ -66,7 +101,7 @@ export default function SearchScreen() {
       >
         <Avatar url={item.avatar_url} name={item.display_name || item.username} size={44} />
         <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={[s.displayName, { color: c.text }]}>{item.display_name || item.username}</Text>
+          <Text style={[s.displayName, { color: c.text }]}>{item.display_name ? renderName(item.display_name, item.emojis) : item.username}</Text>
           <Text style={[s.username, { color: c.textMuted }]}>{handle(item.username, item.is_remote, item.remote_instance)}</Text>
         </View>
         {label && (
@@ -79,7 +114,9 @@ export default function SearchScreen() {
     )
   }
 
-  const isLoading = activeTab === 'users' ? usersLoading : activeTab === 'posts' ? postsLoading : pagesLoading
+  const isLoading = activeTab === 'users' ? (usersLoading || bskyActorsLoading)
+    : activeTab === 'posts' ? (postsLoading || bskyPostsLoading)
+    : pagesLoading
 
   const renderContent = () => {
     if (!query) {
@@ -102,8 +139,12 @@ export default function SearchScreen() {
 
     if (isLoading) return <Spinner />
 
+    // Users tab — grouped by source so coverage isn't oversold: the
+    // fediverse group is only ever accounts already known to this instance,
+    // while the Bluesky group is a real, live, network-wide search
+    // (AGORA-215/216/217).
     if (activeTab === 'users') {
-      if (users.length === 0) {
+      if (agoraUsers.length === 0 && fediverseUsers.length === 0 && bskyActors.length === 0) {
         return (
           <View style={s.emptyState}>
             {isFederated && (
@@ -129,12 +170,23 @@ export default function SearchScreen() {
               </Text>
             </View>
           )}
-          <FlatList
-            data={users}
-            keyExtractor={u => u.id}
-            renderItem={renderUserRow}
-            scrollEnabled={false}
-          />
+          <ResultGroup title="On Agora" count={agoraUsers.length} c={c}>
+            <FlatList data={agoraUsers} keyExtractor={u => u.id} renderItem={renderUserRow} scrollEnabled={false} />
+          </ResultGroup>
+          <ResultGroup title="On the Fediverse (already known to this instance)" count={fediverseUsers.length} c={c}>
+            <FlatList data={fediverseUsers} keyExtractor={u => u.id} renderItem={renderUserRow} scrollEnabled={false} />
+          </ResultGroup>
+          <ResultGroup title="On Bluesky" count={bskyActors.length} c={c}>
+            <FlatList
+              data={bskyActors}
+              keyExtractor={a => a.did}
+              scrollEnabled={false}
+              renderItem={({ item }) => (
+                <BlueskyActorRow actor={item} c={c}
+                  onFollow={() => followBluesky.mutate(item.did)} followPending={followBluesky.isPending} />
+              )}
+            />
+          </ResultGroup>
         </>
       )
     }
@@ -185,8 +237,12 @@ export default function SearchScreen() {
       )
     }
 
-    // Posts tab
-    if (posts.length === 0) {
+    // Posts tab — same source grouping as Users. The Bluesky group mixes
+    // already-cached rows (this instance's own posts table, AGORA-214) with
+    // live network results (AGORA-216); both are genuinely "on Bluesky",
+    // unlike the fediverse group which is explicitly scoped to what's
+    // already cached.
+    if (agoraPosts.length === 0 && fediversePosts.length === 0 && cachedBskyPosts.length === 0 && liveBskyPosts.length === 0) {
       return (
         <View style={s.emptyState}>
           <Ionicons name="document-text-outline" size={40} color={c.textMuted} style={{ marginBottom: 10 }} />
@@ -196,12 +252,22 @@ export default function SearchScreen() {
     }
 
     return (
-      <FlatList
-        data={posts}
-        keyExtractor={p => p.id}
-        renderItem={({ item }) => <PostCard post={item} queryKey={['search-posts', query]} />}
-        scrollEnabled={false}
-      />
+      <>
+        <ResultGroup title="On Agora" count={agoraPosts.length} c={c}>
+          <FlatList data={agoraPosts} keyExtractor={p => p.id} scrollEnabled={false}
+            renderItem={({ item }) => <PostCard post={item} queryKey={['search-posts', query]} />} />
+        </ResultGroup>
+        <ResultGroup title="On the Fediverse (already known to this instance)" count={fediversePosts.length} c={c}>
+          <FlatList data={fediversePosts} keyExtractor={p => p.id} scrollEnabled={false}
+            renderItem={({ item }) => <PostCard post={item} queryKey={['search-posts', query]} />} />
+        </ResultGroup>
+        <ResultGroup title="On Bluesky" count={cachedBskyPosts.length + liveBskyPosts.length} c={c}>
+          <FlatList data={cachedBskyPosts} keyExtractor={p => p.id} scrollEnabled={false}
+            renderItem={({ item }) => <PostCard post={item} queryKey={['search-posts', query]} />} />
+          <FlatList data={liveBskyPosts} keyExtractor={p => p.uri} scrollEnabled={false}
+            renderItem={({ item }) => <BlueskyPostRow post={item} c={c} />} />
+        </ResultGroup>
+      </>
     )
   }
 
@@ -253,7 +319,114 @@ export default function SearchScreen() {
   )
 }
 
+// ── Result group wrapper (AGORA-217) — hides itself when empty rather than
+// rendering an empty labeled section for a source with no matches.
+function ResultGroup({ title, count, c, children }: { title: string, count: number, c: any, children: React.ReactNode }) {
+  if (count === 0) return null
+  return (
+    <View style={{ marginBottom: 8 }}>
+      <Text style={[s.groupTitle, { color: c.textMuted }]}>{title}</Text>
+      {children}
+    </View>
+  )
+}
+
+// ── Bluesky actor row (AGORA-215/217) ───────────────────────────────────────
+// Real, live, network-wide — unlike renderUserRow's Agora/fediverse rows,
+// this never came from this instance's own users table, so it opens
+// bsky.app rather than an in-app /profile/:username route, and its only
+// action is Follow (AGORA-195's existing followBlueskyAccount), no
+// friend-request flow.
+function BlueskyActorRow({ actor: a, c, onFollow, followPending }: {
+  actor: any, c: any, onFollow: () => void, followPending: boolean
+}) {
+  const [followed, setFollowed] = useState(false)
+  const handleFollow = () => { setFollowed(true); onFollow() }
+
+  return (
+    <TouchableOpacity
+      style={[s.userRow, { borderBottomColor: c.border, backgroundColor: c.card }]}
+      onPress={() => Linking.openURL(`https://bsky.app/profile/${a.handle}`)}
+      activeOpacity={0.7}
+    >
+      <Avatar url={a.avatar_url} name={a.display_name || a.handle} size={44} />
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <Text style={[s.displayName, { color: c.text }]}>{a.display_name || a.handle}</Text>
+        <Text style={[s.username, { color: c.textMuted }]}>@{a.handle} · Bluesky</Text>
+      </View>
+      <TouchableOpacity
+        disabled={followPending || followed}
+        onPress={handleFollow}
+        style={[s.followBtn, { backgroundColor: c.primary, opacity: followPending || followed ? 0.6 : 1 }]}
+      >
+        <Text style={s.followBtnText}>{followed ? 'Following' : 'Follow'}</Text>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  )
+}
+
+// ── Bluesky post row (AGORA-216/217) ────────────────────────────────────────
+// Never ingested into the local posts table (the ticket's own explicit
+// read-only constraint), so there's no local post to hand to PostCard —
+// opens the real bsky.app post instead.
+function BlueskyPostRow({ post: p, c }: { post: any, c: any }) {
+  // at://did/app.bsky.feed.post/rkey — bsky.app's own web URL takes the
+  // handle (not the DID) plus that trailing rkey.
+  const rkey = p.uri.split('/').pop()
+  const url = `https://bsky.app/profile/${p.author_handle}/post/${rkey}`
+
+  return (
+    <TouchableOpacity
+      style={[s.bskyPost, { borderBottomColor: c.border, backgroundColor: c.card }]}
+      onPress={() => Linking.openURL(url)}
+      activeOpacity={0.7}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+        <Avatar url={p.author_avatar_url} name={p.author_display_name || p.author_handle} size={28} />
+        <Text style={[s.displayName, { color: c.text, marginLeft: 8, fontSize: 16 }]}>
+          {p.author_display_name || p.author_handle}
+        </Text>
+        <Text style={[s.username, { color: c.textMuted, marginLeft: 4 }]}>@{p.author_handle}</Text>
+        <Text style={[s.username, { color: c.textMuted, marginLeft: 'auto' }]}>
+          {timeAgo(p.created_at)}
+        </Text>
+      </View>
+      <Text style={{ color: c.text, fontSize: 16 }} numberOfLines={3}>{p.text}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+        <Ionicons name="heart-outline" size={14} color={c.textMuted} />
+        <Text style={[s.username, { color: c.textMuted, marginLeft: 4, marginRight: 12 }]}>{p.like_count}</Text>
+        <Ionicons name="open-outline" size={14} color={c.textMuted} />
+        <Text style={[s.username, { color: c.textMuted, marginLeft: 4 }]}>Bluesky</Text>
+      </View>
+    </TouchableOpacity>
+  )
+}
+
 const s = StyleSheet.create({
+  groupTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  followBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  followBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  bskyPost: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -263,7 +436,7 @@ const s = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 18,
     padding: 0,
   },
   tabs: {
@@ -278,7 +451,7 @@ const s = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabText: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '600',
   },
   userRow: {
@@ -289,11 +462,11 @@ const s = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   displayName: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '600',
   },
   username: {
-    fontSize: 13,
+    fontSize: 15,
     marginTop: 1,
   },
   badge: {
@@ -303,7 +476,7 @@ const s = StyleSheet.create({
     paddingVertical: 3,
   },
   badgeText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
   emptyState: {
@@ -314,13 +487,13 @@ const s = StyleSheet.create({
     paddingVertical: 64,
   },
   emptyTitle: {
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: 4,
   },
   emptySub: {
-    fontSize: 14,
+    fontSize: 16,
     textAlign: 'center',
   },
   federatedHint: {
@@ -333,7 +506,7 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
   federatedText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '500',
     flex: 1,
   },

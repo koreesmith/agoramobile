@@ -96,7 +96,7 @@ export default function LoginScreen() {
                   activeOpacity={0.75}
                 >
                   <View style={s.instanceEmoji}>
-                    <Text style={{ fontSize: 28 }}>{inst.emoji}</Text>
+                    <Text style={{ fontSize: 31 }}>{inst.emoji}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.instanceName}>{inst.name}</Text>
@@ -153,7 +153,7 @@ export default function LoginScreen() {
                     }
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => { setShowCustomUrl(false); setInstanceUrl('') }} style={s.backBtn}>
-                    <Text style={{ color: '#829ab1', fontSize: 14 }}>Cancel</Text>
+                    <Text style={{ color: '#829ab1', fontSize: 16 }}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -179,15 +179,22 @@ export default function LoginScreen() {
               >
                 {loading ? <ActivityIndicator color="white" /> : <Text style={s.btnText}>Sign in</Text>}
               </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: '/explore', params: { instanceUrl, instanceName } })}
+                style={{ alignItems: 'center', paddingVertical: 8, flexDirection: 'row', justifyContent: 'center', gap: 6 }}
+              >
+                <Ionicons name="compass-outline" size={16} color="#486581" />
+                <Text style={{ color: '#486581', fontSize: 16, fontWeight: '600' }}>Explore public posts</Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => { setStep('instance'); setShowCustomUrl(false) }} style={s.backBtn}>
-                <Text style={{ color: '#486581', fontSize: 14 }}>← Change server</Text>
+                <Text style={{ color: '#486581', fontSize: 16 }}>← Change server</Text>
               </TouchableOpacity>
               {/* Sign up link */}
               <TouchableOpacity
                 onPress={() => router.push({ pathname: '/(auth)/register', params: { instanceUrl, instanceName } })}
                 style={{ alignItems: 'center', paddingVertical: 4 }}
               >
-                <Text style={{ color: '#829ab1', fontSize: 14 }}>
+                <Text style={{ color: '#829ab1', fontSize: 16 }}>
                   Don't have an account?{' '}
                   <Text style={{ color: '#486581', fontWeight: '600' }}>Sign up</Text>
                 </Text>
@@ -215,38 +222,38 @@ const s = StyleSheet.create({
   container:       { flex: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 56 },
   logoWrap:        { alignItems: 'center', marginBottom: 36 },
   logo:            { width: 72, height: 72, borderRadius: 18, marginBottom: 16 },
-  title:           { fontSize: 26, fontWeight: '800', color: '#102a43' },
-  subtitle:        { color: '#829ab1', marginTop: 4, textAlign: 'center', fontSize: 14 },
+  title:           { fontSize: 29, fontWeight: '800', color: '#102a43' },
+  subtitle:        { color: '#829ab1', marginTop: 4, textAlign: 'center', fontSize: 16 },
 
-  sectionLabel:    { fontSize: 11, fontWeight: '600', color: '#829ab1', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 },
+  sectionLabel:    { fontSize: 12, fontWeight: '600', color: '#829ab1', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 },
 
   instanceCard:    { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#d9e2ec', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
   instanceEmoji:   { width: 52, height: 52, borderRadius: 14, backgroundColor: '#f0f4f8', alignItems: 'center', justifyContent: 'center' },
-  instanceName:    { fontSize: 16, fontWeight: '700', color: '#102a43', marginBottom: 2 },
-  instanceDesc:    { fontSize: 13, color: '#627d98', marginBottom: 2 },
-  instanceUrl:     { fontSize: 11, color: '#9fb3c8' },
+  instanceName:    { fontSize: 18, fontWeight: '700', color: '#102a43', marginBottom: 2 },
+  instanceDesc:    { fontSize: 15, color: '#627d98', marginBottom: 2 },
+  instanceUrl:     { fontSize: 12, color: '#9fb3c8' },
 
   divider:         { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },
   dividerLine:     { flex: 1, height: 1, backgroundColor: '#d9e2ec' },
-  dividerText:     { fontSize: 13, color: '#9fb3c8', fontWeight: '500' },
+  dividerText:     { fontSize: 15, color: '#9fb3c8', fontWeight: '500' },
 
   customBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#d9e2ec', backgroundColor: '#fff' },
-  customBtnText:   { fontSize: 15, fontWeight: '600', color: '#486581' },
+  customBtnText:   { fontSize: 17, fontWeight: '600', color: '#486581' },
   customUrlWrap:   { gap: 4 },
 
   form:            { gap: 4 },
-  label:           { fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 6 },
-  input:           { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, color: '#111827', backgroundColor: 'white', marginBottom: 4 },
+  label:           { fontSize: 16, fontWeight: '500', color: '#374151', marginBottom: 6 },
+  input:           { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 18, color: '#111827', backgroundColor: 'white', marginBottom: 4 },
   btn:             { backgroundColor: '#486581', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
   btnDisabled:     { backgroundColor: '#9fb3c8' },
-  btnText:         { color: 'white', fontWeight: '600', fontSize: 16 },
+  btnText:         { color: 'white', fontWeight: '600', fontSize: 18 },
   backBtn:         { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
   signupBtn:       { borderWidth: 1, borderColor: '#d9e2ec', borderRadius: 12, paddingVertical: 14, alignItems: 'center', backgroundColor: '#fff' },
-  signupBtnText:   { fontSize: 15, fontWeight: '600', color: '#486581' },
+  signupBtnText:   { fontSize: 17, fontWeight: '600', color: '#486581' },
 
   waitlistBanner:  { backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#fcd34d', borderRadius: 10, padding: 12, marginBottom: 12 },
-  waitlistTitle:   { fontSize: 13, color: '#92400e', fontWeight: '600', marginBottom: 2 },
-  waitlistBody:    { fontSize: 12, color: '#b45309', lineHeight: 18 },
+  waitlistTitle:   { fontSize: 15, color: '#92400e', fontWeight: '600', marginBottom: 2 },
+  waitlistBody:    { fontSize: 13, color: '#b45309', lineHeight: 18 },
 })
 
 

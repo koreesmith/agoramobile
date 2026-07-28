@@ -78,8 +78,8 @@ const s = StyleSheet.create({
   grid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   statCard:  { width: '47%', borderWidth: 1, borderRadius: 16, padding: 16, alignItems: 'center', gap: 8 },
   statIcon:  { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  statValue: { fontSize: 28, fontWeight: '800' },
-  statLabel: { fontSize: 12, textAlign: 'center' },
+  statValue: { fontSize: 31, fontWeight: '800' },
+  statLabel: { fontSize: 13, textAlign: 'center' },
   note:      { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderWidth: 1, borderRadius: 12, padding: 12 },
-  noteText:  { fontSize: 13, lineHeight: 18, flex: 1 },
+  noteText:  { fontSize: 15, lineHeight: 18, flex: 1 },
 })

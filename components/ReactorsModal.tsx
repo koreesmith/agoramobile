@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { feedApi } from '../api'
 import { useC } from '../constants/ColorContext'
-import { Avatar } from './ui'
+import { Avatar, renderName } from './ui'
 import { Ionicons } from '@expo/vector-icons'
 
 const REACTIONS = [
@@ -32,7 +32,7 @@ export default function ReactorsModal({ postId, visible, onClose, initialTab = '
     enabled: visible,
   })
 
-  const reactors: Array<{ user_id: string; username: string; display_name: string; avatar_url: string; type: string }> = data?.reactions ?? []
+  const reactors: Array<{ user_id: string; username: string; display_name: string; avatar_url: string; type: string; emojis?: Record<string, string> }> = data?.reactions ?? []
 
   const tabs = [
     { key: 'all', label: 'All' },
@@ -87,7 +87,7 @@ export default function ReactorsModal({ postId, visible, onClose, initialTab = '
                   >
                     <Avatar url={item.avatar_url} name={item.display_name || item.username} size={38} />
                     <View style={s.userInfo}>
-                      <Text style={[s.displayName, { color: c.text }]}>{item.display_name || item.username}</Text>
+                      <Text style={[s.displayName, { color: c.text }]}>{item.display_name ? renderName(item.display_name, item.emojis) : item.username}</Text>
                       {item.username && (
                         <Text style={[s.username, { color: c.textMuted }]}>@{item.username}</Text>
                       )}
@@ -109,15 +109,15 @@ const s = StyleSheet.create({
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet:       { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, borderBottomWidth: 0, maxHeight: '70%' },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
-  title:       { fontWeight: '700', fontSize: 17 },
+  title:       { fontWeight: '700', fontSize: 19 },
   closeBtn:    { padding: 4 },
   tabs:        { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12 },
   tab:         { paddingHorizontal: 14, paddingVertical: 10, marginBottom: -StyleSheet.hairlineWidth },
-  tabLabel:    { fontSize: 14, fontWeight: '600' },
+  tabLabel:    { fontSize: 16, fontWeight: '600' },
   row:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 12 },
   userInfo:    { flex: 1 },
-  displayName: { fontWeight: '600', fontSize: 14 },
-  username:    { fontSize: 12, marginTop: 1 },
-  emoji:       { fontSize: 22 },
-  empty:       { textAlign: 'center', marginTop: 40, fontSize: 14 },
+  displayName: { fontWeight: '600', fontSize: 16 },
+  username:    { fontSize: 13, marginTop: 1 },
+  emoji:       { fontSize: 25 },
+  empty:       { textAlign: 'center', marginTop: 40, fontSize: 16 },
 })

@@ -7,10 +7,11 @@ import { Stack, router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Spinner, EmptyState } from '../components/ui'
-import { feedsApi, friendsApi, groupsApi, federationApi } from '../api'
+import { feedsApi, friendsApi, groupsApi, federationApi, atprotoApi, pagesApi } from '../api'
 import { useC } from '../constants/ColorContext'
 
-type FilterType = 'friend_group' | 'community_group' | 'exclude_friend' | 'exclude_group' | 'fediverse_account' | 'fediverse_all'
+type FilterType = 'friend_group' | 'community_group' | 'exclude_friend' | 'exclude_group' | 'fediverse_account' | 'fediverse_all' | 'atproto_account' | 'atproto_all'
+  | 'include_page' | 'exclude_page' | 'exclude_fediverse_account' | 'exclude_atproto_account'
 
 interface FilterRule {
   filter_type: FilterType
@@ -67,6 +68,20 @@ export default function ManageFeedsScreen() {
   // has been ingested — nothing to filter by before that, so it's left out
   // of the picker until then, matching web's FeedBuilderModal.
   const fediverseAccounts: any[] = (followingData?.following || []).filter((f: any) => f.user_id)
+
+  const { data: bskyFollowingData } = useQuery({
+    queryKey: ['bluesky-following'],
+    queryFn: () => atprotoApi.listBlueskyFollowing().then(r => r.data),
+    enabled: showEditor,
+  })
+  const bskyAccounts: any[] = (bskyFollowingData?.following || []).filter((f: any) => f.user_id)
+
+  const { data: myPagesData } = useQuery({
+    queryKey: ['pages-mine'],
+    queryFn: () => pagesApi.mine().then(r => r.data),
+    enabled: showEditor,
+  })
+  const myPages: any[] = myPagesData?.pages || []
 
   const openCreate = () => {
     setEditingId(null)
@@ -224,6 +239,12 @@ export default function ManageFeedsScreen() {
               <FilterSection title="INCLUDE FROM FRIEND LISTS" items={friendLists} type="friend_group" labelKey="name" />
               <FilterSection title="INCLUDE FROM COMMUNITIES" items={joinedGroups} type="community_group" labelKey="name" />
               <FilterSection
+                title="INCLUDE FROM PAGES"
+                items={myPages.map((p: any) => ({ id: p.id, name: p.display_name || p.slug }))}
+                type="include_page"
+                labelKey="name"
+              />
+              <FilterSection
                 title="INCLUDE FROM THE FEDIVERSE"
                 items={[{ id: 'true', name: 'Everyone I follow on the fediverse' }]}
                 type="fediverse_all"
@@ -237,8 +258,44 @@ export default function ManageFeedsScreen() {
                   labelKey="name"
                 />
               )}
+              <FilterSection
+                title="INCLUDE FROM BLUESKY"
+                items={[{ id: 'true', name: 'Everyone I follow on Bluesky' }]}
+                type="atproto_all"
+                labelKey="name"
+              />
+              {bskyAccounts.length > 0 && (
+                <FilterSection
+                  title="INCLUDE ONE BLUESKY ACCOUNT"
+                  items={bskyAccounts.map((f: any) => ({ id: f.user_id, name: f.display_name || f.handle }))}
+                  type="atproto_account"
+                  labelKey="name"
+                />
+              )}
               <FilterSection title="EXCLUDE FRIENDS" items={friends} type="exclude_friend" labelKey="display_name" />
               <FilterSection title="EXCLUDE COMMUNITIES" items={joinedGroups} type="exclude_group" labelKey="name" />
+              <FilterSection
+                title="EXCLUDE PAGES"
+                items={myPages.map((p: any) => ({ id: p.id, name: p.display_name || p.slug }))}
+                type="exclude_page"
+                labelKey="name"
+              />
+              {fediverseAccounts.length > 0 && (
+                <FilterSection
+                  title="EXCLUDE ONE FEDIVERSE ACCOUNT"
+                  items={fediverseAccounts.map((f: any) => ({ id: f.user_id, name: f.display_name || f.username || f.actor_url }))}
+                  type="exclude_fediverse_account"
+                  labelKey="name"
+                />
+              )}
+              {bskyAccounts.length > 0 && (
+                <FilterSection
+                  title="EXCLUDE ONE BLUESKY ACCOUNT"
+                  items={bskyAccounts.map((f: any) => ({ id: f.user_id, name: f.display_name || f.handle }))}
+                  type="exclude_atproto_account"
+                  labelKey="name"
+                />
+              )}
 
               {showEditor && friendLists.length === 0 && joinedGroups.length === 0 && friends.length === 0 && (
                 <Text style={[s.hint, { color: c.textMuted }]}>
@@ -255,21 +312,21 @@ export default function ManageFeedsScreen() {
 
 const s = StyleSheet.create({
   feedRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
-  feedName: { fontSize: 15, fontWeight: '600' },
-  feedMeta: { fontSize: 12, marginTop: 2 },
+  feedName: { fontSize: 17, fontWeight: '600' },
+  feedMeta: { fontSize: 13, marginTop: 2 },
   deleteBtn: { padding: 8 },
   createBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, margin: 16, paddingVertical: 14, borderRadius: 12 },
-  createBtnText: { color: 'white', fontWeight: '600', fontSize: 15 },
+  createBtnText: { color: 'white', fontWeight: '600', fontSize: 17 },
   editorContainer: { flex: 1 },
   editorHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12, borderBottomWidth: 1 },
-  cancelText: { fontSize: 16 },
-  editorTitle: { fontWeight: '600', fontSize: 16 },
-  saveText: { fontSize: 16, fontWeight: '600' },
+  cancelText: { fontSize: 18 },
+  editorTitle: { fontWeight: '600', fontSize: 18 },
+  saveText: { fontSize: 18, fontWeight: '600' },
   nameWrap: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16 },
-  nameInput: { fontSize: 16 },
-  hint: { fontSize: 13, marginBottom: 16, textAlign: 'center', lineHeight: 18 },
+  nameInput: { fontSize: 18 },
+  hint: { fontSize: 15, marginBottom: 16, textAlign: 'center', lineHeight: 18 },
   section: { borderWidth: 1, borderRadius: 12, marginBottom: 16, overflow: 'hidden' },
-  sectionTitle: { fontSize: 10, fontWeight: '600', letterSpacing: 0.8, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6 },
+  sectionTitle: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6 },
   filterRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  filterLabel: { fontSize: 14 },
+  filterLabel: { fontSize: 16 },
 })

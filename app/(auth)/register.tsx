@@ -87,7 +87,7 @@ export default function RegisterScreen() {
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-              <Text style={{ color: c.primary, fontSize: 16 }}>← Back</Text>
+              <Text style={{ color: c.primary, fontSize: 18 }}>← Back</Text>
             </TouchableOpacity>
             <Text style={[styles.title, { color: c.text }]}>Create account</Text>
             <Text style={[styles.subtitle, { color: c.textMuted }]}>
@@ -186,17 +186,17 @@ const styles = StyleSheet.create({
   container:    { flex: 1, paddingHorizontal: 24, paddingVertical: 48 },
   header:       { marginBottom: 32 },
   backBtn:      { marginBottom: 16 },
-  title:        { fontSize: 28, fontWeight: '800', marginBottom: 4 },
-  subtitle:     { fontSize: 15 },
+  title:        { fontSize: 31, fontWeight: '800', marginBottom: 4 },
+  subtitle:     { fontSize: 17 },
   form:         { gap: 2 },
-  label:        { fontSize: 14, fontWeight: '500', marginBottom: 6 },
-  hint:         { fontSize: 12, marginTop: 4, marginBottom: 2 },
-  input:        { borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, fontSize: 16 },
+  label:        { fontSize: 16, fontWeight: '500', marginBottom: 6 },
+  hint:         { fontSize: 13, marginTop: 4, marginBottom: 2 },
+  input:        { borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, fontSize: 18 },
   btn:          { backgroundColor: '#486581', borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginTop: 24 },
-  btnText:      { color: 'white', fontWeight: '700', fontSize: 16 },
-  legal:        { fontSize: 12, textAlign: 'center', marginTop: 16, lineHeight: 18 },
+  btnText:      { color: 'white', fontWeight: '700', fontSize: 18 },
+  legal:        { fontSize: 13, textAlign: 'center', marginTop: 16, lineHeight: 18 },
   successBox:   { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  successIcon:  { fontSize: 56, marginBottom: 20 },
-  successTitle: { fontSize: 26, fontWeight: '800', marginBottom: 12, textAlign: 'center' },
-  successBody:  { fontSize: 15, lineHeight: 24, textAlign: 'center', marginBottom: 32 },
+  successIcon:  { fontSize: 63, marginBottom: 20 },
+  successTitle: { fontSize: 29, fontWeight: '800', marginBottom: 12, textAlign: 'center' },
+  successBody:  { fontSize: 17, lineHeight: 24, textAlign: 'center', marginBottom: 32 },
 })

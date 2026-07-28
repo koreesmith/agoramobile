@@ -2,7 +2,7 @@ import { View, Text, FlatList, TouchableOpacity, RefreshControl, StyleSheet } fr
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { formatDistanceToNow } from 'date-fns'
+import { timeAgo } from '../../utils/handle'
 import { Screen, Header, Spinner, EmptyState } from '../../components/ui'
 import { notificationsApi, friendsApi } from '../../api'
 
@@ -18,7 +18,7 @@ const ICONS: Record<string, any> = {
   comment_reaction: 'happy', post_comment: 'chatbubble', post_repost: 'repeat',
   post_mention: 'at', comment_reply: 'return-down-forward', wall_post: 'pencil',
   wall_post_pending: 'time', wall_post_approved: 'checkmark-circle', user_post: 'notifications',
-  fediverse_post: 'planet',
+  fediverse_post: 'planet', atproto_post: 'cloud',
   waitlist_signup: 'person-add-outline', waitlist_join: 'person-add-outline',
   waitlist_joined: 'person-add-outline', waitlist: 'person-add-outline',
 }
@@ -28,7 +28,7 @@ const COLORS: Record<string, string> = {
   comment_like: '#ef4444', post_reaction: '#f59e0b', comment_reaction: '#f59e0b',
   post_comment: '#486581', post_repost: '#22c55e', post_mention: '#3b82f6',
   wall_post: '#486581', wall_post_pending: '#f59e0b', wall_post_approved: '#22c55e', user_post: '#486581',
-  fediverse_post: '#0ea5e9',
+  fediverse_post: '#0ea5e9', atproto_post: '#0ea5e9',
   waitlist_signup: '#8b5cf6', waitlist_join: '#8b5cf6',
   waitlist_joined: '#8b5cf6', waitlist: '#8b5cf6',
 }
@@ -41,7 +41,7 @@ const TEXT: Record<string, string> = {
   post_mention: 'mentioned you in a post', comment_reply: 'replied to your comment',
   wall_post: 'posted on your wall', wall_post_pending: 'wants to post on your wall',
   wall_post_approved: 'approved your wall post', user_post: 'made a new post',
-  fediverse_post: 'posted something new on the fediverse',
+  fediverse_post: 'posted something new on the fediverse', atproto_post: 'posted something new on Bluesky',
   waitlist_signup: 'joined the waitlist', waitlist_join: 'joined the waitlist',
   waitlist_joined: 'joined the waitlist', waitlist: 'joined the waitlist',
 }
@@ -122,7 +122,7 @@ export default function NotificationsScreen() {
     <Screen>
       <Header title="Notifications" right={hasUnread ? (
         <TouchableOpacity onPress={() => markAll.mutate()}>
-          <Text style={{ color: c.primary, fontSize: 14, fontWeight: '500' }}>Mark all read</Text>
+          <Text style={{ color: c.primary, fontSize: 16, fontWeight: '500' }}>Mark all read</Text>
         </TouchableOpacity>
       ) : undefined} />
       {isLoading ? <Spinner /> : (
@@ -141,14 +141,14 @@ export default function NotificationsScreen() {
                   <Text style={{ fontWeight: '600' }}>{formatActorLabel(n)}</Text>
                   {' '}{TEXT[n.type] || 'did something'}
                 </Text>
-                <Text style={[s.notifTime, { color: c.textLight }]}>{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</Text>
+                <Text style={[s.notifTime, { color: c.textLight }]}>{timeAgo(n.created_at)}</Text>
                 {n.type === 'friend_request' && n.friend_status !== 'accepted' && n.friend_status !== 'declined' && (
                   <View style={s.friendActions}>
                     <TouchableOpacity onPress={() => accept.mutate(n.actor_id)} style={s.acceptBtn}>
-                      <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>Accept</Text>
+                      <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>Accept</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => decline.mutate(n.actor_id)} style={s.declineBtn}>
-                      <Text style={{ color: c.textMuted, fontSize: 12, fontWeight: '600' }}>Decline</Text>
+                      <Text style={{ color: c.textMuted, fontSize: 13, fontWeight: '600' }}>Decline</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -166,8 +166,8 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
   rowUnread: { backgroundColor: '#f0f4f8' },
   icon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  notifText: { fontSize: 14, color: '#1f2937' },
-  notifTime: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  notifText: { fontSize: 16, color: '#1f2937' },
+  notifTime: { fontSize: 13, color: '#9ca3af', marginTop: 2 },
   friendActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   acceptBtn: { backgroundColor: '#486581', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   declineBtn: { backgroundColor: '#f3f4f6', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },

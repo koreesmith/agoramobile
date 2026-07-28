@@ -36,7 +36,10 @@ export default function GroupScreen() {
     initialPageParam: 0,
   })
 
-  const posts = data?.pages.flatMap(p => p.posts) ?? []
+  // A page has no `posts` key when the group feed is empty or you're not a member,
+  // so flatMap must not spread `undefined` into the list — FlatList's keyExtractor
+  // would then dereference it and throw. (getNextPageParam above already guards.)
+  const posts = (data?.pages.flatMap(p => p?.posts ?? []) ?? []).filter(Boolean)
   const group = groupData?.group || groupData
 
   const join = useMutation({ mutationFn: () => groupsApi.join(slug!), onSuccess: () => { qc.invalidateQueries({ queryKey: ['group', slug] }); qc.invalidateQueries({ queryKey: ['groups'] }) } })
@@ -76,31 +79,52 @@ export default function GroupScreen() {
     finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploading(false) }
   }
 
-  if (gl || !group) return <Screen><Stack.Screen options={{ headerShown: true, headerTitle: 'Group', headerTintColor: c.primary }} /><Spinner /></Screen>
+  // AMOBILE-147: one stable header config, rendered identically in the loading and
+  // loaded branches. Previously the loading branch declared a different set of
+  // options and `headerRight` returned null until the group loaded, so finishing
+  // the fetch made react-native-screens tear down a header subview. That path
+  // (RNSScreenStackHeaderConfig unmountChildComponentView ->
+  // replaceNavigationBarViewsWithSnapshotOfSubview) takes a synchronous
+  // CARenderServer snapshot on the main thread, which is where the main thread sat
+  // in the build-112 crash. Keeping the subview mounted and only changing its
+  // contents avoids the unmount entirely.
+  const isMember = !!group?.is_member
+  const canManage = group?.my_role === 'admin' || group?.is_admin
 
-  return (
-    <Screen>
-      <UploadingModal visible={showUploadModal} />
-      <Stack.Screen options={{
-        headerShown: true, headerTitle: group.name, headerBackTitle: 'Groups',
-        headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
-        headerRight: () => group.is_member ? (
-          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-            {(group.my_role === 'admin' || group.is_admin) && (
-              <TouchableOpacity onPress={() => router.push(`/group/manage/${slug}`)}>
-                <Ionicons name="settings-outline" size={22} color={c.primary} />
-              </TouchableOpacity>
-            )}
+  const headerConfig = (
+    <Stack.Screen options={{
+      headerShown: true,
+      headerTitle: group?.name || 'Group',
+      headerBackTitle: 'Groups',
+      headerStyle: { backgroundColor: c.card },
+      headerTintColor: c.primary,
+      headerRight: () => (
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+          {isMember && canManage ? (
+            <TouchableOpacity onPress={() => router.push(`/group/manage/${slug}`)}>
+              <Ionicons name="settings-outline" size={22} color={c.primary} />
+            </TouchableOpacity>
+          ) : null}
+          {isMember ? (
             <TouchableOpacity onPress={() => Alert.alert('Leave group?', undefined, [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Leave', style: 'destructive', onPress: () => leave.mutate() },
             ])}><Ionicons name="exit-outline" size={22} color={c.red} /></TouchableOpacity>
-          </View>
-        ) : null,
-      }} />
+          ) : null}
+        </View>
+      ),
+    }} />
+  )
+
+  if (gl || !group) return <Screen>{headerConfig}<Spinner /></Screen>
+
+  return (
+    <Screen>
+      <UploadingModal visible={showUploadModal} />
+      {headerConfig}
       <FlatList
         data={posts}
-        keyExtractor={p => p.id}
+        keyExtractor={(p, i) => String(p?.id ?? i)}
         renderItem={({ item }) => <PostCard post={item} queryKey={['group-feed', slug]} />}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { rg(); rf() }} tintColor={c.primary} />}
         onEndReached={() => hasNextPage && fetchNextPage()}
@@ -115,7 +139,7 @@ export default function GroupScreen() {
             <View style={[s.groupCard, { backgroundColor: c.card }]}>
               <View style={s.groupHeaderRow}>
                 <View style={[s.groupIcon, { backgroundColor: c.primaryBg, borderColor: c.card }]}>
-                  {group.avatar_url ? <Image source={{ uri: imgUrl(group.avatar_url) }} style={{ width: 64, height: 64 }} /> : <Text style={[s.groupLetter, { color: c.primary }]}>{group.name[0]}</Text>}
+                  {group.avatar_url ? <Image source={{ uri: imgUrl(group.avatar_url) }} style={{ width: 64, height: 64 }} /> : <Text style={[s.groupLetter, { color: c.primary }]}>{(group.name || '?')[0]}</Text>}
                 </View>
                 {!group.is_member && (
                   <TouchableOpacity onPress={() => join.mutate()} disabled={join.isPending} style={[s.joinBtn, { backgroundColor: c.primary }]}>
@@ -134,8 +158,8 @@ export default function GroupScreen() {
                   <>
                     {showCW && (
                       <View style={{ borderWidth: 1, borderColor: '#fcd34d', backgroundColor: '#fffbeb', borderRadius: 8, padding: 8, marginBottom: 8 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>⚠️ Trigger warning</Text>
-                        <TextInput style={{ fontSize: 13, color: '#92400e', padding: 0 }} placeholder="e.g. spoilers, violence…" placeholderTextColor="#d97706"
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>⚠️ Trigger warning</Text>
+                        <TextInput style={{ fontSize: 15, color: '#92400e', padding: 0 }} placeholder="e.g. spoilers, violence…" placeholderTextColor="#d97706"
                           value={cwLabel} onChangeText={setCwLabel} returnKeyType="done" />
                       </View>
                     )}
@@ -172,12 +196,12 @@ export default function GroupScreen() {
                             ? <ActivityIndicator size="small" color={c.primary} />
                             : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                                 <Ionicons name="image-outline" size={20} color={imageUrls.length >= MAX_IMAGES ? c.border : c.primary} />
-                                {imageUrls.length > 0 && <Text style={{ fontSize: 11, color: c.primary, fontWeight: '600' }}>{imageUrls.length}/{MAX_IMAGES}</Text>}
+                                {imageUrls.length > 0 && <Text style={{ fontSize: 12, color: c.primary, fontWeight: '600' }}>{imageUrls.length}/{MAX_IMAGES}</Text>}
                               </View>}
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setShowCW(v => !v)}
                           style={{ borderWidth: 1, borderColor: showCW ? '#fcd34d' : c.border, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: showCW ? '#fef3c7' : 'transparent' }}>
-                          <Text style={{ fontSize: 11, fontWeight: '600', color: showCW ? '#92400e' : c.textMuted }}>TW</Text>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: showCW ? '#92400e' : c.textMuted }}>TW</Text>
                         </TouchableOpacity>
                       </View>
                       <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -212,22 +236,22 @@ const s = StyleSheet.create({
   groupCard: { backgroundColor: C.card, paddingHorizontal: 16, paddingBottom: 16 },
   groupHeaderRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: -32 },
   groupIcon: { width: 64, height: 64, borderRadius: 12, backgroundColor: C.primaryBg, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: C.card },
-  groupLetter: { color: C.primary, fontWeight: 'bold', fontSize: 26 },
+  groupLetter: { color: C.primary, fontWeight: 'bold', fontSize: 29 },
   joinBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8, marginTop: 32 },
   joinBtnText: { color: 'white', fontWeight: '600' },
-  groupName: { fontSize: 20, fontWeight: 'bold', color: C.text, marginTop: 10 },
-  groupMeta: { fontSize: 12, color: C.textMuted, marginTop: 2, textTransform: 'capitalize' },
-  groupDesc: { fontSize: 14, color: C.textMd, marginTop: 6 },
+  groupName: { fontSize: 22, fontWeight: 'bold', color: C.text, marginTop: 10 },
+  groupMeta: { fontSize: 13, color: C.textMuted, marginTop: 2, textTransform: 'capitalize' },
+  groupDesc: { fontSize: 16, color: C.textMd, marginTop: 6 },
   composer: { backgroundColor: C.card, marginHorizontal: 12, marginTop: 12, borderRadius: 14, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
   composerPrompt: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  composerText: { color: C.textLight, fontSize: 14 },
-  composeInput: { fontSize: 14, color: C.text, minHeight: 60 },
+  composerText: { color: C.textLight, fontSize: 16 },
+  composeInput: { fontSize: 16, color: C.text, minHeight: 60 },
   composeActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: C.border },
   cancelBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  cancelBtnText: { fontSize: 13, color: C.textMd },
+  cancelBtnText: { fontSize: 15, color: C.textMd },
   postBtn: { backgroundColor: C.primary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
-  postBtnText: { color: 'white', fontWeight: '600', fontSize: 13 },
+  postBtnText: { color: 'white', fontWeight: '600', fontSize: 15 },
   removeImg: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
-  postsHeader: { fontSize: 11, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
-  empty: { textAlign: 'center', color: C.textLight, fontSize: 14, paddingVertical: 32 },
+  postsHeader: { fontSize: 12, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
+  empty: { textAlign: 'center', color: C.textLight, fontSize: 16, paddingVertical: 32 },
 })

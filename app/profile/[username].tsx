@@ -2,9 +2,9 @@ import { View, Text, ScrollView, TouchableOpacity, Image, RefreshControl, Alert,
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import { Screen, Spinner, Avatar } from '../../components/ui'
+import { Screen, Spinner, Avatar, LinkedText, renderName } from '../../components/ui'
 import PostCard from '../../components/PostCard'
-import { usersApi, friendsApi, feedApi, dmApi, imgUrl, blockApi, moderationApi, albumsApi, federationApi } from '../../api'
+import { usersApi, friendsApi, feedApi, dmApi, imgUrl, blockApi, moderationApi, albumsApi, federationApi, atprotoApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
 import { useC } from '../../constants/ColorContext'
@@ -74,6 +74,26 @@ export default function ProfileViewScreen() {
   })
   const toggleFedNotify = useMutation({
     mutationFn: () => federationApi.toggleFollowNotify((profile as any).follow_id, !(profile as any)?.follow_notify),
+    onSuccess: inv,
+  })
+
+  // AGORA-234: native Bluesky accounts have no friending concept either —
+  // follow/notify (at_following) is the equivalent, same as the fediverse
+  // block above but against the AT Proto endpoints. profile.username is the
+  // account's Bluesky handle for these rows (getOrCreateRemoteATUser stores
+  // the handle as the username), so it doubles as the "actor" to follow.
+  const isBluesky = (profile as any)?.remote_instance === 'bsky.app'
+  const followBsky = useMutation({
+    mutationFn: () => atprotoApi.followBlueskyAccount(username!),
+    onSuccess: inv,
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not follow this account'),
+  })
+  const unfollowBsky = useMutation({
+    mutationFn: () => atprotoApi.unfollowBlueskyAccount((profile as any).follow_id),
+    onSuccess: inv,
+  })
+  const toggleBskyNotify = useMutation({
+    mutationFn: () => atprotoApi.toggleFollowNotify((profile as any).follow_id, !(profile as any)?.follow_notify),
     onSuccess: inv,
   })
 
@@ -190,6 +210,46 @@ export default function ProfileViewScreen() {
                       </TouchableOpacity>
                     )}
                   </>
+                ) : isBluesky ? (
+                  <>
+                    <TouchableOpacity
+                      onPress={() => (profile as any).following
+                        ? Alert.alert('Unfollow?', `Unfollow ${profile.display_name}?`, [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Unfollow', style: 'destructive', onPress: () => unfollowBsky.mutate() },
+                          ])
+                        : followBsky.mutate()}
+                      disabled={followBsky.isPending || unfollowBsky.isPending}
+                      style={[s.actionBtn, (profile as any).following
+                        ? { borderColor: c.border }
+                        : { borderColor: c.primary, backgroundColor: c.primary }]}
+                    >
+                      <Ionicons
+                        name={(profile as any).following ? 'checkmark' : 'person-add-outline'}
+                        size={15}
+                        color={(profile as any).following ? c.textMd : 'white'}
+                      />
+                      <Text style={[s.actionBtnText, { color: (profile as any).following ? c.textMd : 'white' }]}>
+                        {(profile as any).following ? 'Following' : 'Follow'}
+                      </Text>
+                    </TouchableOpacity>
+                    {(profile as any).following && (
+                      <TouchableOpacity
+                        onPress={() => toggleBskyNotify.mutate()}
+                        disabled={toggleBskyNotify.isPending}
+                        style={[s.actionBtn, { borderColor: (profile as any).follow_notify ? c.primary : c.border, backgroundColor: (profile as any).follow_notify ? c.primaryBg : 'transparent' }]}
+                      >
+                        <Ionicons
+                          name={(profile as any).follow_notify ? 'notifications' : 'notifications-outline'}
+                          size={15}
+                          color={(profile as any).follow_notify ? c.primary : c.textMuted}
+                        />
+                        <Text style={[s.actionBtnText, { color: (profile as any).follow_notify ? c.primary : c.textMuted }]}>
+                          {(profile as any).follow_notify ? 'Notifying' : 'Notify'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
                 ) : (
                   <>
                     {status === 'accepted' && (
@@ -214,7 +274,7 @@ export default function ProfileViewScreen() {
                     )}
                     {status === 'pending' && (
                       <View style={[s.actionBtn, { borderColor: c.border }]}>
-                        <Text style={{ fontSize: 13, color: c.textMuted }}>Pending</Text>
+                        <Text style={{ fontSize: 15, color: c.textMuted }}>Pending</Text>
                       </View>
                     )}
                     {status === 'pending_incoming' && (
@@ -264,26 +324,54 @@ export default function ProfileViewScreen() {
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 6 }}>
-            <Text style={[s.name, { color: c.text }]}>{profile.display_name || profile.username}</Text>
-            {profile.pronouns ? <Text style={{ fontSize: 13, color: c.textLight }}>({profile.pronouns})</Text> : null}
+            <Text style={[s.name, { color: c.text }]}>{profile.display_name ? renderName(profile.display_name, profile.emojis) : profile.username}</Text>
+            {profile.pronouns ? <Text style={{ fontSize: 15, color: c.textLight }}>({profile.pronouns})</Text> : null}
           </View>
-          <Text style={[s.username, { color: c.textMuted }]}>{handle(profile.username, (profile as any).is_remote, (profile as any).remote_instance)}</Text>
-          {profile.bio ? <Text style={[s.bio, { color: c.textMd }]}>{profile.bio}</Text> : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <Text style={[s.username, { color: c.textMuted }]}>{handle(profile.username, (profile as any).is_remote, (profile as any).remote_instance)}</Text>
+            {/* AGORA-249: fediverse/Bluesky mutual-follow indicator — meaningful
+                regardless of whether the viewer follows them back. */}
+            {(isFediverse || isBluesky) && (profile as any).follows_back && (
+              <View style={[s.followsYouTag, { backgroundColor: c.primaryBg }]}>
+                <Ionicons name="person-circle-outline" size={12} color={c.primary} />
+                <Text style={[s.followsYouText, { color: c.primary }]}>Follows you</Text>
+              </View>
+            )}
+          </View>
+          {profile.bio ? <LinkedText text={profile.bio} style={[s.bio, { color: c.textMd }]} emojis={profile.emojis} /> : null}
           {(profile as any).location ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
               <Ionicons name="location-outline" size={13} color={c.textMuted} />
-              <Text style={{ fontSize: 13, color: c.textMuted }}>{(profile as any).location}</Text>
+              <Text style={{ fontSize: 15, color: c.textMuted }}>{(profile as any).location}</Text>
             </View>
           ) : null}
           {(profile as any).website ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
               <Ionicons name="link-outline" size={13} color={c.primary} />
-              <Text style={{ fontSize: 13, color: c.primary }}>{(profile as any).website}</Text>
+              <Text style={{ fontSize: 15, color: c.primary }}>{(profile as any).website}</Text>
             </View>
           ) : null}
-          <Text style={[s.friends, { color: c.textMuted }]}>
-            <Text style={{ fontWeight: 'bold', color: c.text }}>{profile.friend_count || 0}</Text> friends
-          </Text>
+          {/* AGORA-253: a remote account's own post/follower/following
+              counts, same layout Bluesky itself shows on a profile — in
+              place of "friends", which Agora has no concept of for an
+              account it doesn't actually track the social graph of. */}
+          {(isFediverse || isBluesky) && (profile as any).remote_follower_count != null ? (
+            <View style={{ flexDirection: 'row', gap: 16, marginTop: 10 }}>
+              <Text style={{ fontSize: 16, color: c.textMuted }}>
+                <Text style={{ fontWeight: 'bold', color: c.text }}>{(profile as any).remote_post_count ?? 0}</Text> posts
+              </Text>
+              <Text style={{ fontSize: 16, color: c.textMuted }}>
+                <Text style={{ fontWeight: 'bold', color: c.text }}>{(profile as any).remote_follower_count ?? 0}</Text> followers
+              </Text>
+              <Text style={{ fontSize: 16, color: c.textMuted }}>
+                <Text style={{ fontWeight: 'bold', color: c.text }}>{(profile as any).remote_following_count ?? 0}</Text> following
+              </Text>
+            </View>
+          ) : (
+            <Text style={[s.friends, { color: c.textMuted }]}>
+              <Text style={{ fontWeight: 'bold', color: c.text }}>{profile.friend_count || 0}</Text> friends
+            </Text>
+          )}
           {showAlbums && (
             <TouchableOpacity
               onPress={() => router.push(`/albums/${username}`)}
@@ -340,17 +428,19 @@ const s = StyleSheet.create({
   avatarBorder:  { borderWidth: 4, borderRadius: 40 },
   actions:       { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 36 },
   actionBtn:     { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
-  actionBtnText: { fontSize: 13, fontWeight: '500' },
+  actionBtnText: { fontSize: 15, fontWeight: '500' },
   primaryBtn:    { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
-  primaryBtnText:{ color: 'white', fontWeight: '600', fontSize: 13 },
-  name:          { fontSize: 20, fontWeight: 'bold' },
-  username:      { fontSize: 14, marginTop: 2 },
-  bio:           { fontSize: 14, marginTop: 6, lineHeight: 20 },
-  friends:       { fontSize: 14, marginTop: 10 },
+  primaryBtnText:{ color: 'white', fontWeight: '600', fontSize: 15 },
+  name:          { fontSize: 22, fontWeight: 'bold' },
+  username:      { fontSize: 16, marginTop: 2 },
+  followsYouTag: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  followsYouText:{ fontSize: 12, fontWeight: '500' },
+  bio:           { fontSize: 16, marginTop: 6, lineHeight: 20 },
+  friends:       { fontSize: 16, marginTop: 10 },
   albumsRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  albumsText:    { fontSize: 14, fontWeight: '500' },
+  albumsText:    { fontSize: 16, fontWeight: '500' },
   private:       { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 32, marginHorizontal: 12, borderRadius: 16 },
-  privateTitle:  { fontSize: 16, fontWeight: '600', marginTop: 12 },
-  privateText:   { fontSize: 14, textAlign: 'center', marginTop: 4 },
-  noPosts:       { textAlign: 'center', fontSize: 14, paddingVertical: 48 },
+  privateTitle:  { fontSize: 18, fontWeight: '600', marginTop: 12 },
+  privateText:   { fontSize: 16, textAlign: 'center', marginTop: 4 },
+  noPosts:       { textAlign: 'center', fontSize: 16, paddingVertical: 48 },
 })

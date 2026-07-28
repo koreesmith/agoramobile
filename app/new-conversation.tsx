@@ -70,9 +70,9 @@ export default function NewConversationScreen() {
 
 const s = StyleSheet.create({
   searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border, paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
-  searchInput: { flex: 1, fontSize: 15, color: C.text },
+  searchInput: { flex: 1, fontSize: 17, color: C.text },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.bg },
-  name: { fontWeight: '600', color: C.text, fontSize: 15 },
-  username: { fontSize: 13, color: C.textMuted },
+  name: { fontWeight: '600', color: C.text, fontSize: 17 },
+  username: { fontSize: 15, color: C.textMuted },
   empty: { paddingVertical: 48, alignItems: 'center' },
 })

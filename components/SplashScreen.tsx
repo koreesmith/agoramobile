@@ -59,14 +59,14 @@ const s = StyleSheet.create({
     borderRadius: 22,
   },
   title: {
-    fontSize: 42,
+    fontSize: 47,
     fontWeight: '800',
     color: '#ffffff',
     letterSpacing: -1,
     marginBottom: 6,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '300',
     color: '#9fb3c8',
     letterSpacing: 7,

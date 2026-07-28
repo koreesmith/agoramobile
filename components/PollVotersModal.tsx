@@ -4,13 +4,14 @@ import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { pollApi } from '../api'
 import { useC } from '../constants/ColorContext'
-import { Avatar } from './ui'
+import { Avatar, renderName } from './ui'
 
 interface Voter {
   id: string
   username: string
   display_name: string
   avatar_url: string
+  emojis?: Record<string, string>
 }
 interface OptionVoters {
   option_id: string
@@ -73,7 +74,7 @@ export default function PollVotersModal({ postId, visible, onClose }: Props) {
                       <Avatar url={v.avatar_url} name={v.display_name || v.username} size={30} />
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={[s.displayName, { color: c.text }]} numberOfLines={1}>
-                          {v.display_name || v.username}
+                          {v.display_name ? renderName(v.display_name, v.emojis) : v.username}
                         </Text>
                         <Text style={[s.username, { color: c.textMuted }]} numberOfLines={1}>@{v.username}</Text>
                       </View>
@@ -93,13 +94,13 @@ const s = StyleSheet.create({
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet:       { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, borderBottomWidth: 0, maxHeight: '70%' },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
-  title:       { fontWeight: '700', fontSize: 17 },
+  title:       { fontWeight: '700', fontSize: 19 },
   closeBtn:    { padding: 4 },
   section:     { paddingHorizontal: 20, paddingTop: 12 },
-  optionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  noVotes:     { fontSize: 12, fontStyle: 'italic', marginBottom: 4 },
+  optionLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  noVotes:     { fontSize: 13, fontStyle: 'italic', marginBottom: 4 },
   row:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
-  displayName: { fontWeight: '600', fontSize: 14 },
-  username:    { fontSize: 12, marginTop: 1 },
-  empty:       { textAlign: 'center', marginVertical: 40, fontSize: 14 },
+  displayName: { fontWeight: '600', fontSize: 16 },
+  username:    { fontSize: 13, marginTop: 1 },
+  empty:       { textAlign: 'center', marginVertical: 40, fontSize: 16 },
 })

@@ -52,5 +52,5 @@ const s = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
-  text: { fontSize: 14, fontWeight: '600' },
+  text: { fontSize: 16, fontWeight: '600' },
 })

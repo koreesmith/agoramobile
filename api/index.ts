@@ -57,8 +57,8 @@ export const feedsApi = {
 }
 
 export const feedApi = {
-  getFeed:      (offset = 0, customFeedId?: string) =>
-    api.get('/feed', { params: { offset, ...(customFeedId ? { custom_feed_id: customFeedId } : {}) } }),
+  getFeed:      (offset = 0, customFeedId?: string, listId?: string) =>
+    api.get('/feed', { params: { offset, ...(customFeedId ? { custom_feed_id: customFeedId } : {}), ...(listId ? { list_id: listId } : {}) } }),
   getPost:      (id: string)         => api.get(`/posts/${id}`),
   createPost:   (data: any)          => api.post('/posts', data),
   deletePost:   (id: string)         => api.delete(`/posts/${id}`),
@@ -87,6 +87,11 @@ export const feedApi = {
     })
   },
   previewUrl:   (url: string)        => api.get('/preview', { params: { url } }),
+  // Guest-reachable — unauthenticated, so it bypasses the `api` instance
+  // (which always attaches whatever token/instanceUrl auth store currently
+  // holds) and hits the given instance directly, same as authApi.instance.
+  getPublicFeedWithUrl: (baseUrl: string, offset = 0) =>
+    axios.get(`${baseUrl}/api/feed/public`, { params: { offset } }),
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
@@ -211,6 +216,9 @@ export const moderationApi = {
   listInstanceBans:   ()                      => api.get('/moderation/instance-bans'),
   banInstance:        (data: any)             => api.post('/moderation/instance-bans', data),
   unbanInstance:      (id: string)            => api.delete(`/moderation/instance-bans/${id}`),
+  listBlockedDIDs:    ()                      => api.get('/moderation/blocked-dids'),
+  blockDID:           (data: any)             => api.post('/moderation/blocked-dids', data),
+  unblockDID:         (id: string)            => api.delete(`/moderation/blocked-dids/${id}`),
 }
 
 // ── Fediverse (ActivityPub) ──────────────────────────────────────────────────
@@ -224,6 +232,23 @@ export const federationApi = {
   unfollowFediverseAccount: (id: string)       => api.delete(`/federation/follow/${id}`),
   listFollowing:            ()                 => api.get('/federation/following'),
   toggleFollowNotify:       (id: string, notify: boolean) => api.put(`/federation/follow/${id}/notify`, { notify }),
+  toggleShowInFeed:         (id: string, showInFeed: boolean) => api.put(`/federation/follow/${id}/show-in-feed`, { show_in_feed: showInFeed }),
+}
+
+// ── AT Proto / Bluesky ─────────────────────────────────────────────────────
+export const atprotoApi = {
+  resolveBlueskyHandle:   (handle: string) => api.get('/atproto/lookup', { params: { handle } }),
+  followBlueskyAccount:   (actor: string)  => api.post('/atproto/follow', { actor }),
+  unfollowBlueskyAccount: (id: string)     => api.delete(`/atproto/follow/${id}`),
+  listBlueskyFollowing:   ()               => api.get('/atproto/following'),
+  toggleFollowNotify:     (id: string, notify: boolean) => api.put(`/atproto/follow/${id}/notify`, { notify }),
+  // AGORA-236: per-follow main-feed opt-in, mirroring federationApi's own toggleShowInFeed.
+  toggleShowInFeed:       (id: string, showInFeed: boolean) => api.put(`/atproto/follow/${id}/show-in-feed`, { show_in_feed: showInFeed }),
+  migrateBridgedFollow:   (apFollowingId: string) => api.post(`/atproto/bridged-follows/${apFollowingId}/migrate`),
+  // AGORA-215/216: fuzzy, network-wide search — distinct from lookup's exact
+  // handle/DID resolve, and from searchApi's own Agora+cached-remote search.
+  searchBlueskyActors: (q: string) => api.get('/atproto/search/actors', { params: { q } }),
+  searchBlueskyPosts:  (q: string) => api.get('/atproto/search/posts', { params: { q } }),
 }
 
 // ── Instance rules ────────────────────────────────────────────────────────────
@@ -258,6 +283,26 @@ export const adminApi = {
   deleteInvite:   (id: string)                   => api.delete(`/admin/invites/${id}`),
   // Audit log
   getAuditLog:    (page = 0)                     => api.get('/admin/audit-log', { params: { page } }),
+  // Federation (Agora-to-Agora peer instances)
+  listInstances:   ()                            => api.get('/admin/federation/instances'),
+  addInstance:     (domain: string)              => api.post('/admin/federation/instances', { domain }),
+  blockInstance:   (id: string)                  => api.post(`/admin/federation/instances/${id}/block`),
+  unblockInstance: (id: string)                  => api.post(`/admin/federation/instances/${id}/unblock`),
+  // Storage / orphaned media
+  scanOrphans:    ()                             => api.get('/admin/media/orphans'),
+  deleteOrphans:  ()                             => api.delete('/admin/media/orphans'),
+  // Fediverse relays (AMOBILE-134)
+  listRelays:   ()                 => api.get('/admin/relays'),
+  addRelay:     (inboxUrl: string) => api.post('/admin/relays', { inbox_url: inboxUrl }),
+  enableRelay:  (id: string)       => api.post(`/admin/relays/${id}/enable`),
+  disableRelay: (id: string)       => api.post(`/admin/relays/${id}/disable`),
+  deleteRelay:  (id: string)       => api.delete(`/admin/relays/${id}`),
+}
+
+// ── Admin: Page moderation ────────────────────────────────────────────────────
+export const adminPagesApi = {
+  verify:  (slug: string, verified: boolean) => api.patch(`/admin/pages/${slug}/verify`,  { verified }),
+  feature: (slug: string, featured: boolean) => api.patch(`/admin/pages/${slug}/feature`, { featured }),
 }
 
 // ── Pages ─────────────────────────────────────────────────────────────────────

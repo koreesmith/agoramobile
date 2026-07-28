@@ -223,8 +223,8 @@ export default function FeedScreen() {
     initialPageParam: 0,
   })
 
-  const posts = (data?.pages.flatMap(p => p.posts) ?? [])
-    .filter((p: any) => !blockedIds.includes(p.author_id))
+  const posts = (data?.pages.flatMap(p => p?.posts ?? []) ?? [])
+    .filter((p: any) => p && !blockedIds.includes(p.author_id))
 
   const postData = {
     content,
@@ -396,7 +396,7 @@ export default function FeedScreen() {
               {/* CW toggle */}
               <TouchableOpacity onPress={() => setShowCW(v => !v)}
                 style={[s.cwBtn, showCW && { backgroundColor: '#fef3c7', borderColor: '#fcd34d' }]}>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: showCW ? '#92400e' : c.textMuted }}>TW</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: showCW ? '#92400e' : c.textMuted }}>TW</Text>
               </TouchableOpacity>
               {/* Poll toggle */}
               <TouchableOpacity onPress={() => setShowPoll(v => !v)}
@@ -409,7 +409,7 @@ export default function FeedScreen() {
                   : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                       <Ionicons name="image-outline" size={22} color={(showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl) ? c.border : c.primary} />
                       {imageUrls.length > 0 && !showPoll && (
-                        <Text style={{ fontSize: 11, color: c.primary, fontWeight: '600' }}>{imageUrls.length}/{MAX_IMAGES}</Text>
+                        <Text style={{ fontSize: 12, color: c.primary, fontWeight: '600' }}>{imageUrls.length}/{MAX_IMAGES}</Text>
                       )}
                     </View>}
               </TouchableOpacity>
@@ -496,8 +496,8 @@ export default function FeedScreen() {
                     >
                       <Ionicons name={opt.icon as any} size={18} color={visibility === opt.value ? c.primary : c.textMuted} />
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontWeight: '500', color: visibility === opt.value ? c.primary : c.text }}>{opt.label}</Text>
-                        <Text style={{ fontSize: 12, color: c.textMuted }}>{opt.desc}</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '500', color: visibility === opt.value ? c.primary : c.text }}>{opt.label}</Text>
+                        <Text style={{ fontSize: 13, color: c.textMuted }}>{opt.desc}</Text>
                       </View>
                       {visibility === opt.value && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
                     </TouchableOpacity>
@@ -509,11 +509,11 @@ export default function FeedScreen() {
               {showListSheet && visibility === 'group' && (
                 <View style={[s.inlinePicker, { backgroundColor: c.bg, borderBottomColor: c.border }]}>
                   <TouchableOpacity onPress={() => setShowListSheet(false)} style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
-                    <Text style={{ fontSize: 12, color: c.textMuted }}>← Back to audience</Text>
+                    <Text style={{ fontSize: 13, color: c.textMuted }}>← Back to audience</Text>
                   </TouchableOpacity>
                   {friendLists.length === 0 ? (
                     <View style={{ padding: 16, alignItems: 'center' }}>
-                      <Text style={{ color: c.textMuted, fontSize: 13, textAlign: 'center' }}>
+                      <Text style={{ color: c.textMuted, fontSize: 15, textAlign: 'center' }}>
                         No friend lists yet. Create one in the Friends tab.
                       </Text>
                     </View>
@@ -526,8 +526,8 @@ export default function FeedScreen() {
                       >
                         <Ionicons name="people-outline" size={18} color={friendListId === g.id ? c.primary : c.textMuted} />
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 14, fontWeight: '500', color: friendListId === g.id ? c.primary : c.text }}>{g.name}</Text>
-                          <Text style={{ fontSize: 12, color: c.textMuted }}>{g.member_count ?? 0} friends</Text>
+                          <Text style={{ fontSize: 16, fontWeight: '500', color: friendListId === g.id ? c.primary : c.text }}>{g.name}</Text>
+                          <Text style={{ fontSize: 13, color: c.textMuted }}>{g.member_count ?? 0} friends</Text>
                         </View>
                         {friendListId === g.id && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
                       </TouchableOpacity>
@@ -546,6 +546,9 @@ export default function FeedScreen() {
                 <TextInput style={s.cwInput} placeholder="e.g. spoilers, violence…"
                   placeholderTextColor="#d97706" value={cwLabel} onChangeText={setCwLabel}
                   returnKeyType="done" />
+                {/* AGORA-204: Bluesky has no free-text CW field, only a fixed
+                    label vocabulary, so this specific text can't carry over. */}
+                <Text style={s.cwInputHint}>On Bluesky, this shows as a generic content warning — the text above won't carry over.</Text>
               </View>
             )}
 
@@ -564,8 +567,8 @@ export default function FeedScreen() {
                     style={[s.mentionRow, { borderBottomColor: c.border }]}>
                     <Avatar url={u.avatar_url} name={u.display_name || u.username} size={28} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>{u.display_name || u.username}</Text>
-                      <Text style={{ fontSize: 11, color: c.textMuted }}>@{u.username}</Text>
+                      <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{u.display_name || u.username}</Text>
+                      <Text style={{ fontSize: 12, color: c.textMuted }}>@{u.username}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -578,8 +581,8 @@ export default function FeedScreen() {
                     style={[s.mentionRow, { borderBottomColor: c.border }]}>
                     <Avatar url={g.avatar_url} name={g.name} size={28} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>{g.name}</Text>
-                      <Text style={{ fontSize: 11, color: c.textMuted }}>+{g.slug}</Text>
+                      <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{g.name}</Text>
+                      <Text style={{ fontSize: 12, color: c.textMuted }}>+{g.slug}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -609,7 +612,7 @@ export default function FeedScreen() {
                 {pollOptions.length < 6 && (
                   <TouchableOpacity onPress={() => setPollOptions(opts=>[...opts,''])} style={s.pollAddBtn}>
                     <Ionicons name="add" size={14} color={c.primary} />
-                    <Text style={{ fontSize: 13, color: c.primary }}>Add option</Text>
+                    <Text style={{ fontSize: 15, color: c.primary }}>Add option</Text>
                   </TouchableOpacity>
                 )}
                 {/* Poll settings */}
@@ -617,12 +620,12 @@ export default function FeedScreen() {
                   <Text style={[s.pollEditorLabel, { color: c.textMuted }]}>SETTINGS</Text>
                   {/* Duration */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <Text style={{ fontSize: 13, color: c.textMd, flex: 1 }}>Duration</Text>
+                    <Text style={{ fontSize: 15, color: c.textMd, flex: 1 }}>Duration</Text>
                     <View style={{ flexDirection: 'row', gap: 6 }}>
                       {[{h:1,l:'1h'},{h:24,l:'1d'},{h:72,l:'3d'},{h:168,l:'1w'},{h:0,l:'∞'}].map(({h,l}) => (
                         <TouchableOpacity key={h} onPress={() => setPollExpiresHours(h)}
                           style={[s.durationBtn, { borderColor: pollExpiresHours===h ? c.primary : c.border, backgroundColor: pollExpiresHours===h ? c.primaryBg : 'transparent' }]}>
-                          <Text style={{ fontSize: 12, color: pollExpiresHours===h ? c.primary : c.textMuted }}>{l}</Text>
+                          <Text style={{ fontSize: 13, color: pollExpiresHours===h ? c.primary : c.textMuted }}>{l}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -631,13 +634,13 @@ export default function FeedScreen() {
                   <TouchableOpacity onPress={() => setPollMultiple(v=>!v)}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}>
                     <Ionicons name={pollMultiple ? 'checkbox' : 'square-outline'} size={18} color={pollMultiple ? c.primary : c.border} />
-                    <Text style={{ fontSize: 13, color: c.textMd }}>Allow multiple selections</Text>
+                    <Text style={{ fontSize: 15, color: c.textMd }}>Allow multiple selections</Text>
                   </TouchableOpacity>
                   {/* Allow new options */}
                   <TouchableOpacity onPress={() => setPollAllowsNew(v=>!v)}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}>
                     <Ionicons name={pollAllowsNew ? 'checkbox' : 'square-outline'} size={18} color={pollAllowsNew ? c.primary : c.border} />
-                    <Text style={{ fontSize: 13, color: c.textMd }}>Let respondents add options</Text>
+                    <Text style={{ fontSize: 15, color: c.textMd }}>Let respondents add options</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -676,7 +679,7 @@ export default function FeedScreen() {
                   ) : null}
                   <View style={s.videoPreviewOverlay}>
                     <Ionicons name="videocam" size={32} color="rgba(255,255,255,0.9)" />
-                    <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12, marginTop: 4 }}>Video attached</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, marginTop: 4 }}>Video attached</Text>
                   </View>
                 </View>
                 <TouchableOpacity
@@ -721,10 +724,10 @@ export default function FeedScreen() {
 const s = StyleSheet.create({
   switcher: { flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth },
   feedTab: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  feedTabText: { fontSize: 13, fontWeight: '500' },
+  feedTabText: { fontSize: 15, fontWeight: '500' },
   searchBtn: { padding: 4 },
   postBtn: { backgroundColor: '#486581', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
-  postBtnText: { color: 'white', fontWeight: '600', fontSize: 14 },
+  postBtnText: { color: 'white', fontWeight: '600', fontSize: 16 },
   fab: {
     position: 'absolute',
     bottom: 20,
@@ -741,35 +744,36 @@ const s = StyleSheet.create({
     shadowRadius: 6,
     elevation: 6,
   },
-  fabText: { color: 'white', fontWeight: '700', fontSize: 15 },
+  fabText: { color: 'white', fontWeight: '700', fontSize: 17 },
   modal: { flex: 1, backgroundColor: 'white' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-  cancelText: { color: '#6b7280', fontSize: 16 },
-  modalTitle: { fontWeight: '600', color: '#111827', fontSize: 16 },
+  cancelText: { color: '#6b7280', fontSize: 18 },
+  modalTitle: { fontWeight: '600', color: '#111827', fontSize: 18 },
   submitBtn: { backgroundColor: '#486581', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 6 },
   submitBtnDisabled: { backgroundColor: '#9fb3c8' },
   submitBtnText: { color: 'white', fontWeight: '600' },
-  composeInput: { fontSize: 16, color: '#111827', flex: 1 },
+  composeInput: { fontSize: 18, color: '#111827', flex: 1 },
   imagePreview: { height: 180, borderRadius: 12, marginTop: 8 },
   removeImage: { position: 'absolute', top: 10, right: 2, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   cwBtn: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   cwInputWrap: { borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 12 },
-  cwInputLabel: { fontSize: 11, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
-  cwInput: { fontSize: 14, color: '#92400e', padding: 0 },
+  cwInputLabel: { fontSize: 12, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
+  cwInput: { fontSize: 16, color: '#92400e', padding: 0 },
+  cwInputHint: { fontSize: 12, color: '#b45309', marginTop: 6 },
   pollEditor: { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12 },
-  pollEditorLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 0.8, marginBottom: 10 },
-  pollOptionInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14 },
+  pollEditorLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 10 },
+  pollOptionInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 16 },
   pollAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, marginBottom: 4 },
   pollSettings: { borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
   durationBtn: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   linkPreviewCard: { marginTop: 12, borderWidth: 1, borderRadius: 12, overflow: 'hidden', minHeight: 48, justifyContent: 'center' },
   linkPreviewImage: { width: '100%', height: 160 },
   linkPreviewBody: { padding: 10, gap: 2 },
-  linkPreviewDomain: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 },
-  linkPreviewTitle: { fontSize: 14, fontWeight: '600' },
-  linkPreviewDesc: { fontSize: 12 },
+  linkPreviewDomain: { fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.4 },
+  linkPreviewTitle: { fontSize: 16, fontWeight: '600' },
+  linkPreviewDesc: { fontSize: 13 },
   audienceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 1 },
-  audienceLabel: { fontSize: 13, fontWeight: '600' },
+  audienceLabel: { fontSize: 15, fontWeight: '600' },
   inlinePicker: { borderBottomWidth: 1 },
   inlineOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   mentionList: { borderWidth: 1, borderRadius: 10, marginTop: 4, overflow: 'hidden' },
@@ -777,6 +781,6 @@ const s = StyleSheet.create({
   videoPreview: { height: 180, borderRadius: 12, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   videoPreviewOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' },
   identityRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 1 },
-  identityLabel: { fontSize: 13 },
+  identityLabel: { fontSize: 15 },
 })
 

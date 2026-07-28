@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { View, Text, FlatList, TouchableOpacity, TextInput, RefreshControl, StyleSheet } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import { router } from 'expo-router'
-import { formatDistanceToNow } from 'date-fns'
+import { timeAgo } from '../../utils/handle'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Spinner, EmptyState, Avatar } from '../../components/ui'
 import { dmApi } from '../../api'
@@ -64,7 +64,7 @@ export default function MessagesScreen() {
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={[s.name, conv.unread_count > 0 && { fontWeight: '700' }]}>{o.display_name || o.username}</Text>
-                    {conv.last_message && <Text style={[s.time, { color: c.textLight }]}>{formatDistanceToNow(new Date(conv.last_message.created_at), { addSuffix: false })}</Text>}
+                    {conv.last_message && <Text style={[s.time, { color: c.textLight }]}>{timeAgo(conv.last_message.created_at, false)}</Text>}
                   </View>
                   <Text style={[s.preview, conv.unread_count > 0 && { color: '#374151', fontWeight: '500' }]} numberOfLines={1}>
                     {!conv.is_accepted ? '⚠️ Message request' : preview}
@@ -81,12 +81,12 @@ export default function MessagesScreen() {
 
 const s = StyleSheet.create({
   searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border, paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
-  searchInput: { flex: 1, fontSize: 14, color: '#111827' },
+  searchInput: { flex: 1, fontSize: 16, color: '#111827' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
   badge: { position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: 10, backgroundColor: '#486581', alignItems: 'center', justifyContent: 'center' },
-  badgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
-  name: { fontSize: 14, fontWeight: '500', color: '#374151' },
-  time: { fontSize: 12, color: '#9ca3af' },
-  preview: { fontSize: 13, color: '#9ca3af', marginTop: 2 },
+  badgeText: { color: 'white', fontSize: 11, fontWeight: 'bold' },
+  name: { fontSize: 16, fontWeight: '500', color: '#374151' },
+  time: { fontSize: 13, color: '#9ca3af' },
+  preview: { fontSize: 15, color: '#9ca3af', marginTop: 2 },
 })
 
