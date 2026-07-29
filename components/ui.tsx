@@ -25,14 +25,15 @@ export function Avatar({ url, name, size = 40, online }: { url?: string; name?: 
   )
 }
 
-// Matches URLs, fediverse mentions (@handle@instance.tld), local @mentions,
-// and +group-slug tags -- ports web's renderContent() (AMOBILE-99), so
-// mobile matches web's link handling instead of only linkifying URLs.
-// The fediverse-mention alternative must come before the bare-local one so a
-// full remote handle is captured as one token rather than just its @handle
-// portion (AGORA-163 hit the equivalent ordering bug server-side).
-const LINK_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+|@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+|@[a-zA-Z0-9_-]+|\+[a-zA-Z0-9_-]+|#[a-zA-Z0-9_]+|:[a-zA-Z0-9_]+:)/g
-const MENTION_RE = /^@[a-zA-Z0-9_-]+$|^@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+$/
+// Matches URLs, fediverse mentions (@handle@instance.tld), a single-@ dotted
+// handle typed as one token (@alice.bsky.social — AGORA-276/AMOBILE-154),
+// local @mentions, and +group-slug tags -- ports web's renderContent()
+// (AMOBILE-99), so mobile matches web's link handling instead of only
+// linkifying URLs. The dotted alternatives must come before the bare-local
+// one so a full remote handle is captured as one token rather than just its
+// @handle portion (AGORA-163 hit the equivalent ordering bug server-side).
+const LINK_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+|@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+|@[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)+|@[a-zA-Z0-9_-]+|\+[a-zA-Z0-9_-]+|#[a-zA-Z0-9_]+|:[a-zA-Z0-9_]+:)/g
+const MENTION_RE = /^@[a-zA-Z0-9_-]+$|^@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+$|^@[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)+$/
 const GROUP_TAG_RE = /^\+[a-zA-Z0-9_-]+$/
 const HASHTAG_RE = /^#[a-zA-Z0-9_]+$/
 const URL_PART_RE = /^https?:\/\//i
