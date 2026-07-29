@@ -709,6 +709,11 @@ export default function FeedScreen() {
                     <Text style={{ fontSize: 15, color: c.primary }}>Add option</Text>
                   </TouchableOpacity>
                 )}
+                {/* AMOBILE-155: Bluesky has no native poll type, so federated
+                    polls are flattened to text + a voting link there. */}
+                {(user as any)?.atproto_enabled && (
+                  <Text style={s.pollBlueskyHint}>Polls appear as text with a voting link on Bluesky — Mastodon supports full polls.</Text>
+                )}
                 {/* Poll settings */}
                 <View style={[s.pollSettings, { borderTopColor: c.border }]}>
                   <Text style={[s.pollEditorLabel, { color: c.textMuted }]}>SETTINGS</Text>
@@ -854,6 +859,7 @@ const s = StyleSheet.create({
   cwInputLabel: { fontSize: 12, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
   cwInput: { fontSize: 16, color: '#92400e', padding: 0 },
   cwInputHint: { fontSize: 12, color: '#b45309', marginTop: 6 },
+  pollBlueskyHint: { fontSize: 12, color: '#6b7280', marginTop: 2, marginBottom: 10 },
   pollEditor: { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12 },
   pollEditorLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 10 },
   pollOptionInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 16 },
