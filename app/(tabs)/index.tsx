@@ -14,7 +14,7 @@ import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Header, Spinner, EmptyState, UploadingModal, Avatar } from '../../components/ui'
 import AutoGrowInput from '../../components/AutoGrowInput'
 import PostCard from '../../components/PostCard'
-import { feedApi, feedsApi, friendsApi, instanceApi, usersApi, pagesApi, groupMentionApi, imgUrl } from '../../api'
+import { feedApi, feedsApi, friendsApi, instanceApi, usersApi, pagesApi, groupMentionApi, atprotoApi, federationApi, imgUrl } from '../../api'
 import { trackInteraction } from '../../utils/interactions'
 import WhatsNewModal, { shouldShowWhatsNew } from '../../components/WhatsNewModal'
 import { useAuthStore } from '../../store/auth'
@@ -98,6 +98,16 @@ export default function FeedScreen() {
     queryFn: () => pagesApi.mine().then(r => r.data),
     enabled: showCompose,
   })
+
+  // AMOBILE-153: accounts already known to this instance (followed on the
+  // fediverse) — the "lighter-weight assist" the ticket calls for in place
+  // of a live directory search, which ActivityPub has no protocol for.
+  const { data: fediFollowingData } = useQuery({
+    queryKey: ['fediverse-following'],
+    queryFn: () => federationApi.listFollowing().then(r => r.data),
+    enabled: showCompose,
+  })
+  const fediFollowing: any[] = fediFollowingData?.following || []
   const myPages: any[] = myPagesData?.pages || []
 
   const selectedFriendList = friendLists.find((g: any) => g.id === friendListId)
@@ -110,6 +120,7 @@ export default function FeedScreen() {
     setVisibility('friends'); setFriendListId('')
     setLinkPreview(null); setLinkFetching(false)
     setPostAsPageSlug(null)
+    setMentionQuery(null); setBlueskyQuery(null); setFediverseQuery(null)
     setShowCompose(false)
   }
 
@@ -170,12 +181,27 @@ export default function FeedScreen() {
     // offer to insert the wrong person and corrupt the handle being typed.
     // AGORA-163 hit the equivalent bug server-side with a bare local-only
     // mention regex; this is the client-side half of the same failure mode.
-    if (/@\w+@[\w.-]*$/.test(text)) {
+    //
+    // AMOBILE-153: rather than going fully read-only here like AMOBILE-114
+    // did, suggest from accounts already followed on the fediverse that
+    // match what's typed so far.
+    const fediMatch = text.match(/@([\w.-]*@[\w.-]*)$/)
+    if (fediMatch) {
       setMentionQuery(null)
+      setBlueskyQuery(null)
+      setFediverseQuery(fediMatch[1])
       return
     }
-    const match = text.match(/@(\w*)$/)
-    setMentionQuery(match ? match[1] : null)
+    setFediverseQuery(null)
+
+    // A single @ followed by word chars and dots covers both a local
+    // username fragment and a Bluesky handle in progress (e.g.
+    // "@alice.bsky.social") — Bluesky's live actor search tolerates dots,
+    // local search never sees them since local usernames don't have any.
+    const match = text.match(/@([\w.-]*)$/)
+    const query = match ? match[1] : null
+    setMentionQuery(query)
+    setBlueskyQuery(query)
 
     // AMOBILE-99: +group-slug tag autocomplete, mirrors web's CreatePost.tsx
     const groupMatch = text.match(/\+([a-zA-Z0-9_-]*)$/)
@@ -185,13 +211,53 @@ export default function FeedScreen() {
   const { data: mentionData } = useQuery({
     queryKey: ['mention-search', mentionQuery],
     queryFn: () => usersApi.mentionSearch(mentionQuery!).then(r => r.data),
-    enabled: mentionQuery !== null && mentionQuery.length >= 1,
+    // Local usernames never contain dots, so a query with one can only ever
+    // match Bluesky/fediverse handles — skip the local search entirely.
+    enabled: mentionQuery !== null && mentionQuery.length >= 1 && !mentionQuery.includes('.'),
   })
   const mentionSuggestions: any[] = mentionData?.users || []
 
   const insertMention = (username: string) => {
     setContent(prev => prev.replace(/@\w*$/, `@${username} `))
     setMentionQuery(null)
+    setBlueskyQuery(null)
+  }
+
+  // AMOBILE-153: BlueSky mention autocomplete — reuses the same live actor
+  // search app/search.tsx already calls directly (AT Proto, no backend
+  // mention-search endpoint needed for this half of the gap).
+  const [blueskyQuery, setBlueskyQuery] = useState<string | null>(null)
+  const [debouncedBlueskyQuery, setDebouncedBlueskyQuery] = useState<string | null>(null)
+  useEffect(() => {
+    if (blueskyQuery === null) { setDebouncedBlueskyQuery(null); return }
+    const t = setTimeout(() => setDebouncedBlueskyQuery(blueskyQuery), 200)
+    return () => clearTimeout(t)
+  }, [blueskyQuery])
+
+  const { data: bskyMentionData } = useQuery({
+    queryKey: ['mention-search-bsky', debouncedBlueskyQuery],
+    queryFn: () => atprotoApi.searchBlueskyActors(debouncedBlueskyQuery!).then(r => r.data),
+    enabled: debouncedBlueskyQuery !== null && debouncedBlueskyQuery.length >= 2,
+  })
+  const bskyMentionSuggestions: any[] = bskyMentionData?.disabled ? [] : (bskyMentionData?.actors || [])
+
+  const insertBlueskyMention = (handle: string) => {
+    setContent(prev => prev.replace(/@[\w.-]*$/, `@${handle} `))
+    setBlueskyQuery(null)
+  }
+
+  // AMOBILE-153: generic Fediverse (Mastodon/Pleroma/etc.) has no directory
+  // search, so once a full user@instance-in-progress handle is detected,
+  // suggest from accounts already followed rather than hitting a live API.
+  const [fediverseQuery, setFediverseQuery] = useState<string | null>(null)
+  const fediMentionSuggestions: any[] = fediverseQuery !== null
+    ? fediFollowing.filter((f: any) =>
+        f.username && f.instance && `${f.username}@${f.instance}`.toLowerCase().startsWith(fediverseQuery.toLowerCase()))
+    : []
+
+  const insertFediverseMention = (username: string, instance: string) => {
+    setContent(prev => prev.replace(/@[\w.-]*@[\w.-]*$/, `@${username}@${instance} `))
+    setFediverseQuery(null)
   }
 
   // AMOBILE-99: debounced (200ms per AC) so a group isn't queried on every
@@ -569,6 +635,34 @@ export default function FeedScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{u.display_name || u.username}</Text>
                       <Text style={{ fontSize: 12, color: c.textMuted }}>@{u.username}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {bskyMentionSuggestions.length > 0 && blueskyQuery !== null && (
+              <View style={[s.mentionList, { backgroundColor: c.card, borderColor: c.border }]}>
+                {bskyMentionSuggestions.slice(0, 5).map((a: any) => (
+                  <TouchableOpacity key={a.did} onPress={() => insertBlueskyMention(a.handle)}
+                    style={[s.mentionRow, { borderBottomColor: c.border }]}>
+                    <Avatar url={a.avatar_url} name={a.display_name || a.handle} size={28} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{a.display_name || a.handle}</Text>
+                      <Text style={{ fontSize: 12, color: c.textMuted }}>@{a.handle} · Bluesky</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {fediMentionSuggestions.length > 0 && fediverseQuery !== null && (
+              <View style={[s.mentionList, { backgroundColor: c.card, borderColor: c.border }]}>
+                {fediMentionSuggestions.slice(0, 5).map((f: any) => (
+                  <TouchableOpacity key={f.id} onPress={() => insertFediverseMention(f.username, f.instance)}
+                    style={[s.mentionRow, { borderBottomColor: c.border }]}>
+                    <Avatar url={f.avatar_url} name={f.display_name || f.username} size={28} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{f.display_name || f.username}</Text>
+                      <Text style={{ fontSize: 12, color: c.textMuted }}>@{f.username}@{f.instance}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
