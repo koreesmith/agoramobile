@@ -227,6 +227,10 @@ export const moderationApi = {
 // native Agora-to-Agora protocol's /federation/lookup (see AMOBILE-118) —
 // this only talks to real fediverse software (Mastodon/Pleroma/etc.).
 export const federationApi = {
+  // AMOBILE-118: native Agora-to-Agora lookup — resolves a user@instance
+  // handle via the custom Ed25519-signed protocol, distinct from
+  // resolveFediverseHandle's ActivityPub ap-lookup below.
+  lookupUser:               (handle: string)   => api.get('/federation/lookup', { params: { handle } }),
   resolveFediverseHandle:   (handle: string)   => api.get('/federation/ap-lookup', { params: { handle } }),
   followFediverseAccount:   (actorUrl: string) => api.post('/federation/follow', { actor_url: actorUrl }),
   unfollowFediverseAccount: (id: string)       => api.delete(`/federation/follow/${id}`),

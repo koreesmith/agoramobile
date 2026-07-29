@@ -5,7 +5,7 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Spinner, Avatar, renderName } from '../components/ui'
 import PostCard from '../components/PostCard'
-import { searchApi, pagesApi, atprotoApi, imgUrl } from '../api'
+import { searchApi, pagesApi, atprotoApi, federationApi, imgUrl } from '../api'
 import { useC } from '../constants/ColorContext'
 import { handle, timeAgo } from '../utils/handle'
 
@@ -66,6 +66,15 @@ export default function SearchScreen() {
     mutationFn: (actor: string) => atprotoApi.followBlueskyAccount(actor),
   })
 
+  // AMOBILE-118: native Agora-to-Agora handle lookup, separate from the
+  // plain-text /search/users hit above — resolves a remote Agora user
+  // who isn't cached locally yet via the native federation protocol.
+  const { data: lookupData, isLoading: lookupLoading } = useQuery({
+    queryKey: ['federation-lookup', query],
+    queryFn: () => federationApi.lookupUser(query).then(r => r.data),
+    enabled: isFederated && query.length >= 2,
+  })
+
   const users: any[] = usersData?.users || []
   const posts: any[] = postsData?.posts || []
   const pages: any[] = pagesData?.pages || []
@@ -77,6 +86,13 @@ export default function SearchScreen() {
   const agoraUsers = users.filter(u => !u.is_remote)
   const fediverseUsers = users.filter(u => u.is_remote && u.remote_instance !== 'bsky.app')
   const bskyActors: any[] = bskyActorsData?.disabled ? [] : (bskyActorsData?.actors || [])
+
+  // The native lookup can resolve a remote Agora user who isn't in the
+  // local users table yet, so /search/users won't have returned them —
+  // only show it as its own row if it's not already present there.
+  const lookedUpUser = lookupData?.user || (lookupData?.id ? lookupData : null)
+  const federatedLookupUsers: any[] =
+    lookedUpUser && !users.some(u => u.id === lookedUpUser.id) ? [lookedUpUser] : []
 
   const agoraPosts = posts.filter(p => !p.is_remote)
   const fediversePosts = posts.filter(p => p.is_remote && p.remote_instance !== 'bsky.app')
@@ -114,7 +130,7 @@ export default function SearchScreen() {
     )
   }
 
-  const isLoading = activeTab === 'users' ? (usersLoading || bskyActorsLoading)
+  const isLoading = activeTab === 'users' ? (usersLoading || bskyActorsLoading || (isFederated && lookupLoading))
     : activeTab === 'posts' ? (postsLoading || bskyPostsLoading)
     : pagesLoading
 
@@ -144,7 +160,7 @@ export default function SearchScreen() {
     // while the Bluesky group is a real, live, network-wide search
     // (AGORA-215/216/217).
     if (activeTab === 'users') {
-      if (agoraUsers.length === 0 && fediverseUsers.length === 0 && bskyActors.length === 0) {
+      if (agoraUsers.length === 0 && fediverseUsers.length === 0 && bskyActors.length === 0 && federatedLookupUsers.length === 0) {
         return (
           <View style={s.emptyState}>
             {isFederated && (
@@ -170,6 +186,9 @@ export default function SearchScreen() {
               </Text>
             </View>
           )}
+          <ResultGroup title="Agora (federated lookup)" count={federatedLookupUsers.length} c={c}>
+            <FlatList data={federatedLookupUsers} keyExtractor={u => u.id} renderItem={renderUserRow} scrollEnabled={false} />
+          </ResultGroup>
           <ResultGroup title="On Agora" count={agoraUsers.length} c={c}>
             <FlatList data={agoraUsers} keyExtractor={u => u.id} renderItem={renderUserRow} scrollEnabled={false} />
           </ResultGroup>
