@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { timeAgo } from '../../utils/handle'
-import { Screen, Header, Spinner, EmptyState } from '../../components/ui'
+import { Screen, Header, Spinner, EmptyState, renderName } from '../../components/ui'
 import { notificationsApi, friendsApi } from '../../api'
 
 import { C } from '../../constants/colors'
@@ -46,20 +46,29 @@ const TEXT: Record<string, string> = {
   waitlist_joined: 'joined the waitlist', waitlist: 'joined the waitlist',
 }
 
-function formatActorLabel(n: any): string {
+// AMOBILE-150: actor names get resolved through renderName (same as feed/
+// comments/search) so a remote account's :shortcode: custom emoji renders
+// as the inline image everywhere else in the app, not raw text here. This
+// returns renderable nodes instead of a flat string because the "X and Y
+// and N others" concatenation needs emoji substitution per-actor-name, not
+// once over the joined string.
+function formatActorLabel(n: any): React.ReactNode {
   const count: number = n.count ?? n.actor_count ?? 1
   const actors: any[] = n.actors ?? []
-  const primary = actors[0]?.display_name || actors[0]?.username || n.actor_display_name || n.actor_username || 'Someone'
+  const primaryName = actors[0]?.display_name || actors[0]?.username || n.actor_display_name || n.actor_username || 'Someone'
+  const primary = renderName(primaryName, actors[0]?.emojis || n.actor_emojis)
 
   if (count <= 1 || actors.length <= 1) return primary
 
-  const second = actors[1]?.display_name || actors[1]?.username
-  if (count === 2 && second) return `${primary} and ${second}`
+  const secondName = actors[1]?.display_name || actors[1]?.username
+  const second = secondName ? renderName(secondName, actors[1]?.emojis) : null
+
+  if (count === 2 && second) return <>{primary} and {second}</>
 
   const others = count - 1
   return second
-    ? `${primary}, ${second}, and ${others - 1} other${others - 1 === 1 ? '' : 's'}`
-    : `${primary} and ${others} other${others === 1 ? '' : 's'}`
+    ? <>{primary}, {second}, and {others - 1} other{others - 1 === 1 ? '' : 's'}</>
+    : <>{primary} and {others} other{others === 1 ? '' : 's'}</>
 }
 
 export default function NotificationsScreen() {

@@ -52,25 +52,25 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
   const myVotes = new Set([post.my_poll_vote, ...(post.my_poll_votes || [])].filter(Boolean))
   const hasVoted = myVotes.size > 0
   const isExpired = !!post.poll_expired
-  // AGORA-210: an inbound fediverse poll has no way to deliver a vote back
-  // to the origin server, so voting locally would either do nothing real or
-  // misrepresent the poll's actual tally — read-only here, same as an
-  // expired poll, but with its own honest label rather than claiming it
-  // "ended" when it may still be open on the source instance.
+  // AGORA-268 (backend) added real Vote-activity delivery in both directions,
+  // so a remote/fediverse poll is votable like any other — it just round-trips
+  // through the origin instance, which can be slower or fail outright.
   const isRemote = !!post.is_remote
-  const canVote = !isExpired && !isRemote
+  const canVote = !isExpired
 
   return (
     <View style={{ marginTop: 10, gap: 6 }}>
       {isExpired && (
         <Text style={{ fontSize: 13, color: c.textMuted }}>🔒 This poll has ended</Text>
       )}
-      {!isExpired && isRemote && (
-        <Text style={{ fontSize: 13, color: c.textMuted }}>📡 Results from the fediverse — voting happens on the original post</Text>
-      )}
-      {!isExpired && !isRemote && post.poll_expires_at && (
+      {!isExpired && post.poll_expires_at && (
         <Text style={{ fontSize: 13, color: c.textMuted }}>
           ⏱ Closes {new Date(post.poll_expires_at).toLocaleString()}
+        </Text>
+      )}
+      {vote.isPending && (
+        <Text style={{ fontSize: 12, color: c.textMuted }}>
+          {isRemote ? 'Sending your vote to the original server…' : 'Submitting vote…'}
         </Text>
       )}
       {post.poll_multiple_choice && canVote && !hasVoted && (
@@ -80,14 +80,14 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
       {opts.map((opt: any) => {
         const isMyVote = myVotes.has(opt.id)
         const pct = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0
-        const showResults = hasVoted || isExpired || isRemote
+        const showResults = hasVoted || isExpired
 
         return showResults ? (
           <TouchableOpacity
             key={opt.id}
-            onPress={() => canVote ? vote.mutate(isMyVote ? null : opt.id) : undefined}
-            disabled={!canVote}
-            style={[pw.resultRow, { borderColor: isMyVote ? c.primary : c.border }]}
+            onPress={() => canVote && !vote.isPending ? vote.mutate(isMyVote ? null : opt.id) : undefined}
+            disabled={!canVote || vote.isPending}
+            style={[pw.resultRow, { borderColor: isMyVote ? c.primary : c.border, opacity: vote.isPending ? 0.6 : 1 }]}
           >
             <View style={[pw.resultFill, { width: `${pct}%` as any, backgroundColor: isMyVote ? c.primaryBg : c.bg }]} />
             <View style={pw.resultContent}>
@@ -102,7 +102,7 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
             key={opt.id}
             onPress={() => vote.mutate(opt.id)}
             disabled={vote.isPending}
-            style={[pw.optionRow, { borderColor: c.border }]}
+            style={[pw.optionRow, { borderColor: c.border, opacity: vote.isPending ? 0.6 : 1 }]}
           >
             {post.poll_multiple_choice && (
               <Ionicons name="square-outline" size={14} color={c.textMuted} style={{ marginRight: 6 }} />
