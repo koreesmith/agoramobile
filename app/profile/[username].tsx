@@ -97,7 +97,7 @@ export default function ProfileViewScreen() {
     onSuccess: inv,
   })
 
-  const notifying = !!(profile as any)?.notify
+  const notifying = !!(profile as any)?.post_notifications_enabled
   const followNotif = useMutation({
     mutationFn: () => notifying
       ? usersApi.unfollowNotifications(username!)
@@ -424,9 +424,9 @@ export default function ProfileViewScreen() {
 const s = StyleSheet.create({
   cover:         { height: 100 },
   profileCard:   { paddingHorizontal: 16, paddingBottom: 16 },
-  avatarRow:     { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: -36, marginBottom: 12 },
+  avatarRow:     { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', marginTop: -36, marginBottom: 12 },
   avatarBorder:  { borderWidth: 4, borderRadius: 40 },
-  actions:       { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 36 },
+  actions:       { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 1, marginTop: 36 },
   actionBtn:     { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
   actionBtnText: { fontSize: 15, fontWeight: '500' },
   primaryBtn:    { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
