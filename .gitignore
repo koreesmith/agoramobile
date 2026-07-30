@@ -9,3 +9,11 @@ google-play-service-account.json
 
 # GCP/Firebase service account keys used for Google builds — never commit these
 agora-*.json
+
+.DS_Store
+
+# Local Claude Code config
+.claude/
+
+# TestFlight feedback exports
+testflight_feedback-*/
