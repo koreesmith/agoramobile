@@ -81,7 +81,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
           <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 }}>
             <Text style={[s.commentAuthor, { color: c.text }]}>{comment.display_name ? renderName(comment.display_name, comment.author_emojis) : comment.username}</Text>
             {comment.pronouns ? <Text style={{ fontSize: 12, color: c.textLight }}>({comment.pronouns})</Text> : null}
-            <Text style={[s.commentTime, { color: c.textLight }]}>{timeAgo(comment.created_at)}</Text>
+            <Text style={[s.commentTime, { color: c.textLight }]}>{timeAgo(comment.published_at || comment.created_at)}</Text>
           </View>
           {isEditing ? (
             <View style={{ marginTop: 4 }}>

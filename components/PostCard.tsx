@@ -490,7 +490,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               <Text style={[s.authorMeta, { color: c.textMuted }]}>
                 {[
                   isPagePost ? (post.page_type || 'Page') : handle(username, post.is_remote, post.remote_instance),
-                  timeAgo(post.created_at),
+                  timeAgo(post.published_at || post.created_at), // AGORA-270/AMOBILE-152: real origin publish time for a remote post
                 ].filter(Boolean).join(' · ')}
               </Text>
               <Ionicons
