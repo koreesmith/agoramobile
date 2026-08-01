@@ -126,8 +126,9 @@ export default function FeedScreen() {
   // A feed deleted on another device would otherwise leave the picker stuck on
   // an id the server no longer knows, with no pill to show for it.
   useEffect(() => {
-    if (activeFeedId && customFeedsData && !customFeeds.some(f => f.id === activeFeedId)) selectFeed(null)
-  }, [activeFeedId, customFeedsData, customFeeds, selectFeed])
+    if (!activeFeedId || !customFeedsData) return
+    if (!customFeedsData.some((f: any) => f.id === activeFeedId)) selectFeed(null)
+  }, [activeFeedId, customFeedsData, selectFeed])
 
   const { data: groupsData } = useQuery({
     queryKey: ['friend-lists'],
