@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  View, Text, FlatList, TouchableOpacity, TextInput, Modal, ScrollView,
+  View, Text, SectionList, TouchableOpacity, TextInput, Modal, ScrollView,
   Alert, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { Stack, router } from 'expo-router'
@@ -21,8 +21,15 @@ interface FilterRule {
 interface CustomFeed {
   id: string
   name: string
+  pinned: boolean
+  position: number
   filters: FilterRule[]
 }
+
+// Mirrors maxPinnedFeeds in the backend's internal/customfeeds. The server is
+// the authority and returns 422 past it; this only drives the counter and the
+// dimmed pin controls (AMOBILE-167).
+const MAX_PINNED = 3
 
 export default function ManageFeedsScreen() {
   const c = useC()
@@ -37,6 +44,14 @@ export default function ManageFeedsScreen() {
     queryFn: () => feedsApi.list().then(r => r.data),
   })
   const feeds: CustomFeed[] = data || []
+  // The server returns pinned feeds first, already in the user's order.
+  const pinned   = feeds.filter(f => f.pinned)
+  const unpinned = feeds.filter(f => !f.pinned)
+
+  const sections = feeds.length === 0 ? [] : [
+    { title: 'Pinned',     pinnedSection: true,  data: pinned },
+    ...(unpinned.length > 0 ? [{ title: 'More feeds', pinnedSection: false, data: unpinned }] : []),
+  ]
 
   const { data: friendListsData } = useQuery({
     queryKey: ['friend-lists'],
@@ -128,6 +143,36 @@ export default function ManageFeedsScreen() {
     onError: () => Alert.alert('Error', 'Could not delete feed'),
   })
 
+  const setPinned = useMutation({
+    mutationFn: ({ id, pinned }: { id: string; pinned: boolean }) => feedsApi.setPinned(id, pinned),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['custom-feeds'] }),
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not update pins'),
+  })
+
+  const reorderPins = useMutation({
+    mutationFn: (ids: string[]) => feedsApi.reorderPins(ids),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['custom-feeds'] }),
+    onError: () => Alert.alert('Error', 'Could not reorder pins'),
+  })
+
+  const togglePin = (feed: CustomFeed, pinned: boolean, atCap: boolean) => {
+    if (atCap) {
+      Alert.alert('Pin limit reached', `You can pin up to ${MAX_PINNED} feeds. Unpin one to make room.`)
+      return
+    }
+    setPinned.mutate({ id: feed.id, pinned })
+  }
+
+  // Capped at 3 pins, so up/down beats drag here: it needs no pointer precision
+  // and adds no dependency for a list that can never exceed three rows.
+  const movePin = (index: number, delta: number) => {
+    const next = [...pinned]
+    const target = index + delta
+    if (target < 0 || target >= next.length) return
+    ;[next[index], next[target]] = [next[target], next[index]]
+    reorderPins.mutate(next.map(f => f.id))
+  }
+
   const confirmDelete = (feed: CustomFeed) => {
     Alert.alert('Delete Feed', `Delete "${feed.name}"?`, [
       { text: 'Cancel', style: 'cancel' },
@@ -171,25 +216,74 @@ export default function ManageFeedsScreen() {
       <Header title="Manage Feeds" back />
 
       {isLoading ? <Spinner /> : (
-        <FlatList
-          data={feeds}
+        <SectionList
+          sections={sections}
           keyExtractor={f => f.id}
-          renderItem={({ item }) => (
-            <View style={[s.feedRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-              <TouchableOpacity style={{ flex: 1 }} onPress={() => openEdit(item)}>
-                <Text style={[s.feedName, { color: c.text }]}>{item.name}</Text>
-                <Text style={[s.feedMeta, { color: c.textMuted }]}>
-                  {item.filters?.length || 0} filter{(item.filters?.length || 0) !== 1 ? 's' : ''}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.push(`/feed/${item.id}` as any)} style={s.deleteBtn}>
-                <Ionicons name="play-circle-outline" size={20} color={c.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => confirmDelete(item)} style={s.deleteBtn}>
-                <Ionicons name="trash-outline" size={18} color="#ef4444" />
-              </TouchableOpacity>
+          stickySectionHeadersEnabled={false}
+          renderSectionHeader={({ section }) => (
+            <View style={s.sectionHeader}>
+              <Text style={[s.sectionHeading, { color: c.text }]}>{section.title}</Text>
+              {section.pinnedSection && (
+                <Text style={[s.pinCount, { color: c.textMuted }]}>{pinned.length} of {MAX_PINNED} pins used</Text>
+              )}
             </View>
           )}
+          renderSectionFooter={({ section }) =>
+            section.pinnedSection && pinned.length === 0 ? (
+              <Text style={[s.sectionNote, { color: c.textMuted }]}>
+                Pin up to {MAX_PINNED} feeds to reach them in one tap from your feed.
+              </Text>
+            ) : null
+          }
+          renderItem={({ item, index, section }) => {
+            const isPinned = !!section.pinnedSection
+            const atCap    = !isPinned && pinned.length >= MAX_PINNED
+            return (
+              <View style={[s.feedRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
+                {isPinned && (
+                  <View style={s.reorderCol}>
+                    <TouchableOpacity
+                      onPress={() => movePin(index, -1)}
+                      disabled={index === 0 || reorderPins.isPending}
+                      hitSlop={6}
+                    >
+                      <Ionicons name="chevron-up" size={16} color={index === 0 ? c.border : c.textMuted} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => movePin(index, 1)}
+                      disabled={index === pinned.length - 1 || reorderPins.isPending}
+                      hitSlop={6}
+                    >
+                      <Ionicons name="chevron-down" size={16} color={index === pinned.length - 1 ? c.border : c.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+                <TouchableOpacity style={{ flex: 1 }} onPress={() => openEdit(item)}>
+                  <Text style={[s.feedName, { color: c.text }]}>{item.name}</Text>
+                  <Text style={[s.feedMeta, { color: c.textMuted }]}>
+                    {item.filters?.length || 0} filter{(item.filters?.length || 0) !== 1 ? 's' : ''}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => togglePin(item, !isPinned, atCap)}
+                  disabled={setPinned.isPending}
+                  style={s.deleteBtn}
+                >
+                  <Ionicons
+                    name={isPinned ? 'bookmark' : 'bookmark-outline'}
+                    size={18}
+                    color={isPinned ? c.primary : atCap ? c.border : c.textMuted}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push(`/feed/${item.id}` as any)} style={s.deleteBtn}>
+                  <Ionicons name="play-circle-outline" size={20} color={c.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => confirmDelete(item)} style={s.deleteBtn}>
+                  <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                </TouchableOpacity>
+              </View>
+            )
+          }}
           ListEmptyComponent={
             <EmptyState icon="🗂️" title="No custom feeds" subtitle="Create a feed to filter your timeline" />
           }
@@ -315,6 +409,11 @@ const s = StyleSheet.create({
   feedName: { fontSize: 17, fontWeight: '600' },
   feedMeta: { fontSize: 13, marginTop: 2 },
   deleteBtn: { padding: 8 },
+  reorderCol: { marginRight: 8, alignItems: 'center' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 18, paddingBottom: 6 },
+  sectionHeading: { fontSize: 15, fontWeight: '600' },
+  pinCount: { fontSize: 13 },
+  sectionNote: { fontSize: 13, paddingHorizontal: 16, paddingVertical: 12 },
   createBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, margin: 16, paddingVertical: 14, borderRadius: 12 },
   createBtnText: { color: 'white', fontWeight: '600', fontSize: 17 },
   editorContainer: { flex: 1 },
