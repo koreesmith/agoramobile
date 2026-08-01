@@ -54,6 +54,8 @@ export const feedsApi = {
   get:    (id: string)            => api.get(`/feeds/${id}`),
   update: (id: string, data: any) => api.put(`/feeds/${id}`, data),
   delete: (id: string)            => api.delete(`/feeds/${id}`),
+  setPinned:   (id: string, pinned: boolean) => api.put(`/feeds/${id}/pin`, { pinned }),
+  reorderPins: (feed_ids: string[])          => api.put('/feeds/pins/order', { feed_ids }),
 }
 
 export const feedApi = {

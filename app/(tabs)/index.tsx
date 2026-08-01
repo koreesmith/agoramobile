@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView, Platform, Dimensions,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import * as SecureStore from 'expo-secure-store'
 import { Image } from 'expo-image'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -23,6 +24,15 @@ import { useWhatsNewStore } from '../../store/whatsNew'
 
 import { C } from '../../constants/colors'
 import { useC } from '../../constants/ColorContext'
+
+// AMOBILE-167: the feed the user was last reading, so relaunching the app does
+// not silently drop them back to Home. Mirrors the /feed?f=<id> URL state the
+// web client gained in AGORA-303.
+const ACTIVE_FEED_KEY = 'agora_active_feed_id'
+
+// Past this many feeds the sheet stops being scannable and earns a search
+// field. Below it, search is a control nobody needs. Matches web.
+const FEED_SEARCH_THRESHOLD = 8
 
 function isGifUrl(url: string): boolean {
   if (!url) return false
@@ -77,10 +87,21 @@ export default function FeedScreen() {
   const [showListSheet, setShowListSheet] = useState(false)
   const [linkPreview, setLinkPreview] = useState<{url:string,title:string,description:string,image:string,domain:string}|null>(null)
   const [linkFetching, setLinkFetching] = useState(false)
-  const [activeFeedId, setActiveFeedId] = useState<string | null>(null)
+  // AMOBILE-167: seeded synchronously from storage so the first render already
+  // shows the feed the user was last reading, rather than flashing Home first.
+  const [activeFeedId, setActiveFeedId] = useState<string | null>(() => SecureStore.getItem(ACTIVE_FEED_KEY) || null)
+  const [showFeedSheet, setShowFeedSheet] = useState(false)
+  const [feedQuery, setFeedQuery] = useState('')
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [postAsPageSlug, setPostAsPageSlug] = useState<string | null>(null)
   const [showWhatsNew, setShowWhatsNew] = useState(false)
+
+  const selectFeed = useCallback((id: string | null) => {
+    setActiveFeedId(id)
+    setShowFeedSheet(false)
+    if (id) SecureStore.setItemAsync(ACTIVE_FEED_KEY, id)
+    else SecureStore.deleteItemAsync(ACTIVE_FEED_KEY)
+  }, [])
 
   const { data: customFeedsData } = useQuery({
     queryKey: ['custom-feeds'],
@@ -88,6 +109,25 @@ export default function FeedScreen() {
     staleTime: 0,
   })
   const customFeeds: any[] = customFeedsData || []
+
+  // The server returns pinned feeds first, already in the user's order.
+  const pinnedFeeds:   any[] = customFeeds.filter(f => f.pinned)
+  const unpinnedFeeds: any[] = customFeeds.filter(f => !f.pinned)
+
+  // An unpinned feed picked from the sheet joins the pill row while it stays
+  // selected, so the row always shows which feed is being read.
+  const promotedFeed = activeFeedId ? unpinnedFeeds.find(f => f.id === activeFeedId) : undefined
+  const pillFeeds    = promotedFeed ? [...pinnedFeeds, promotedFeed] : pinnedFeeds
+  const sheetFeeds   = promotedFeed ? unpinnedFeeds.filter(f => f.id !== promotedFeed.id) : unpinnedFeeds
+  const feedMatches  = feedQuery.trim()
+    ? sheetFeeds.filter(f => f.name.toLowerCase().includes(feedQuery.trim().toLowerCase()))
+    : sheetFeeds
+
+  // A feed deleted on another device would otherwise leave the picker stuck on
+  // an id the server no longer knows, with no pill to show for it.
+  useEffect(() => {
+    if (activeFeedId && customFeedsData && !customFeeds.some(f => f.id === activeFeedId)) selectFeed(null)
+  }, [activeFeedId, customFeedsData, customFeeds, selectFeed])
 
   const { data: groupsData } = useQuery({
     queryKey: ['friend-lists'],
@@ -408,32 +448,98 @@ export default function FeedScreen() {
         </View>
       } />
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[s.switcher, { borderBottomColor: c.border }]}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: 'center' }}
-      >
-        <TouchableOpacity
-          onPress={() => setActiveFeedId(null)}
-          style={[s.feedTab, { borderColor: c.border }, activeFeedId === null && { backgroundColor: c.primary, borderColor: c.primary }]}
+      {/* Pinned feeds get pills; everything else lives behind the trailing
+          button, which stays outside the ScrollView so it can never scroll out
+          of reach the way the old Manage pill did (AMOBILE-167). */}
+      <View style={[s.switcherRow, { borderBottomColor: c.border }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={s.switcher}
+          contentContainerStyle={{ paddingLeft: 12, paddingRight: 4, paddingVertical: 8, gap: 8, alignItems: 'center' }}
         >
-          <Text style={[s.feedTabText, { color: activeFeedId === null ? 'white' : c.textMuted }]}>Home</Text>
-        </TouchableOpacity>
-        {customFeeds.map((feed: any) => (
           <TouchableOpacity
-            key={feed.id}
-            onPress={() => setActiveFeedId(feed.id)}
-            style={[s.feedTab, { borderColor: c.border }, activeFeedId === feed.id && { backgroundColor: c.primary, borderColor: c.primary }]}
+            onPress={() => selectFeed(null)}
+            style={[s.feedTab, { borderColor: c.border }, activeFeedId === null && { backgroundColor: c.primary, borderColor: c.primary }]}
           >
-            <Text style={[s.feedTabText, { color: activeFeedId === feed.id ? 'white' : c.textMuted }]}>{feed.name}</Text>
+            <Text style={[s.feedTabText, { color: activeFeedId === null ? 'white' : c.textMuted }]}>Home</Text>
           </TouchableOpacity>
-        ))}
-        <TouchableOpacity onPress={() => router.push('/manage-feeds')} style={[s.feedTab, { borderColor: c.border }]}>
-          <Ionicons name="options-outline" size={14} color={c.textMuted} />
-          <Text style={[s.feedTabText, { color: c.textMuted }]}>Manage</Text>
+          {pillFeeds.map((feed: any) => (
+            <TouchableOpacity
+              key={feed.id}
+              onPress={() => selectFeed(feed.id)}
+              style={[s.feedTab, { borderColor: c.border }, activeFeedId === feed.id && { backgroundColor: c.primary, borderColor: c.primary }]}
+            >
+              <Text style={[s.feedTabText, { color: activeFeedId === feed.id ? 'white' : c.textMuted }]}>{feed.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <TouchableOpacity
+          onPress={() => { setFeedQuery(''); setShowFeedSheet(true) }}
+          style={[s.feedTab, s.feedOverflowTab, { borderColor: c.border, backgroundColor: c.bg }]}
+        >
+          <Text style={[s.feedTabText, { color: c.textMuted }]}>
+            {sheetFeeds.length > 0 ? `${sheetFeeds.length} more` : 'Feeds'}
+          </Text>
+          <Ionicons name="chevron-down" size={13} color={c.textMuted} />
         </TouchableOpacity>
-      </ScrollView>
+      </View>
+
+      {/* Overflow sheet: the native analogue of web's dropdown. */}
+      <Modal visible={showFeedSheet} transparent animationType="slide" onRequestClose={() => setShowFeedSheet(false)}>
+        <TouchableOpacity style={s.sheetBackdrop} activeOpacity={1} onPress={() => setShowFeedSheet(false)}>
+          <TouchableOpacity activeOpacity={1} style={[s.sheet, { backgroundColor: c.card, paddingBottom: insets.bottom + 12 }]}>
+            <View style={[s.sheetGrabber, { backgroundColor: c.border }]} />
+
+            {customFeeds.length > FEED_SEARCH_THRESHOLD && (
+              <View style={[s.sheetSearch, { borderColor: c.border }]}>
+                <Ionicons name="search-outline" size={15} color={c.textMuted} />
+                <TextInput
+                  value={feedQuery}
+                  onChangeText={setFeedQuery}
+                  placeholder="Find a feed"
+                  placeholderTextColor={c.textMuted}
+                  style={[s.sheetSearchInput, { color: c.text }]}
+                  autoCorrect={false}
+                />
+              </View>
+            )}
+
+            <ScrollView style={{ maxHeight: 320 }}>
+              {feedMatches.map((feed: any) => (
+                <TouchableOpacity
+                  key={feed.id}
+                  onPress={() => selectFeed(feed.id)}
+                  style={[s.sheetRow, { borderBottomColor: c.border }]}
+                >
+                  <Ionicons name="radio-outline" size={18} color={c.textMuted} />
+                  <Text style={[s.sheetRowText, { color: c.text }]} numberOfLines={1}>{feed.name}</Text>
+                  {activeFeedId === feed.id && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
+                </TouchableOpacity>
+              ))}
+
+              {feedMatches.length === 0 && (
+                <Text style={[s.sheetEmpty, { color: c.textMuted }]}>
+                  {feedQuery.trim()
+                    ? 'No feeds match'
+                    : customFeeds.length === 0
+                      ? 'No custom feeds yet'
+                      : 'Every feed is pinned'}
+                </Text>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => { setShowFeedSheet(false); router.push('/manage-feeds') }}
+              style={[s.sheetFooter, { borderTopColor: c.border }]}
+            >
+              <Ionicons name="options-outline" size={18} color={c.textMuted} />
+              <Text style={[s.sheetRowText, { color: c.textMuted }]}>Manage feeds</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       <View style={{ flex: 1 }}>
         {isLoading ? <Spinner /> : (
@@ -842,9 +948,22 @@ export default function FeedScreen() {
 }
 
 const s = StyleSheet.create({
-  switcher: { flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth },
+  // switcherRow holds the scrolling pills and the fixed overflow button side by
+  // side, so the border sits under both and only the pills scroll.
+  switcherRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
+  switcher: { flexGrow: 0, flexShrink: 1 },
   feedTab: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  feedOverflowTab: { marginRight: 12, marginLeft: 4, flexShrink: 0 },
   feedTabText: { fontSize: 15, fontWeight: '500' },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 8 },
+  sheetGrabber: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
+  sheetSearch: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 10, marginHorizontal: 16, marginBottom: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  sheetSearchInput: { flex: 1, fontSize: 15, padding: 0 },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  sheetRowText: { flex: 1, fontSize: 16 },
+  sheetEmpty: { textAlign: 'center', fontSize: 15, paddingVertical: 24 },
+  sheetFooter: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth },
   searchBtn: { padding: 4 },
   postBtn: { backgroundColor: '#486581', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
   postBtnText: { color: 'white', fontWeight: '600', fontSize: 16 },
