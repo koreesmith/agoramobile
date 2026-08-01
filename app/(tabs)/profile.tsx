@@ -2,7 +2,7 @@ import { View, Text, ScrollView, TouchableOpacity, Image, RefreshControl, Alert,
 import { useQuery } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { Screen, Header, Spinner, Avatar } from '../../components/ui'
+import { Screen, Header, Spinner, Avatar, SearchIconButton } from '../../components/ui'
 import PostCard from '../../components/PostCard'
 import { feedApi, usersApi, instanceApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
@@ -42,6 +42,7 @@ export default function ProfileScreen() {
     <Screen>
       <Header title="Profile" right={
         <View style={{ flexDirection: 'row', gap: 8 }}>
+          <SearchIconButton />
           <TouchableOpacity onPress={() => router.push('/settings')} style={{ padding: 4 }}>
             <Ionicons name="settings-outline" size={22} color={c.primary} />
           </TouchableOpacity>

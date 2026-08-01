@@ -3,7 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, RefreshControl, Image, TextInpu
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { Screen, Header, Spinner, EmptyState } from '../../components/ui'
+import { Screen, Header, Spinner, EmptyState, SearchIconButton } from '../../components/ui'
 import { groupsApi } from '../../api'
 
 import { C } from '../../constants/colors'
@@ -73,9 +73,12 @@ export default function GroupsScreen() {
       <Header
         title="Groups"
         right={
-          <TouchableOpacity onPress={() => setShowCreate(true)} style={{ padding: 4 }}>
-            <Ionicons name="add" size={24} color={c.primary} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <SearchIconButton />
+            <TouchableOpacity onPress={() => setShowCreate(true)} style={{ padding: 4 }}>
+              <Ionicons name="add" size={24} color={c.primary} />
+            </TouchableOpacity>
+          </View>
         }
       />
       <View style={[s.searchWrap, { backgroundColor: c.card, borderBottomColor: c.border }]}>

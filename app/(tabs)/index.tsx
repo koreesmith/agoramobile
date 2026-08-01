@@ -439,15 +439,25 @@ export default function FeedScreen() {
   return (
     <Screen>
       <Header title="Feed" right={
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <TouchableOpacity onPress={() => router.push('/search')} style={s.searchBtn}>
-            <Ionicons name="search-outline" size={22} color={c.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowCompose(true)} style={s.postBtn}>
-            <Text style={s.postBtnText}>Post</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity onPress={() => setShowCompose(true)} style={s.postBtn}>
+          <Text style={s.postBtnText}>Post</Text>
+        </TouchableOpacity>
       } />
+
+      {/* AMOBILE-169: a field rather than an icon, so search reads as search.
+          It is a button and not a TextInput on purpose: app/search.tsx already
+          autofocuses its own input and renders live results as you type, so
+          typing in place would mean duplicating that whole stack into the feed
+          to save a tap that the autofocus already gives back. */}
+      <TouchableOpacity
+        onPress={() => router.push('/search')}
+        accessibilityRole="button"
+        accessibilityLabel="Search people and posts"
+        style={[s.searchField, { backgroundColor: c.bg, borderColor: c.border }]}
+      >
+        <Ionicons name="search-outline" size={17} color={c.textMuted} />
+        <Text style={[s.searchFieldText, { color: c.textMuted }]}>Search people and posts</Text>
+      </TouchableOpacity>
 
       {/* Pinned feeds get pills; everything else lives behind the trailing
           button, which stays outside the ScrollView so it can never scroll out
@@ -965,7 +975,10 @@ const s = StyleSheet.create({
   sheetRowText: { flex: 1, fontSize: 16 },
   sheetEmpty: { textAlign: 'center', fontSize: 15, paddingVertical: 24 },
   sheetFooter: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth },
-  searchBtn: { padding: 4 },
+  // Same 20pt radius and 12pt inset as feedTab, so the field and the pills
+  // directly beneath it read as one block rather than two stacked controls.
+  searchField: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8, marginHorizontal: 12, marginTop: 8 },
+  searchFieldText: { fontSize: 15 },
   postBtn: { backgroundColor: '#486581', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
   postBtnText: { color: 'white', fontWeight: '600', fontSize: 16 },
   fab: {

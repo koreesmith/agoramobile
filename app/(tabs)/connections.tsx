@@ -3,7 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, TextInput, RefreshControl, Aler
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { Screen, Header, Spinner, EmptyState, Avatar, renderName } from '../../components/ui'
+import { Screen, Header, Spinner, EmptyState, Avatar, renderName, SearchIconButton } from '../../components/ui'
 import FriendListPickerModal from '../../components/FriendListPickerModal'
 import { friendsApi, usersApi, instanceApi, federationApi, atprotoApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
@@ -191,7 +191,7 @@ export default function ConnectionsScreen() {
 
   return (
     <Screen>
-      <Header title="Connections" />
+      <Header title="Connections" right={<SearchIconButton />} />
       <View style={{ flex: 1 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.tabBar, { backgroundColor: c.card, borderBottomColor: c.border }]}>
           {(['friends', 'requests', 'discover', 'fediverse', 'bluesky'] as Tab[]).map(t => (

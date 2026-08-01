@@ -144,6 +144,25 @@ export function Header({ title, right, back }: { title: string; right?: React.Re
   )
 }
 
+// AMOBILE-169: web put search in a bar that sits on every screen, so search has
+// to be reachable from every tab here too. The feed gets a full field above its
+// pills; everywhere else this icon is the equivalent that doesn't spend a row of
+// vertical space on a screen that has its own content to show.
+export function SearchIconButton() {
+  const c = useC()
+  const router = useRouter()
+  return (
+    <TouchableOpacity
+      onPress={() => router.push('/search')}
+      accessibilityRole="button"
+      accessibilityLabel="Search"
+      style={{ padding: 4 }}
+    >
+      <Ionicons name="search-outline" size={22} color={c.primary} />
+    </TouchableOpacity>
+  )
+}
+
 export function Card({ children }: { children: React.ReactNode }) {
   const c = useC()
   return <View style={[lay.card, { backgroundColor: c.card }]}>{children}</View>

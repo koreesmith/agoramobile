@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { timeAgo } from '../../utils/handle'
-import { Screen, Header, Spinner, EmptyState, renderName } from '../../components/ui'
+import { Screen, Header, Spinner, EmptyState, renderName, SearchIconButton } from '../../components/ui'
 import { notificationsApi, friendsApi } from '../../api'
 
 import { C } from '../../constants/colors'
@@ -129,11 +129,16 @@ export default function NotificationsScreen() {
 
   return (
     <Screen>
-      <Header title="Notifications" right={hasUnread ? (
-        <TouchableOpacity onPress={() => markAll.mutate()}>
-          <Text style={{ color: c.primary, fontSize: 16, fontWeight: '500' }}>Mark all read</Text>
-        </TouchableOpacity>
-      ) : undefined} />
+      <Header title="Notifications" right={
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {hasUnread && (
+            <TouchableOpacity onPress={() => markAll.mutate()}>
+              <Text style={{ color: c.primary, fontSize: 16, fontWeight: '500' }}>Mark all read</Text>
+            </TouchableOpacity>
+          )}
+          <SearchIconButton />
+        </View>
+      } />
       {isLoading ? <Spinner /> : (
         <FlatList
           data={notifs}
