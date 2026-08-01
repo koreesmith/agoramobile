@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import { router } from 'expo-router'
+import { router, useNavigation } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Header, Spinner, EmptyState, UploadingModal, Avatar } from '../../components/ui'
@@ -41,6 +41,9 @@ function isGifUrl(url: string): boolean {
 }
 
 const URL_RE = /https?:\/\/[^\s]+/g
+
+// Max gap between two Feed tab presses to count as a double tap.
+const DOUBLE_TAP_MS = 300
 
 export default function FeedScreen() {
   const c = useC()
@@ -375,6 +378,23 @@ export default function FeedScreen() {
     }
   }, [])
 
+  // Double-tapping the Feed tab scrolls back to the top of the list.
+  const listRef = useRef<FlatList<any>>(null)
+  const lastTabPress = useRef(0)
+  const navigation = useNavigation()
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress' as any, () => {
+      const now = Date.now()
+      if (now - lastTabPress.current < DOUBLE_TAP_MS) {
+        lastTabPress.current = 0
+        listRef.current?.scrollToOffset({ offset: 0, animated: true })
+      } else {
+        lastTabPress.current = now
+      }
+    })
+    return unsubscribe
+  }, [navigation])
+
   return (
     <Screen>
       <Header title="Feed" right={
@@ -418,6 +438,7 @@ export default function FeedScreen() {
       <View style={{ flex: 1 }}>
         {isLoading ? <Spinner /> : (
           <FlatList
+            ref={listRef}
             data={posts}
             keyExtractor={p => p.id}
             renderItem={({ item }) => <PostCard post={item} queryKey={['feed', activeFeedId]} />}
