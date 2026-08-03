@@ -6,11 +6,26 @@ import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
 import { imgUrl } from '../api'
 
-export function Avatar({ url, name, size = 40, online }: { url?: string; name?: string; size?: number; online?: boolean }) {
+/**
+ * `locked` (AMOBILE-171) marks a fediverse account that approves follow
+ * requests by hand, and only while the viewer isn't through that gate yet.
+ * It rides on the same bottom-right slot the presence dot uses: the outer
+ * View is deliberately not clipped, so a badge can sit over the circle's edge
+ * without the avatar's own `overflow: 'hidden'` cropping it away.
+ *
+ * Fediverse only. AT Proto has no follow-approval mechanism at all (a follow
+ * is a public repo write with no Accept to wait on), so a Bluesky account can
+ * never be locked and callers should never pass one.
+ */
+export function Avatar({ url, name, size = 40, online, locked }: { url?: string; name?: string; size?: number; online?: boolean; locked?: boolean }) {
   const c = useC()
   const letter = (name || '?')[0].toUpperCase()
   const resolvedUrl = imgUrl(url)
   const dotSize = Math.round(size * 0.28)
+  // Slightly larger than the presence dot, which only has to be seen, where
+  // this has to be read as a specific glyph. Floored so the lock stays legible
+  // on the smallest avatars a caller might pass.
+  const lockSize = Math.max(16, Math.round(size * 0.34))
   return (
     <View style={{ width: size, height: size }}>
       <View style={[lay.avatarWrap, { width: size, height: size, borderRadius: size / 2, backgroundColor: c.primaryBg }]}>
@@ -20,6 +35,18 @@ export function Avatar({ url, name, size = 40, online }: { url?: string; name?: 
       </View>
       {online && (
         <View style={[lay.statusDot, { width: dotSize, height: dotSize, borderRadius: dotSize / 2 }]} />
+      )}
+      {locked && (
+        <View
+          accessibilityRole="image"
+          accessibilityLabel="Requires follow approval"
+          style={[lay.lockBadge, {
+            width: lockSize, height: lockSize, borderRadius: lockSize / 2,
+            backgroundColor: c.primary, borderColor: c.card,
+          }]}
+        >
+          <Ionicons name="lock-closed" size={Math.round(lockSize * 0.6)} color="white" />
+        </View>
       )}
     </View>
   )
@@ -222,6 +249,10 @@ const lay = StyleSheet.create({
   avatarWrap: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
   avatarLetter: { fontWeight: 'bold' },
   statusDot: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#22c55e', borderWidth: 2, borderColor: '#ffffff' },
+  // Colours come from the theme at render time (see Avatar) rather than being
+  // baked in here the way statusDot's green is, so the ring keeps matching the
+  // card behind it in dark mode instead of punching a white hole in it.
+  lockBadge:  { position: 'absolute', bottom: -1, right: -1, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
   screen: { flex: 1 },
   header: { borderBottomWidth: 1, paddingHorizontal: 16, paddingTop: 56, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { fontSize: 22, fontWeight: 'bold' },

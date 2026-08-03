@@ -97,6 +97,16 @@ export default function ProfileViewScreen() {
     onSuccess: inv,
   })
 
+  // AMOBILE-171: this account gates follows behind manual approval and the
+  // viewer isn't through that gate yet. Fediverse only, since AT Proto has no
+  // follow-approval mechanism. `following` means accepted rather than merely
+  // requested, and a mutual follow clears the lock just as an Accept does:
+  // either way no gate is left standing between the two accounts.
+  const followPending = !!(profile as any)?.follow_pending
+  const showLock = isFediverse && !isSelf
+    && !!(profile as any)?.manually_approves_followers
+    && !(profile as any)?.following && !(profile as any)?.follows_back
+
   const notifying = !!(profile as any)?.post_notifications_enabled
   const followNotif = useMutation({
     mutationFn: () => notifying
@@ -166,31 +176,42 @@ export default function ProfileViewScreen() {
         <View style={[s.profileCard, { backgroundColor: c.card }]}>
           <View style={s.avatarRow}>
             <View style={[s.avatarBorder, { borderColor: c.card }]}>
-              <Avatar url={profile.avatar_url} name={profile.display_name || profile.username} size={72} />
+              <Avatar url={profile.avatar_url} name={profile.display_name || profile.username} size={72} locked={showLock} />
             </View>
             {!isSelf && (
               <View style={s.actions}>
                 {isFediverse ? (
                   <>
+                    {/* AMOBILE-171: three states, not two. A follow of a locked
+                        account sits un-Accepted for as long as its owner takes
+                        to approve it, and collapsing that into "not following"
+                        left the button showing Follow again on tap, as though
+                        nothing had been sent. Tapping through withdraws the
+                        request, which is the same unfollow call. */}
                     <TouchableOpacity
-                      onPress={() => (profile as any).following
-                        ? Alert.alert('Unfollow?', `Unfollow ${profile.display_name}?`, [
-                            { text: 'Cancel', style: 'cancel' },
-                            { text: 'Unfollow', style: 'destructive', onPress: () => unfollowFed.mutate() },
-                          ])
+                      onPress={() => (profile as any).following || followPending
+                        ? Alert.alert(
+                            followPending ? 'Withdraw request?' : 'Unfollow?',
+                            followPending
+                              ? `Withdraw your follow request to ${profile.display_name}?`
+                              : `Unfollow ${profile.display_name}?`,
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              { text: followPending ? 'Withdraw' : 'Unfollow', style: 'destructive', onPress: () => unfollowFed.mutate() },
+                            ])
                         : followFed.mutate()}
                       disabled={followFed.isPending || unfollowFed.isPending}
-                      style={[s.actionBtn, (profile as any).following
+                      style={[s.actionBtn, (profile as any).following || followPending
                         ? { borderColor: c.border }
                         : { borderColor: c.primary, backgroundColor: c.primary }]}
                     >
                       <Ionicons
-                        name={(profile as any).following ? 'checkmark' : 'person-add-outline'}
+                        name={(profile as any).following ? 'checkmark' : followPending ? 'time-outline' : 'person-add-outline'}
                         size={15}
-                        color={(profile as any).following ? c.textMd : 'white'}
+                        color={(profile as any).following || followPending ? c.textMd : 'white'}
                       />
-                      <Text style={[s.actionBtnText, { color: (profile as any).following ? c.textMd : 'white' }]}>
-                        {(profile as any).following ? 'Following' : 'Follow'}
+                      <Text style={[s.actionBtnText, { color: (profile as any).following || followPending ? c.textMd : 'white' }]}>
+                        {(profile as any).following ? 'Following' : followPending ? 'Requested' : 'Follow'}
                       </Text>
                     </TouchableOpacity>
                     {(profile as any).following && (

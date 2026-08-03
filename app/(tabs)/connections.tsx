@@ -43,6 +43,9 @@ interface FollowingEntry {
   follows_back?: boolean
   // AGORA-258: custom emoji (shortcode -> image URL) for display_name.
   emojis?: Record<string, string>
+  // AGORA-306: the account approves follow requests by hand, which is why an
+  // entry can sit un-Accepted indefinitely rather than momentarily.
+  manually_approves_followers?: boolean
 }
 
 export default function ConnectionsScreen() {
@@ -358,7 +361,15 @@ export default function ConnectionsScreen() {
                         disabled={!f.username}
                         onPress={() => router.push(`/profile/${f.username}` as any)}
                       >
-                        <Avatar url={f.avatar_url} name={f.display_name || f.username} size={38} />
+                        {/* AMOBILE-171: the lock marks why this row can sit
+                            "Requested" indefinitely. Already-accepted is not a
+                            state worth marking, hence the !f.accepted guard. */}
+                        <Avatar
+                          url={f.avatar_url}
+                          name={f.display_name || f.username}
+                          size={38}
+                          locked={!!f.manually_approves_followers && !f.accepted && !f.follows_back}
+                        />
                         <View style={{ flex: 1, marginLeft: 10 }}>
                           <Text style={[s.previewName, { color: c.text }]} numberOfLines={1}>
                             {f.display_name ? renderName(f.display_name, f.emojis) : (f.username || f.actor_url)}
