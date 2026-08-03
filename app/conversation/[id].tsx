@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator, Modal, StyleSheet } from 'react-native'
+import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator, Modal, StyleSheet, Dimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -12,6 +12,11 @@ import { dmApi, feedApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { C } from '../../constants/colors'
 import { useC } from '../../constants/ColorContext'
+import { REACTIONS, reactionDisplay, pickerMetrics } from '../../utils/reactions'
+
+// AMOBILE-170: DMs share the post reaction set now, so this picker carries all ten
+// and needs the same width-driven sizing. See pickerMetrics.
+const PICKER = pickerMetrics(Dimensions.get('window').width)
 
 export default function ConversationScreen() {
   const c = useC()
@@ -26,8 +31,6 @@ export default function ConversationScreen() {
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [reactionTarget, setReactionTarget] = useState<string | null>(null)
   const flatListRef = useRef<FlatList>(null)
-
-  const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '😡', '👍']
 
   const { data: convData } = useQuery({ queryKey: ['conversation', id], queryFn: () => dmApi.getConversation(id!).then(r => r.data) })
   const { data: msgData, refetch } = useQuery({ queryKey: ['messages', id], queryFn: () => dmApi.getMessages(id!).then(r => r.data), refetchInterval: 5_000 })
@@ -45,8 +48,11 @@ export default function ConversationScreen() {
     onSuccess: () => { setText(''); setImageUrl(''); refetch(); qc.invalidateQueries({ queryKey: ['conversations'] }) },
   })
   const del      = useMutation({ mutationFn: (msgId: string) => dmApi.deleteMessage(msgId), onSuccess: refetch })
+  // AMOBILE-170: sends the reaction type, not the glyph. The endpoint used to
+  // store whatever string it was handed and now validates against the canonical
+  // set, so a glyph here is a 400.
   const react    = useMutation({
-    mutationFn: ({ msgId, emoji }: { msgId: string; emoji: string }) => dmApi.reactMessage(msgId, emoji),
+    mutationFn: ({ msgId, type }: { msgId: string; type: string }) => dmApi.reactMessage(msgId, type),
     onSuccess: () => { setReactionTarget(null); refetch() },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not react to message'),
   })
@@ -133,8 +139,9 @@ export default function ConversationScreen() {
                     </Text>
                   </TouchableOpacity>
                   {myReaction && (
-                    <TouchableOpacity onPress={() => unreact.mutate(msg.id)} style={s.msgReaction}>
-                      <Text style={{ fontSize: 16 }}>{myReaction}</Text>
+                    <TouchableOpacity onPress={() => unreact.mutate(msg.id)} style={s.msgReaction}
+                      accessibilityLabel={reactionDisplay(myReaction).label}>
+                      <Text style={{ fontSize: 16 }}>{reactionDisplay(myReaction).emoji}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -156,10 +163,11 @@ export default function ConversationScreen() {
             {/* Full-screen backdrop — dismiss only; rendered beneath picker so it doesn't intercept emoji taps */}
             <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setReactionTarget(null)} />
             <View style={[s.reactionPicker, { backgroundColor: c.card, borderColor: c.border }]}>
-              {QUICK_REACTIONS.map(emoji => (
-                <TouchableOpacity key={emoji} onPress={() => reactionTarget && react.mutate({ msgId: reactionTarget, emoji })}
+              {REACTIONS.map(r => (
+                <TouchableOpacity key={r.type} accessibilityLabel={r.label}
+                  onPress={() => reactionTarget && react.mutate({ msgId: reactionTarget, type: r.type })}
                   style={s.reactionBtn}>
-                  <Text style={{ fontSize: 29 }}>{emoji}</Text>
+                  <Text style={{ fontSize: PICKER.emoji, textAlign: 'center' }}>{r.emoji}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -185,8 +193,8 @@ export default function ConversationScreen() {
 
 const s = StyleSheet.create({
   reactionOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.35)' },
-  reactionPicker:  { flexDirection: 'row', gap: 6, padding: 14, borderRadius: 20, borderWidth: 1 },
-  reactionBtn:     { padding: 6 },
+  reactionPicker:  { flexDirection: 'row', width: PICKER.width, paddingVertical: 12, borderRadius: 20, borderWidth: 1 },
+  reactionBtn:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 },
   msgReaction:     { marginTop: 3, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: 'rgba(0,0,0,0.07)', borderRadius: 12 },
   requestBanner: { margin: 12, padding: 12, backgroundColor: '#fefce8', borderWidth: 1, borderColor: '#fde68a', borderRadius: 12 },
   requestTitle: { fontSize: 16, fontWeight: '600', color: '#92400e' },

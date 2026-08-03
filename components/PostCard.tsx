@@ -19,14 +19,11 @@ import { useToastStore } from '../store/toast'
 import { Avatar, LinkedText, renderName } from './ui'
 import { useC } from '../constants/ColorContext'
 import ReactorsModal from './ReactorsModal'
+import { REACTIONS, reactionDisplay, pickerMetrics } from '../utils/reactions'
 
-const REACTIONS = [
-  { type: 'like', emoji: '❤️' }, { type: 'love', emoji: '😍' },
-  { type: 'laugh', emoji: '😂' }, { type: 'wow', emoji: '😮' },
-  { type: 'angry', emoji: '😡' }, { type: 'care', emoji: '🤗' },
-  { type: 'pride', emoji: '🏳️‍🌈' }, { type: 'thankful', emoji: '🙏' },
-  { type: 'vomit', emoji: '🤮' },
-]
+// AMOBILE-170: ten reactions no longer fit a narrow phone at the sizing used for
+// nine. See pickerMetrics for why the row is width-driven rather than glyph-driven.
+const PICKER = pickerMetrics(Dimensions.get('window').width)
 
 function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
   const c = useC()
@@ -221,7 +218,15 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         gs.isPicking = true
         wrapperRef.current?.measure((_x, _y, _w, h, pageX, pageY) => {
           const sh = Dimensions.get('window').height
-          setPickerPosition({ bottom: sh - pageY - h + 40, left: pageX })
+          const sw = Dimensions.get('window').width
+          // AMOBILE-170: at ten reactions the row is wide enough to run off the
+          // right edge from a left-ish anchor. That is worse than it looks:
+          // onPanResponderMove maps a finger to an index by dividing the
+          // measured picker width by REACTIONS.length, so anything hanging off
+          // screen is not merely clipped, it is unreachable. Clamp the origin so
+          // the whole row is always on screen and the hit regions stay honest.
+          const left = Math.max(PICKER.margin, Math.min(pageX, sw - PICKER.width - PICKER.margin))
+          setPickerPosition({ bottom: sh - pageY - h + 40, left })
           setShowReactions(true)
         })
       }, 400)
@@ -427,7 +432,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   }
   const reactionCounts: Record<string, number> = post.reaction_counts || {}
   const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + b, 0)
-  const myReactionEmoji = REACTIONS.find(r => r.type === post.my_reaction)?.emoji
+  const myReactionEmoji = post.my_reaction ? reactionDisplay(post.my_reaction).emoji : undefined
 
   return (
     <View style={[s.card, { backgroundColor: c.card }, post.group_slug && { borderLeftWidth: 3, borderLeftColor: c.primaryLt }]}>
@@ -679,7 +684,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         {totalReactions > 0 && (
           <View style={s.reactionCounts}>
             {Object.entries(reactionCounts).filter(([,v]) => v > 0).map(([type, count]) => {
-              const emoji = REACTIONS.find(r => r.type === type)?.emoji ?? '❤️'
+              const emoji = reactionDisplay(type).emoji
               const isActive = post.my_reaction === type
               return (
                 <TouchableOpacity key={type} onPress={() => { setReactorsTab(type); setShowReactors(true) }}
@@ -695,7 +700,12 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         <View style={[s.actions, { borderTopColor: c.border }]}>
           <View ref={wrapperRef}>
             <View style={s.actionBtn} {...panResponder.panHandlers}>
-              <Text style={{ fontSize: 21 }}>{myReactionEmoji ?? '🤍'}</Text>
+              {/* Unreacted is an outline thumb, matching the sibling action
+                  icons. The filled glyph only appears once the viewer has
+                  actually reacted (AMOBILE-170). */}
+              {myReactionEmoji
+                ? <Text style={{ fontSize: 21 }}>{myReactionEmoji}</Text>
+                : <Ionicons name="thumbs-up-outline" size={19} color={c.textMuted} />}
               {totalReactions > 0 && <Text style={[s.actionCount, { color: c.textMuted }]}>{totalReactions}</Text>}
             </View>
           </View>
@@ -1098,7 +1108,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                     hoveredReaction === r.type && { transform: [{ scale: 1.25 }] },
                   ]}
                 >
-                  <Text style={{ fontSize: 27 }}>{r.emoji}</Text>
+                  <Text style={{ fontSize: PICKER.emoji, textAlign: 'center' }}>{r.emoji}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -1150,8 +1160,8 @@ const s = StyleSheet.create({
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   actionCount: { fontSize: 13 },
   picker: { position: 'absolute', bottom: 40, left: 0, borderWidth: 1, borderRadius: 24, padding: 8, flexDirection: 'row', gap: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10, zIndex: 99 },
-  pickerModal: { position: 'absolute', borderWidth: 1, borderRadius: 24, padding: 8, flexDirection: 'row', gap: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10 },
-  pickerItem: { borderRadius: 10, padding: 3 },
+  pickerModal: { position: 'absolute', width: PICKER.width, borderWidth: 1, borderRadius: 24, paddingVertical: 8, flexDirection: 'row', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10 },
+  pickerItem: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 10, paddingVertical: 3 },
   pickerItemActive: { borderRadius: 10 },
   lightboxBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' },
   lightboxClose: { color: 'rgba(255,255,255,0.5)', fontSize: 15, marginTop: 16 },

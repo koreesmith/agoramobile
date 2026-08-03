@@ -6,14 +6,7 @@ import { feedApi } from '../api'
 import { useC } from '../constants/ColorContext'
 import { Avatar, renderName } from './ui'
 import { Ionicons } from '@expo/vector-icons'
-
-const REACTIONS = [
-  { type: 'like', emoji: '❤️' }, { type: 'love', emoji: '😍' },
-  { type: 'laugh', emoji: '😂' }, { type: 'wow', emoji: '😮' },
-  { type: 'angry', emoji: '😡' }, { type: 'care', emoji: '🤗' },
-  { type: 'pride', emoji: '🏳️‍🌈' }, { type: 'thankful', emoji: '🙏' },
-  { type: 'vomit', emoji: '🤮' },
-]
+import { REACTIONS, reactionDisplay } from '../utils/reactions'
 
 interface Props {
   postId: string
@@ -79,7 +72,7 @@ export default function ReactorsModal({ postId, visible, onClose, initialTab = '
               data={filtered}
               keyExtractor={(item, i) => `${item.user_id ?? i}-${item.type}`}
               renderItem={({ item }) => {
-                const emoji = REACTIONS.find(r => r.type === item.type)?.emoji ?? '❤️'
+                const emoji = reactionDisplay(item.type).emoji
                 return (
                   <TouchableOpacity
                     style={s.row}
