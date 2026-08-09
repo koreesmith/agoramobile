@@ -297,6 +297,10 @@ export const adminApi = {
   addInstance:     (domain: string)              => api.post('/admin/federation/instances', { domain }),
   blockInstance:   (id: string)                  => api.post(`/admin/federation/instances/${id}/block`),
   unblockInstance: (id: string)                  => api.post(`/admin/federation/instances/${id}/unblock`),
+  // AMOBILE-176: removing a peer without blocking it (AGORA-320), and the
+  // per-peer timeline exchange (AGORA-322).
+  disconnectInstance:  (id: string)              => api.delete(`/admin/federation/instances/${id}`),
+  setInstanceTimeline: (id: string, enabled: boolean) => api.put(`/admin/federation/instances/${id}/timeline`, { enabled }),
   // Storage / orphaned media
   scanOrphans:    ()                             => api.get('/admin/media/orphans'),
   deleteOrphans:  ()                             => api.delete('/admin/media/orphans'),
