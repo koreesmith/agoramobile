@@ -86,6 +86,25 @@ export default function ConversationScreen() {
         ) : null,
       }} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={headerHeight}>
+        {/* AMOBILE-173: a conversation that crosses instances, said once.
+            An ActivityPub direct message is not end-to-end encrypted and is
+            readable by the administrators of both servers, which is true of
+            every one including Mastodon's. Saying so is not optional: whatever
+            the product tells people about message privacy has to be accurate
+            for this case, and until now this screen said nothing, which made a
+            stronger claim than the system delivers. Worded as a fact about
+            where the message goes rather than as a warning. */}
+        {other?.is_remote && (
+          <View style={[s.federatedNotice, { borderColor: c.border, backgroundColor: c.card }]}>
+            <Ionicons name="information-circle-outline" size={15} color={c.textMuted} style={{ marginTop: 1 }} />
+            <Text style={[s.federatedText, { color: c.textMuted }]}>
+              {other.display_name || other.username} is on{' '}
+              <Text style={{ fontWeight: '600' }}>{other.remote_instance || 'another server'}</Text>, so these
+              messages travel between two servers. They are not end-to-end encrypted, and administrators of
+              either server can read them.
+            </Text>
+          </View>
+        )}
         {conv && !conv.is_accepted && (
           <View style={s.requestBanner}>
             <Text style={s.requestTitle}>Message request</Text>
@@ -196,6 +215,11 @@ const s = StyleSheet.create({
   reactionPicker:  { flexDirection: 'row', width: PICKER.width, paddingVertical: 12, borderRadius: 20, borderWidth: 1 },
   reactionBtn:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 },
   msgReaction:     { marginTop: 3, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: 'rgba(0,0,0,0.07)', borderRadius: 12 },
+  // AMOBILE-173: deliberately quieter than requestBanner below. A message
+  // request needs an answer; this is context, and styling it as an alert would
+  // make an ordinary federated conversation look like a problem.
+  federatedNotice: { marginHorizontal: 12, marginTop: 12, padding: 10, flexDirection: 'row', gap: 8, borderWidth: 1, borderRadius: 12 },
+  federatedText: { flex: 1, fontSize: 12, lineHeight: 17 },
   requestBanner: { margin: 12, padding: 12, backgroundColor: '#fefce8', borderWidth: 1, borderColor: '#fde68a', borderRadius: 12 },
   requestTitle: { fontSize: 16, fontWeight: '600', color: '#92400e' },
   requestSub: { fontSize: 13, color: '#b45309', marginBottom: 8 },
