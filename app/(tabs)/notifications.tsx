@@ -11,6 +11,8 @@ import { useC } from '../../constants/ColorContext'
 
 // All type strings the API may send for a waitlist signup notification
 const WAITLIST_TYPES = ['waitlist_signup', 'waitlist_join', 'waitlist_joined', 'waitlist']
+// AMOBILE-178: group notifications all land on the group carried in `data`.
+const GROUP_TYPES = ['group_join_request', 'group_join_approved', 'group_join_rejected', 'group_invite_accepted']
 
 const ICONS: Record<string, any> = {
   friend_request: 'person-add', friend_accepted: 'checkmark-circle',
@@ -21,16 +23,38 @@ const ICONS: Record<string, any> = {
   fediverse_post: 'planet', atproto_post: 'cloud',
   waitlist_signup: 'person-add-outline', waitlist_join: 'person-add-outline',
   waitlist_joined: 'person-add-outline', waitlist: 'person-add-outline',
+  // AMOBILE-178: the fifteen types that had no entry here and were falling
+  // through to the placeholder below. Web renders all of them, so the icon and
+  // wording choices are matched rather than invented.
+  fediverse_follow: 'planet', atproto_follow: 'cloud',
+  group_join_request: 'people', group_join_approved: 'checkmark-circle',
+  group_join_rejected: 'close-circle', group_invite_accepted: 'people',
+  group_tag: 'pricetag', page_post: 'newspaper', page_member_invite: 'mail-open',
+  new_report: 'flag', federation_request: 'git-network',
+  custom_domain_live: 'globe', custom_domain_verified: 'shield-checkmark',
+  custom_domain_failed: 'alert-circle', custom_domain_lost: 'alert-circle',
+  custom_domain_rejected: 'close-circle',
 }
 
 const COLORS: Record<string, string> = {
   friend_request: '#486581', friend_accepted: '#22c55e', post_like: '#ef4444',
   comment_like: '#ef4444', post_reaction: '#f59e0b', comment_reaction: '#f59e0b',
   post_comment: '#486581', post_repost: '#22c55e', post_mention: '#3b82f6',
+  // Had an icon and a sentence but no colour, so it rendered grey while every
+  // other reply-shaped type did not. Caught while auditing coverage.
+  comment_reply: '#486581',
   wall_post: '#486581', wall_post_pending: '#f59e0b', wall_post_approved: '#22c55e', user_post: '#486581',
   fediverse_post: '#0ea5e9', atproto_post: '#0ea5e9',
   waitlist_signup: '#8b5cf6', waitlist_join: '#8b5cf6',
   waitlist_joined: '#8b5cf6', waitlist: '#8b5cf6',
+  fediverse_follow: '#0ea5e9', atproto_follow: '#0ea5e9',
+  group_join_request: '#486581', group_join_approved: '#22c55e',
+  group_join_rejected: '#ef4444', group_invite_accepted: '#22c55e',
+  group_tag: '#3b82f6', page_post: '#486581', page_member_invite: '#8b5cf6',
+  new_report: '#ef4444', federation_request: '#8b5cf6',
+  custom_domain_live: '#22c55e', custom_domain_verified: '#22c55e',
+  custom_domain_failed: '#ef4444', custom_domain_lost: '#ef4444',
+  custom_domain_rejected: '#ef4444',
 }
 
 const TEXT: Record<string, string> = {
@@ -44,6 +68,34 @@ const TEXT: Record<string, string> = {
   fediverse_post: 'posted something new on the fediverse', atproto_post: 'posted something new on Bluesky',
   waitlist_signup: 'joined the waitlist', waitlist_join: 'joined the waitlist',
   waitlist_joined: 'joined the waitlist', waitlist: 'joined the waitlist',
+  fediverse_follow: 'followed you from the fediverse',
+  atproto_follow: 'followed you on Bluesky',
+  group_join_request: 'wants to join your group',
+  group_join_approved: 'approved your request to join a group',
+  group_join_rejected: 'declined your request to join a group',
+  group_invite_accepted: 'added you to a group',
+  group_tag: 'tagged your group in a post',
+  page_post: 'published a new post on a page you follow',
+  page_member_invite: 'invited you to join a page as a team member',
+  new_report: 'submitted a new report, tap to review',
+}
+
+// AMOBILE-178: notifications that come from the instance itself rather than
+// from a person. There is no actor to name, so they render as a whole sentence
+// with their subject inlined instead of the "<actor> <predicate>" shape every
+// other type is built from. Feeding these through formatActorLabel would
+// produce "Someone your domain is live", which is worse than the placeholder
+// they were already getting.
+//
+// The subject rides in the notification's `data` column, matching web
+// (AGORA-287 for the domains, AGORA-314 for the federation request).
+const SYSTEM_TEXT: Record<string, (subject: string) => string> = {
+  custom_domain_live:     d => `${d} is verified and live, it's your handle on Bluesky now`,
+  custom_domain_verified: d => `${d} is verified and waiting for an administrator to approve it`,
+  custom_domain_failed:   d => `We couldn't verify ${d}, tap to see what went wrong`,
+  custom_domain_lost:     d => `${d} stopped verifying, so your handle has gone back to the one this instance issued you`,
+  custom_domain_rejected: d => `Your request to use ${d} as your handle was declined`,
+  federation_request:     d => `${d} has started federating with this instance`,
 }
 
 // AMOBILE-150: actor names get resolved through renderName (same as feed/
@@ -119,11 +171,28 @@ export default function NotificationsScreen() {
       const markDone = ids.length > 1 ? notificationsApi.markManyRead(ids) : notificationsApi.markRead(ids[0])
       markDone.then(invalidateNotifs)
     }
-    if (n.type === 'friend_request' || n.type === 'friend_accepted') {
+    // AMOBILE-178: several of the types added here have nowhere to go by
+    // post_id, and a row that navigates nowhere is only marginally better than
+    // one that says nothing. Destinations match web's notifTarget.
+    if (n.type === 'friend_request' || n.type === 'friend_accepted'
+      || n.type === 'fediverse_follow' || n.type === 'atproto_follow') {
+      // A follow has no post to land on, so it routes to the follower. Remote
+      // stubs carry the synthetic handle@domain username, which /profile
+      // already resolves.
       const username = n.actor_username || n.actors?.[0]?.username
       if (username) router.push(`/profile/${username}`)
     } else if (WAITLIST_TYPES.includes(n.type)) {
       router.push({ pathname: '/admin', params: { tab: 'waitlist' } } as any)
+    } else if (n.type === 'new_report') {
+      router.push({ pathname: '/admin', params: { tab: 'reports' } } as any)
+    } else if (n.type === 'federation_request') {
+      router.push({ pathname: '/admin', params: { tab: 'federation' } } as any)
+    } else if (n.type.startsWith('custom_domain_')) {
+      router.push({ pathname: '/settings', params: { tab: 'bluesky' } } as any)
+    } else if (GROUP_TYPES.includes(n.type)) {
+      router.push(n.data ? `/groups/${n.data}` : '/groups')
+    } else if (n.type === 'page_member_invite') {
+      router.push(n.data ? `/pages/${n.data}` : '/pages')
     } else if (n.post_id) router.push(`/post/${n.post_id}`)
   }
 
@@ -152,8 +221,16 @@ export default function NotificationsScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[s.notifText, { color: c.text }]}>
-                  <Text style={{ fontWeight: '600' }}>{formatActorLabel(n)}</Text>
-                  {' '}{TEXT[n.type] || 'did something'}
+                  {SYSTEM_TEXT[n.type] ? (
+                    // No actor to lead with: the subject is a domain or a
+                    // server, so the whole sentence carries it.
+                    SYSTEM_TEXT[n.type](n.data || 'A domain')
+                  ) : (
+                    <>
+                      <Text style={{ fontWeight: '600' }}>{formatActorLabel(n)}</Text>
+                      {' '}{TEXT[n.type] || 'sent you a notification'}
+                    </>
+                  )}
                 </Text>
                 <Text style={[s.notifTime, { color: c.textLight }]}>{timeAgo(n.created_at)}</Text>
                 {n.type === 'friend_request' && n.friend_status !== 'accepted' && n.friend_status !== 'declined' && (
