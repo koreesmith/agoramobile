@@ -72,6 +72,18 @@ export default function ConnectionsScreen() {
   const decline = useMutation({ mutationFn: (id: string) => friendsApi.declineRequest(id), onSuccess: inv })
   const unfriend = useMutation({ mutationFn: (id: string) => friendsApi.unfriend(id), onSuccess: inv })
   const sendReq = useMutation({ mutationFn: (id: string) => friendsApi.sendRequest(id), onSuccess: () => qc.invalidateQueries({ queryKey: ['discover'] }) })
+  // AMOBILE-174: a request you sent had no way back. Invalidates both lists,
+  // since the same person can be sitting in Requests as outgoing and in
+  // Discover as "Sent", and clearing one while leaving the other would look
+  // like the cancel half worked.
+  const cancelReq = useMutation({
+    mutationFn: (id: string) => friendsApi.cancelRequest(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requests'] })
+      qc.invalidateQueries({ queryKey: ['discover'] })
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not cancel the request'),
+  })
 
   const friends = friendsData?.friends || []
   const incoming = reqData?.incoming || []
@@ -243,7 +255,15 @@ export default function ConnectionsScreen() {
                   <TouchableOpacity onPress={() => accept.mutate(f.id)} style={[s.acceptBtn, { backgroundColor: c.primary }]}><Text style={s.acceptBtnText}>Accept</Text></TouchableOpacity>
                   <TouchableOpacity onPress={() => decline.mutate(f.id)} style={[s.declineBtn, { backgroundColor: c.bg, borderColor: c.border }]}><Text style={[s.declineBtnText, { color: c.textMd }]}>Decline</Text></TouchableOpacity>
                 </View>
-              ) : <Text style={{ fontSize: 13, color: c.textMuted }}>Pending</Text>
+              ) : (
+                // Styled as an ordinary secondary action, not a destructive
+                // one: withdrawing a request you sent is a correction, and the
+                // red treatment Block uses would overstate it.
+                <TouchableOpacity onPress={() => cancelReq.mutate(f.id)} disabled={cancelReq.isPending}
+                  style={[s.declineBtn, { backgroundColor: c.bg, borderColor: c.border }]}>
+                  <Text style={[s.declineBtnText, { color: c.textMd }]}>Cancel</Text>
+                </TouchableOpacity>
+              )
             } />}
           />
         )}
@@ -255,7 +275,12 @@ export default function ConnectionsScreen() {
               ListEmptyComponent={<EmptyState icon="🔍" title="No suggestions" />}
               ListFooterComponent={invitesEnabled ? <View style={{ height: 88 }} /> : null}
               renderItem={({ item: u }) => <PersonRow user={u} right={
-                u.friend_status === 'pending' ? <Text style={{ fontSize: 13, color: c.textMuted }}>Sent</Text>
+                u.friend_status === 'pending' ? (
+                  <TouchableOpacity onPress={() => cancelReq.mutate(u.id)} disabled={cancelReq.isPending}
+                    style={[s.declineBtn, { backgroundColor: c.bg, borderColor: c.border }]}>
+                    <Text style={[s.declineBtnText, { color: c.textMd }]}>Cancel</Text>
+                  </TouchableOpacity>
+                )
                 : u.friend_status === 'accepted' ? <Text style={{ fontSize: 13, color: '#22c55e', fontWeight: '500' }}>Friends</Text>
                 : <TouchableOpacity onPress={() => sendReq.mutate(u.id)} style={[s.acceptBtn, { backgroundColor: c.primary }]}><Text style={s.acceptBtnText}>Add</Text></TouchableOpacity>
               } />}

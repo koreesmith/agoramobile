@@ -54,6 +54,11 @@ export default function ProfileViewScreen() {
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not send friend request'),
   })
   const accept   = useMutation({ mutationFn: () => friendsApi.acceptRequest(profile!.id), onSuccess: inv })
+  const cancelReq = useMutation({
+    mutationFn: () => friendsApi.cancelRequest(profile!.id),
+    onSuccess: inv,
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not cancel the request'),
+  })
   const unfriend = useMutation({ mutationFn: () => friendsApi.unfriend(profile!.id), onSuccess: inv })
   const startDM  = useMutation({
     mutationFn: () => dmApi.startConversation(username!),
@@ -309,9 +314,26 @@ export default function ProfileViewScreen() {
                       </TouchableOpacity>
                     )}
                     {status === 'pending' && (
-                      <View style={[s.actionBtn, { borderColor: c.border }]}>
-                        <Text style={{ fontSize: 15, color: c.textMuted }}>Pending</Text>
-                      </View>
+                      // AMOBILE-174: a sent request had no way back from here
+                      // either. Confirms first, since the button sits where
+                      // "Pending" used to and a stray tap should not silently
+                      // withdraw something the other person may be about to
+                      // accept.
+                      <TouchableOpacity
+                        onPress={() => Alert.alert(
+                          'Cancel request?',
+                          `Withdraw your friend request to ${profile.display_name || profile.username}?`,
+                          [
+                            { text: 'Keep waiting', style: 'cancel' },
+                            { text: 'Cancel request', style: 'destructive', onPress: () => cancelReq.mutate() },
+                          ],
+                        )}
+                        disabled={cancelReq.isPending}
+                        style={[s.actionBtn, { borderColor: c.border }]}
+                      >
+                        <Ionicons name="close-circle-outline" size={15} color={c.textMuted} />
+                        <Text style={[s.actionBtnText, { color: c.textMuted }]}>Pending</Text>
+                      </TouchableOpacity>
                     )}
                     {status === 'pending_incoming' && (
                       <TouchableOpacity onPress={() => accept.mutate()}

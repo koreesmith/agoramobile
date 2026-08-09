@@ -126,6 +126,9 @@ export const friendsApi = {
   sendRequest:    (id: string)     => api.post(`/friends/request/${id}`),
   acceptRequest:  (id: string)     => api.post(`/friends/accept/${id}`),
   declineRequest: (id: string)     => api.post(`/friends/decline/${id}`),
+  // AMOBILE-174: withdraw a request you sent. For a remote addressee the
+  // backend also sends the Undo(Follow) that clears it on their side.
+  cancelRequest:  (id: string)     => api.delete(`/friends/request/${id}`),
   unfriend:       (id: string)     => api.delete(`/friends/${id}`),
   listFriendLists:    ()                                => api.get('/friend-groups'),
   createFriendList:   (name: string)                    => api.post('/friend-groups', { name }),
