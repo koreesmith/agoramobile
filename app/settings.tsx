@@ -244,6 +244,9 @@ export default function SettingsScreen() {
         <Row icon="person-outline" label="Edit profile" onPress={() => router.push('/edit-profile')} />
         <Row icon="people-outline" label="Friend lists" onPress={() => router.push('/friend-lists')} />
         <Row icon="ban-outline" label="Blocked users" onPress={() => router.push('/blocked-users')} />
+        {/* AGORA-309: sits next to blocked users, since both are things the
+            user has chosen not to see. */}
+        <Row icon="eye-off-outline" label="Hidden posts" onPress={() => router.push('/hidden-posts')} />
         <Row icon="mail-outline" label="Change email" onPress={() => setSection('email')} />
         <Row icon="key-outline" label="Change password" onPress={() => setSection('password')} />
         {invitesEnabled && (

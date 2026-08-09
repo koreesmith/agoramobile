@@ -10,7 +10,7 @@ import * as MediaLibrary from 'expo-media-library'
 import * as FileSystem from 'expo-file-system'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import { feedApi, imgUrl, blockApi, moderationApi, friendsApi, pagesApi } from '../api'
+import { feedApi, imgUrl, blockApi, moderationApi, friendsApi, pagesApi, hiddenPostsApi } from '../api'
 import { trackInteraction } from '../utils/interactions'
 import { handle, timeAgo } from '../utils/handle'
 import { useAuthStore } from '../store/auth'
@@ -363,6 +363,16 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
       qc.invalidateQueries({ queryKey })
     },
     onError: () => Alert.alert('Error', 'Could not block user. Please try again.'),
+  })
+
+  // AGORA-309. Shares the feed's queryKey invalidation with the actions above,
+  // so the post leaves the list it is sitting in without a bespoke removal
+  // path: from the reader's point of view hiding and blocking have the same
+  // immediate effect, and only one of them is about the person.
+  const hidePost = useMutation({
+    mutationFn: () => hiddenPostsApi.hide(post.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not hide post'),
   })
 
   const isOwn    = user?.id === post.author_id
@@ -786,6 +796,20 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               </>
             ) : (
               <>
+                {/* AGORA-309: hiding one post, for when a specific post is
+                    unwanted but the author is not. Deliberately first and in
+                    ordinary colour: it is the lightest of the three actions
+                    here, reversible, private, and the only one that is not
+                    about the person. Needs no confirmation for the same
+                    reasons. */}
+                <TouchableOpacity style={s.menuItem} onPress={() => {
+                  setShowMenu(false)
+                  hidePost.mutate()
+                }}>
+                  <Ionicons name="eye-off-outline" size={18} color={c.textMd} />
+                  <Text style={[s.menuItemText, { color: c.textMd }]}>Hide post</Text>
+                </TouchableOpacity>
+                <View style={[s.menuDivider, { backgroundColor: c.border }]} />
                 <TouchableOpacity style={s.menuItem} onPress={() => {
                   setShowMenu(false)
                   router.push({ pathname: '/report', params: { postId: post.id } } as any)

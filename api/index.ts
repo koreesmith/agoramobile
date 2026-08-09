@@ -266,6 +266,14 @@ export const rulesApi = {
 }
 
 // ── Blocking ──────────────────────────────────────────────────────────────────
+// AGORA-309: per-user, per-post timeline hiding. A client of one: it changes
+// nothing for anybody else and notifies no one.
+export const hiddenPostsApi = {
+  list:   ()               => api.get('/hidden-posts'),
+  hide:   (postId: string) => api.post(`/posts/${postId}/hide`),
+  unhide: (postId: string) => api.delete(`/posts/${postId}/hide`),
+}
+
 export const blockApi = {
   blockUser:   (username: string) => api.post(`/blocks/${username}`),
   unblockUser: (username: string) => api.delete(`/blocks/${username}`),
