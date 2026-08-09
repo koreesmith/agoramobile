@@ -60,9 +60,24 @@ export default function ProfileViewScreen() {
     onSuccess: (res) => router.push(`/conversation/${res.data.id}`)
   })
 
-  // AGORA-167: fediverse accounts have no friending concept — follow/notify
+  // AGORA-167: fediverse accounts have no friending concept, so follow/notify
   // (ap_following) is the equivalent, surfaced here instead of Add friend.
-  const isFediverse = !!(profile as any)?.ap_actor_url
+  //
+  // AMOBILE-172: an actor URL no longer identifies one. This read
+  // `!!ap_actor_url`, which was right while only Mastodon-style accounts had
+  // one; since AGORA-329 moved friend requests onto ActivityPub and AGORA-330
+  // removed the legacy transport, every remote Agora user has one too. So a
+  // friend on another Agora instance was being classified as a fediverse
+  // account and offered Follow, with no way to friend them at all, and a follow
+  // is not a substitute: friendship is what carries friends-only posts, list
+  // audiences and direct messages.
+  //
+  // can_friend (AGORA-334) is the backend answering the question directly,
+  // because the client genuinely cannot derive it. A remote Agora account then
+  // falls through to the same branch a local one takes, which is the point:
+  // they are a friend on another instance, not a different kind of thing.
+  const canFriend = !!(profile as any)?.can_friend
+  const isFediverse = !!(profile as any)?.ap_actor_url && !canFriend
   const followFed = useMutation({
     mutationFn: () => federationApi.followFediverseAccount((profile as any).ap_actor_url),
     onSuccess: inv,
