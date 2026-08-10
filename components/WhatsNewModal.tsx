@@ -5,33 +5,40 @@ import * as SecureStore from 'expo-secure-store'
 import { Ionicons } from '@expo/vector-icons'
 import { useC } from '../constants/ColorContext'
 
-const WHATS_NEW_VERSION = '3.0.0'
+const WHATS_NEW_VERSION = '4.0.0'
 const STORAGE_KEY = 'last_seen_whats_new'
 
 const FEATURES: { icon: string; title: string; desc: string; link?: string; linkText?: string }[] = [
   {
-    icon: 'cloud',
-    title: 'Native Bluesky account',
-    desc: 'Every Agora account is now also a real Bluesky account — no bridge, no separate signup required. Your public posts sync both ways, and you can follow any Bluesky account natively.',
-    link: '/connections?tab=bluesky',
-    linkText: 'Explore Bluesky →',
-  },
-  {
-    icon: 'list',
-    title: 'Unified Connections & Friend Lists',
-    desc: 'Friends, Fediverse follows, and Bluesky follows now live together on one Connections screen — Friend Lists can include accounts from either network, not just Agora friends.',
+    icon: 'git-network-outline',
+    title: 'Friends across Agora instances',
+    desc: "Friend requests, friends-only posts, and their replies and reactions now reach your friends even when they're on a different Agora instance, not just your own.",
     link: '/connections',
-    linkText: 'See your lists →',
+    linkText: 'See your friends →',
   },
-  { icon: 'chatbubbles', title: 'Quote posts', desc: 'Mastodon and other fediverse apps can now quote your Agora posts, not just boost them.' },
   {
-    icon: 'search',
-    title: 'Unified search',
-    desc: 'Search now covers Agora, the Fediverse, and Bluesky in one place — accounts, posts, and hashtags.',
-    link: '/search',
+    icon: 'mail-outline',
+    title: 'Direct messages across instances',
+    desc: 'Send and receive DMs with friends on other Agora instances, not just your own.',
+    link: '/messages',
+    linkText: 'Open Messages →',
+  },
+  {
+    icon: 'pin-outline',
+    title: 'Pinned feed pills',
+    desc: 'Pin your favorite feeds to the top of your feed bar, with an overflow sheet for the rest.',
+    link: '/',
     linkText: 'Try it →',
   },
-  { icon: 'warning', title: 'Trigger warnings on shares', desc: "Add your own content warning when sharing someone else's post, independent of the original post's own visibility." },
+  { icon: 'happy-outline', title: 'Refreshed reactions', desc: 'A realigned reaction set, shared consistently between posts and Messages.' },
+  {
+    icon: 'eye-outline',
+    title: 'See your followers',
+    desc: 'View your fediverse and Bluesky follower and following lists, now with a dedicated Followers segment in each tab.',
+    link: '/connections?tab=fediverse&sub=followers',
+    linkText: 'Check your followers →',
+  },
+  { icon: 'eye-off-outline', title: 'Hide a post', desc: 'Remove a post from your own timeline without deleting it.' },
 ]
 
 export async function shouldShowWhatsNew(): Promise<boolean> {
@@ -74,7 +81,7 @@ export default function WhatsNewModal({ visible, onDismiss }: { visible: boolean
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleDismiss}>
       <View style={[s.container, { backgroundColor: c.card }]}>
         <View style={[s.header, { borderBottomColor: c.border }]}>
-          <Text style={[s.title, { color: c.text }]}>What's New in 3.0</Text>
+          <Text style={[s.title, { color: c.text }]}>What's New in 4.0</Text>
           <TouchableOpacity onPress={handleDismiss} style={s.closeBtn}>
             <Ionicons name="close" size={22} color={c.textMuted} />
           </TouchableOpacity>
