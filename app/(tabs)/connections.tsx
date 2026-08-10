@@ -48,12 +48,45 @@ interface FollowingEntry {
   manually_approves_followers?: boolean
 }
 
+// AGORA-348/349: the caller's own inbound followers — distinct shape from
+// FollowingEntry above, since a follower has no accepted/notify/show_in_feed
+// (those only ever apply to a follow the caller made).
+interface FollowerEntry {
+  actor_url: string
+  created_at: string
+  user_id?: string
+  username?: string
+  display_name?: string
+  avatar_url?: string
+  instance?: string
+  emojis?: Record<string, string>
+  following_back: boolean
+}
+
+interface BlueskyFollowerEntry {
+  did: string
+  created_at: string
+  user_id?: string
+  handle?: string
+  display_name?: string
+  avatar_url?: string
+  following_back: boolean
+}
+
 export default function ConnectionsScreen() {
   const c = useC()
   const qc = useQueryClient()
   const { user } = useAuthStore()
-  const params = useLocalSearchParams<{ tab?: string }>()
+  const params = useLocalSearchParams<{ tab?: string; sub?: string }>()
   const [tab, setTab] = useState<Tab>((params.tab as Tab) || 'friends')
+  // AMOBILE-179: which segment of the fediverse/bluesky tab is showing —
+  // separate per platform, same reasoning as web's AGORA-349. ?sub= only
+  // ever seeds whichever platform ?tab= itself points at, so a new-follower
+  // push notification can deep-link straight to e.g.
+  // /connections?tab=bluesky&sub=followers.
+  const initialSub = params.sub === 'followers' ? 'followers' : 'following'
+  const [fediSubTab, setFediSubTab] = useState<'following' | 'followers'>(params.tab === 'fediverse' ? initialSub : 'following')
+  const [bskySubTab, setBskySubTab] = useState<'following' | 'followers'>(params.tab === 'bluesky' ? initialSub : 'following')
   const [search, setSearch] = useState('')
   // AMOBILE-145: the list icon on a Fediverse/Bluesky follow row used to just
   // navigate to the standalone Friend Lists screen with no idea which
@@ -106,6 +139,17 @@ export default function ConnectionsScreen() {
   const following: FollowingEntry[] = followingData?.following ?? []
   const fediNotificationsEnabled = (user as any)?.fediverse_notifications_enabled ?? true
 
+  // AGORA-348/349: fetched whenever the fediverse tab is open (not gated on
+  // fediSubTab === 'followers') so the Followers segment's count is live from
+  // the moment the tab renders and switching segments never shows a loading
+  // flash.
+  const { data: followersData } = useQuery({
+    queryKey: ['fediverse-followers'],
+    queryFn: () => federationApi.listFollowers().then(r => r.data),
+    enabled: tab === 'fediverse',
+  })
+  const followers: FollowerEntry[] = followersData?.followers ?? []
+
   const resolveFediHandle = useMutation({
     mutationFn: (h: string) => federationApi.resolveFediverseHandle(h).then(r => r.data),
     onSuccess: (data) => { setFediPreview(data); setFediSearchError('') },
@@ -117,6 +161,9 @@ export default function ConnectionsScreen() {
     onSuccess: () => {
       setFediPreview(null); setFediHandle('')
       qc.invalidateQueries({ queryKey: ['fediverse-following'] })
+      // A Follow Back from the Followers segment needs this list's
+      // following_back flags to settle too, not just the Following list.
+      qc.invalidateQueries({ queryKey: ['fediverse-followers'] })
     },
     onError: (e: any) => setFediSearchError(e.response?.data?.error || 'Could not follow that account.'),
   })
@@ -160,6 +207,16 @@ export default function ConnectionsScreen() {
   const bskyFollowing: any[] = bskyFollowingData?.following ?? []
   const atprotoNotificationsEnabled = (user as any)?.atproto_notifications_enabled ?? true
 
+  // AGORA-348/349: same shape as the fediverse followers query above.
+  const { data: bskyFollowersData } = useQuery({
+    queryKey: ['bluesky-followers'],
+    queryFn: () => atprotoApi.listBlueskyFollowers().then(r => r.data),
+    enabled: tab === 'bluesky',
+  })
+  const bskyFollowers: BlueskyFollowerEntry[] = bskyFollowersData?.followers ?? []
+  const bskyFollowersSeeded: boolean = bskyFollowersData?.seeded ?? false
+  const bskyFollowersSyncedAt: string | undefined = bskyFollowersData?.synced_at
+
   const resolveBskyHandle = useMutation({
     mutationFn: (h: string) => atprotoApi.resolveBlueskyHandle(h).then(r => r.data),
     onSuccess: (data) => { setBskyPreview(data); setBskySearchError('') },
@@ -171,6 +228,7 @@ export default function ConnectionsScreen() {
     onSuccess: () => {
       setBskyPreview(null); setBskyHandle('')
       qc.invalidateQueries({ queryKey: ['bluesky-following'] })
+      qc.invalidateQueries({ queryKey: ['bluesky-followers'] })
     },
     onError: (e: any) => setBskySearchError(e.response?.data?.error || 'Could not follow that account.'),
   })
@@ -290,6 +348,19 @@ export default function ConnectionsScreen() {
 
         {tab === 'fediverse' && (
           <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+            {/* AMOBILE-179: Following vs Followers — kept as a segment inside
+                this tab rather than a seventh top-level tab, matching web's
+                AGORA-349 (see that ticket for the full reasoning). */}
+            <View style={[s.subTabBar, { backgroundColor: c.bg }]}>
+              <TouchableOpacity onPress={() => setFediSubTab('following')} style={[s.subTabItem, fediSubTab === 'following' && { backgroundColor: c.card }]}>
+                <Text style={[s.subTabText, { color: fediSubTab === 'following' ? c.text : c.textMuted }]}>Following ({following.length})</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setFediSubTab('followers')} style={[s.subTabItem, fediSubTab === 'followers' && { backgroundColor: c.card }]}>
+                <Text style={[s.subTabText, { color: fediSubTab === 'followers' ? c.text : c.textMuted }]}>Followers ({followers.length})</Text>
+              </TouchableOpacity>
+            </View>
+
+            {fediSubTab === 'following' && (<>
             <View style={[s.card, { backgroundColor: c.card }]}>
               <Text style={[s.cardTitle, { color: c.text }]}>Follow a fediverse account</Text>
               <Text style={[s.cardSubtitle, { color: c.textMuted, marginBottom: 12 }]}>
@@ -478,6 +549,57 @@ export default function ConnectionsScreen() {
                 </Text>
               )}
             </View>
+            </>)}
+
+            {/* ── Followers segment (AMOBILE-179) ── */}
+            {fediSubTab === 'followers' && (
+            <View style={[s.card, { backgroundColor: c.card }]}>
+              <Text style={[s.cardTitle, { color: c.text }]}>Your followers</Text>
+              {followers.length === 0 ? (
+                <Text style={[s.emptyText, { color: c.textMuted, borderColor: c.border }]}>
+                  No one on the fediverse follows you yet.
+                </Text>
+              ) : (
+                <View style={{ marginTop: 8 }}>
+                  {followers.map(f => (
+                    <View key={f.actor_url} style={[s.followRow, { borderBottomColor: c.border }]}>
+                      <TouchableOpacity
+                        style={s.followRowMain}
+                        disabled={!f.username}
+                        onPress={() => router.push(`/profile/${f.username}` as any)}
+                      >
+                        <Avatar url={f.avatar_url} name={f.display_name || f.username} size={38} />
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                          <Text style={[s.previewName, { color: c.text }]} numberOfLines={1}>
+                            {f.display_name ? renderName(f.display_name, f.emojis) : (f.username || f.actor_url)}
+                          </Text>
+                          {!!f.username && (
+                            <Text style={[s.previewHandle, { color: c.textMuted }]} numberOfLines={1}>
+                              @{f.username}{f.instance ? `@${f.instance}` : ''}
+                            </Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                      {f.following_back ? (
+                        <View style={s.pendingTag}>
+                          <Ionicons name="checkmark-circle-outline" size={13} color={c.primary} />
+                          <Text style={[s.pendingText, { color: c.primary }]}>Following</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => followFedi.mutate(f.actor_url)}
+                          disabled={followFedi.isPending}
+                          style={[s.followBtn, { backgroundColor: c.primary, marginLeft: 8 }]}
+                        >
+                          <Text style={s.followBtnText}>Follow back</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+            )}
 
             <TouchableOpacity onPress={() => router.push('/settings?tab=fediverse' as any)}>
               <Text style={[s.hintLink, { color: c.textMuted }]}>
@@ -489,6 +611,17 @@ export default function ConnectionsScreen() {
 
         {tab === 'bluesky' && (
           <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+            {/* AMOBILE-179: see the matching comment on the fediverse tab above. */}
+            <View style={[s.subTabBar, { backgroundColor: c.bg }]}>
+              <TouchableOpacity onPress={() => setBskySubTab('following')} style={[s.subTabItem, bskySubTab === 'following' && { backgroundColor: c.card }]}>
+                <Text style={[s.subTabText, { color: bskySubTab === 'following' ? c.text : c.textMuted }]}>Following ({bskyFollowing.length})</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setBskySubTab('followers')} style={[s.subTabItem, bskySubTab === 'followers' && { backgroundColor: c.card }]}>
+                <Text style={[s.subTabText, { color: bskySubTab === 'followers' ? c.text : c.textMuted }]}>Followers ({bskyFollowers.length})</Text>
+              </TouchableOpacity>
+            </View>
+
+            {bskySubTab === 'following' && (<>
             <View style={[s.card, { backgroundColor: c.card }]}>
               <Text style={[s.cardTitle, { color: c.text }]}>Follow a Bluesky account</Text>
               <Text style={[s.cardSubtitle, { color: c.textMuted, marginBottom: 12 }]}>
@@ -628,6 +761,65 @@ export default function ConnectionsScreen() {
                 </Text>
               )}
             </View>
+            </>)}
+
+            {/* ── Followers segment (AMOBILE-179) ── */}
+            {bskySubTab === 'followers' && (
+            <View style={[s.card, { backgroundColor: c.card }]}>
+              <Text style={[s.cardTitle, { color: c.text }]}>Your followers</Text>
+              {/* AGORA-348: at_followers is only ever as current as the last
+                  poll (AT Proto never delivers a follow to us), so an empty
+                  list needs to say whether that's "no followers" or "not
+                  synced yet" rather than reading as fact either way. */}
+              <Text style={[s.cardSubtitle, { color: c.textMuted, marginTop: 2 }]}>
+                {bskyFollowersSeeded
+                  ? (bskyFollowersSyncedAt ? `Last synced ${new Date(bskyFollowersSyncedAt).toLocaleString()}` : 'Synced')
+                  : 'Not synced yet — this can take a little while after enabling Bluesky.'}
+              </Text>
+              {bskyFollowers.length === 0 && bskyFollowersSeeded && (
+                <Text style={[s.emptyText, { color: c.textMuted, borderColor: c.border }]}>
+                  No one on Bluesky follows you yet.
+                </Text>
+              )}
+              {bskyFollowers.length > 0 && (
+                <View style={{ marginTop: 8 }}>
+                  {bskyFollowers.map(f => (
+                    <View key={f.did} style={[s.followRow, { borderBottomColor: c.border }]}>
+                      <TouchableOpacity
+                        style={s.followRowMain}
+                        disabled={!f.handle}
+                        onPress={() => router.push(`/profile/${f.handle}` as any)}
+                      >
+                        <Avatar url={f.avatar_url} name={f.display_name || f.handle} size={38} />
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                          <Text style={[s.previewName, { color: c.text }]} numberOfLines={1}>
+                            {f.display_name || f.handle}
+                          </Text>
+                          <Text style={[s.previewHandle, { color: c.textMuted }]} numberOfLines={1}>
+                            @{f.handle}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                      {f.following_back ? (
+                        <View style={s.pendingTag}>
+                          <Ionicons name="checkmark-circle-outline" size={13} color={c.primary} />
+                          <Text style={[s.pendingText, { color: c.primary }]}>Following</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => followBsky.mutate(f.did)}
+                          disabled={followBsky.isPending}
+                          style={[s.followBtn, { backgroundColor: c.primary, marginLeft: 8 }]}
+                        >
+                          <Text style={s.followBtnText}>Follow back</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+            )}
 
             <TouchableOpacity onPress={() => router.push('/settings?tab=bluesky' as any)}>
               <Text style={[s.hintLink, { color: c.textMuted }]}>
@@ -711,4 +903,8 @@ const s = StyleSheet.create({
   iconBtn: { padding: 6, marginLeft: 2 },
   hintLink: { fontSize: 13, textAlign: 'center', marginTop: 4, lineHeight: 17 },
   hintText: { fontSize: 12, marginTop: 10, lineHeight: 15 },
+  // ── Following/Followers segment (AMOBILE-179) ──
+  subTabBar: { flexDirection: 'row', borderRadius: 10, padding: 3, marginBottom: 16 },
+  subTabItem: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
+  subTabText: { fontSize: 14, fontWeight: '600' },
 })
