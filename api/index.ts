@@ -174,6 +174,7 @@ export const groupsApi = {
   getInvites:     (slug: string)                     => api.get(`/groups/${slug}/invites`),
   createInvite:   (slug: string)                     => api.post(`/groups/${slug}/invites`),
   deleteInvite:   (slug: string, token: string)      => api.delete(`/groups/${slug}/invites/${token}`),
+  joinByInvite:   (token: string)                    => api.get(`/groups/join-by-invite/${token}`),
   requestJoin:    (slug: string)                     => api.post(`/groups/${slug}/request`),
   getRequests:    (slug: string)                     => api.get(`/groups/${slug}/requests`),
   approveRequest: (slug: string, requestId: string)  => api.post(`/groups/${slug}/requests/${requestId}/approve`),

@@ -17,6 +17,8 @@ export default function GroupsScreen() {
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
   const [newPrivate, setNewPrivate] = useState(false)
+  const [showJoinByInvite, setShowJoinByInvite] = useState(false)
+  const [inviteInput, setInviteInput] = useState('')
 
   const { data: joinedData, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['groups', 'joined'],
@@ -42,6 +44,18 @@ export default function GroupsScreen() {
     },
     onError: () => Alert.alert('Error', 'Failed to create group.'),
   })
+
+  // AMOBILE-182: accept either a bare invite token or a full invite link
+  // (`.../invite/<token>`) pasted from a share sheet, since mobile has no
+  // universal-link handling set up for the web domain yet.
+  const submitInviteLink = () => {
+    const trimmed = inviteInput.trim()
+    if (!trimmed) return
+    const token = trimmed.split('/').filter(Boolean).pop() || trimmed
+    setShowJoinByInvite(false)
+    setInviteInput('')
+    router.push(`/invite/${encodeURIComponent(token)}`)
+  }
 
   const myGroups = joinedData?.groups || []
   const allDiscover = (discoverData?.groups || []).filter((g: any) => !myGroups.find((m: any) => m.id === g.id))
@@ -75,6 +89,9 @@ export default function GroupsScreen() {
         right={
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <SearchIconButton />
+            <TouchableOpacity onPress={() => setShowJoinByInvite(true)} style={{ padding: 4 }}>
+              <Ionicons name="link" size={22} color={c.primary} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowCreate(true)} style={{ padding: 4 }}>
               <Ionicons name="add" size={24} color={c.primary} />
             </TouchableOpacity>
@@ -172,6 +189,41 @@ export default function GroupsScreen() {
                 style={[s.modalBtn, { backgroundColor: (!newName.trim() || createGroup.isPending) ? c.primaryLt : c.primary, borderColor: 'transparent' }]}
               >
                 <Text style={{ color: 'white', fontWeight: '600' }}>{createGroup.isPending ? 'Creating…' : 'Create'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showJoinByInvite} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <View style={[s.modalCard, { backgroundColor: c.card }]}>
+            <Text style={[s.modalTitle, { color: c.text }]}>Join with Invite</Text>
+            <Text style={{ fontSize: 13, color: c.textMuted, marginBottom: 4 }}>
+              Paste an invite link or code someone shared with you.
+            </Text>
+            <TextInput
+              style={[s.fieldInput, { backgroundColor: c.bg, color: c.text, borderColor: c.border }]}
+              placeholder="https://.../invite/... or code"
+              placeholderTextColor={c.textLight}
+              value={inviteInput}
+              onChangeText={setInviteInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+              <TouchableOpacity
+                onPress={() => { setShowJoinByInvite(false); setInviteInput('') }}
+                style={[s.modalBtn, { borderColor: c.border }]}
+              >
+                <Text style={{ color: c.textMd }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={submitInviteLink}
+                disabled={!inviteInput.trim()}
+                style={[s.modalBtn, { backgroundColor: !inviteInput.trim() ? c.primaryLt : c.primary, borderColor: 'transparent' }]}
+              >
+                <Text style={{ color: 'white', fontWeight: '600' }}>Join</Text>
               </TouchableOpacity>
             </View>
           </View>

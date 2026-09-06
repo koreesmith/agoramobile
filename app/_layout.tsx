@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
+import * as SecureStore from 'expo-secure-store'
 import { useAuthStore } from '../store/auth'
 import { usersApi } from '../api'
 import { ColorProvider } from '../constants/ColorContext'
@@ -93,6 +94,16 @@ function AppContent() {
     // exception that React Native cannot catch on the bridge queue.
     const t = setTimeout(registerForPushNotifications, 1500)
     return () => clearTimeout(t)
+  }, [isAuthenticated])
+
+  // AMOBILE-182: resume a group-invite redemption that had to pause for
+  // login. 'agora_pending_invite' must match app/invite/[token].tsx's key.
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const pending = SecureStore.getItem('agora_pending_invite')
+    if (!pending) return
+    SecureStore.deleteItemAsync('agora_pending_invite')
+    setTimeout(() => router.push(`/invite/${pending}` as any), 300)
   }, [isAuthenticated])
 
   // Defer all notification native module setup past the HadesGC-sensitive
