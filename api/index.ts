@@ -372,7 +372,10 @@ export const pollApi = {
 export const waitlistApi = {
   list:    ()            => api.get('/admin/waitlist'),
   approve: (id: string)  => api.post(`/admin/waitlist/${id}/approve`),
-  reject:  (id: string)  => api.post(`/admin/waitlist/${id}/reject`),
+  // AMOBILE-181: rejection is a DELETE on the waitlist entry itself, not a
+  // POST to a /reject sub-path (which the backend never registered) — matches
+  // the web client and the actual backend route (internal/admin/admin.go).
+  reject:  (id: string)  => api.delete(`/admin/waitlist/${id}`),
 }
 
 // ── Albums ────────────────────────────────────────────────────────────────────
