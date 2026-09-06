@@ -88,6 +88,11 @@ export const feedApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
+  // AMOBILE-180: a 'videos' upload doesn't return a url synchronously the
+  // way an image upload does — it kicks off a background transcode and
+  // returns { job_id, status: 'processing' } immediately. Poll this until
+  // status is 'done' (url/thumb_url) or 'failed' (error).
+  getVideoJob:  (jobId: string)      => api.get(`/media/jobs/${jobId}`),
   previewUrl:   (url: string)        => api.get('/preview', { params: { url } }),
   // Guest-reachable — unauthenticated, so it bypasses the `api` instance
   // (which always attaches whatever token/instanceUrl auth store currently

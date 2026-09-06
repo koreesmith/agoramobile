@@ -30,6 +30,12 @@ import { useC } from '../../constants/ColorContext'
 // web client gained in AGORA-303.
 const ACTIVE_FEED_KEY = 'agora_active_feed_id'
 
+// AMOBILE-180: persists the in-flight video transcode job id, mirroring
+// web's own PENDING_VIDEO_KEY (AGORA-137), so backgrounding or relaunching
+// the app while a video is still processing resumes the poll instead of
+// losing track of the job.
+const PENDING_VIDEO_KEY = 'agora_pending_video_job'
+
 // Past this many feeds the sheet stops being scannable and earns a search
 // field. Below it, search is a control nobody needs. Matches web.
 const FEED_SEARCH_THRESHOLD = 8
@@ -72,6 +78,10 @@ export default function FeedScreen() {
   const [imageUrls, setImageUrls] = useState<string[]>([])
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [videoThumbUrl, setVideoThumbUrl] = useState<string | null>(null)
+  // AMOBILE-180: a video upload returns a job id and transcodes in the
+  // background, unlike an image upload which returns its url immediately —
+  // see startVideoPolling below.
+  const [videoProcessing, setVideoProcessing] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showCW, setShowCW] = useState(false)
@@ -157,6 +167,12 @@ export default function FeedScreen() {
   const selectedFriendList = friendLists.find((g: any) => g.id === friendListId)
 
   const resetCompose = () => {
+    // AMOBILE-180: a post can only submit once a pending video finishes (the
+    // submit button stays disabled while videoProcessing), so there's never
+    // a job actually in flight here — stopping regardless is just defensive.
+    stopVideoPolling()
+    SecureStore.deleteItemAsync(PENDING_VIDEO_KEY)
+    setVideoProcessing(false)
     setContent(''); setImageUrls([]); setVideoUrl(null); setVideoThumbUrl(null)
     setShowCW(false); setCwLabel('')
     setShowPoll(false); setPollOptions(['', '']); setPollMultiple(false)
@@ -389,8 +405,70 @@ export default function FeedScreen() {
     finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploading(false) }
   }
 
+  // AMOBILE-180: transcoding runs in the background on the server. Poll the
+  // job until it's done, then attach the resulting video — mirrors web's
+  // startVideoPolling (AGORA-137) exactly, including resuming a pending job
+  // across a relaunch via PENDING_VIDEO_KEY.
+  const videoPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const stopVideoPolling = () => {
+    if (videoPollRef.current) {
+      clearInterval(videoPollRef.current)
+      videoPollRef.current = null
+    }
+  }
+
+  const startVideoPolling = (jobId: string) => {
+    stopVideoPolling()
+    SecureStore.setItemAsync(PENDING_VIDEO_KEY, jobId)
+    setVideoProcessing(true)
+    videoPollRef.current = setInterval(async () => {
+      try {
+        const { data } = await feedApi.getVideoJob(jobId)
+        if (data.status === 'done') {
+          stopVideoPolling()
+          SecureStore.deleteItemAsync(PENDING_VIDEO_KEY)
+          setVideoProcessing(false)
+          setImageUrls([]) // video and photos are mutually exclusive
+          setVideoUrl(data.url)
+          setVideoThumbUrl(data.thumb_url || null)
+        } else if (data.status === 'failed') {
+          stopVideoPolling()
+          SecureStore.deleteItemAsync(PENDING_VIDEO_KEY)
+          setVideoProcessing(false)
+          Alert.alert('Video processing failed', data.error || 'Please try a different file.')
+        }
+        // status 'processing' → keep polling
+      } catch (err: any) {
+        // A 404 means the job no longer exists — stop polling. Transient
+        // network errors are ignored so a brief blip doesn't abort a valid job.
+        if (err?.response?.status === 404) {
+          stopVideoPolling()
+          SecureStore.deleteItemAsync(PENDING_VIDEO_KEY)
+          setVideoProcessing(false)
+        }
+      }
+    }, 3000)
+  }
+
+  const removeVideo = () => {
+    stopVideoPolling()
+    SecureStore.deleteItemAsync(PENDING_VIDEO_KEY)
+    setVideoUrl(null)
+    setVideoThumbUrl(null)
+    setVideoProcessing(false)
+  }
+
+  // Resume a pending transcode after the app is relaunched; clean up on unmount.
+  useEffect(() => {
+    const pending = SecureStore.getItem(PENDING_VIDEO_KEY)
+    if (pending) startVideoPolling(pending)
+    return () => stopVideoPolling()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const pickVideo = async () => {
-    if (videoUrl) return
+    if (videoUrl || videoProcessing) return
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
       allowsEditing: false,
@@ -406,8 +484,10 @@ export default function FeedScreen() {
     try {
       const file = { uri: asset.uri, type: 'video/mp4', name: 'video.mp4' } as any
       const res = await feedApi.uploadMedia(file, 'videos')
-      setVideoUrl(res.data.url)
-      setVideoThumbUrl(res.data.thumb_url || null)
+      const jobId = res.data.job_id
+      if (!jobId) throw new Error('missing job id')
+      setImageUrls([]) // video and photos are mutually exclusive
+      startVideoPolling(jobId)
     } catch { Alert.alert('Upload failed', 'Could not upload video') }
     finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploading(false) }
   }
@@ -607,23 +687,25 @@ export default function FeedScreen() {
                 style={[s.cwBtn, showPoll && { backgroundColor: c.primaryBg, borderColor: c.primaryLt }]}>
                 <Ionicons name="bar-chart-outline" size={16} color={showPoll ? c.primary : c.textMuted} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={pickImage} disabled={uploading || showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl}>
+              <TouchableOpacity onPress={pickImage} disabled={uploading || showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl || videoProcessing}>
                 {uploading
                   ? <ActivityIndicator size="small" color={c.primary} />
                   : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                      <Ionicons name="image-outline" size={22} color={(showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl) ? c.border : c.primary} />
+                      <Ionicons name="image-outline" size={22} color={(showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl || videoProcessing) ? c.border : c.primary} />
                       {imageUrls.length > 0 && !showPoll && (
                         <Text style={{ fontSize: 12, color: c.primary, fontWeight: '600' }}>{imageUrls.length}/{MAX_IMAGES}</Text>
                       )}
                     </View>}
               </TouchableOpacity>
-              <TouchableOpacity onPress={pickVideo} disabled={uploading || showPoll || imageUrls.length > 0 || !!videoUrl}>
-                <Ionicons name="videocam-outline" size={22} color={(showPoll || imageUrls.length > 0 || !!videoUrl) ? c.border : c.primary} />
+              <TouchableOpacity onPress={pickVideo} disabled={uploading || showPoll || imageUrls.length > 0 || !!videoUrl || videoProcessing}>
+                {videoProcessing
+                  ? <ActivityIndicator size="small" color={c.primary} />
+                  : <Ionicons name="videocam-outline" size={22} color={(showPoll || imageUrls.length > 0 || !!videoUrl) ? c.border : c.primary} />}
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => createPost.mutate()}
-                disabled={(!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || createPost.isPending}
-                style={[s.submitBtn, (!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) && s.submitBtnDisabled]}
+                disabled={(!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || createPost.isPending || videoProcessing}
+                style={[s.submitBtn, ((!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || videoProcessing) && s.submitBtnDisabled]}
               >
                 <Text style={s.submitBtnText}>{createPost.isPending ? '…' : 'Post'}</Text>
               </TouchableOpacity>
@@ -927,10 +1009,23 @@ export default function FeedScreen() {
                   </View>
                 </View>
                 <TouchableOpacity
-                  onPress={() => { setVideoUrl(null); setVideoThumbUrl(null) }}
+                  onPress={removeVideo}
                   style={s.removeImage}
                 >
                   <Ionicons name="close" size={14} color="white" />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {/* AMOBILE-180: video processing indicator, mirroring web's (AGORA-137) */}
+            {!showPoll && videoProcessing && !videoUrl ? (
+              <View style={[s.linkPreviewCard, { borderColor: c.border, backgroundColor: c.bg, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+                <ActivityIndicator size="small" color={c.primary} />
+                <Text style={{ flex: 1, fontSize: 13, color: c.textMuted }}>
+                  Processing video… this can take a minute. You can keep typing or come back later.
+                </Text>
+                <TouchableOpacity onPress={removeVideo}>
+                  <Ionicons name="close" size={16} color={c.textMuted} />
                 </TouchableOpacity>
               </View>
             ) : null}
