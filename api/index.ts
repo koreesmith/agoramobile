@@ -44,7 +44,16 @@ export const authApi = {
     axios.get(`${instanceUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } }),
   instance:   (baseUrl: string)  => axios.get(`${baseUrl}/api/instance`),
   changePassword: (data: any)    => api.post('/auth/change-password', data),
-  changeEmail:    (data: any)    => api.post('/auth/change-email', data),
+  // AMOBILE-184: this used to hit /auth/change-email, which the backend
+  // never registered. The actual endpoint is the two-step request+verify
+  // flow: this kicks it off, and the user completes it via the emailed link.
+  changeEmail:    (data: any)    => api.post('/auth/request-email-change', data),
+  // Pre-auth: instanceUrl isn't in the store yet, so these hit the instance
+  // directly like login()/registerWithUrl() do.
+  forgotPasswordWithUrl: (instanceUrl: string, email: string) =>
+    axios.post(`${instanceUrl}/api/auth/forgot-password`, { email }),
+  resetPasswordWithUrl:  (instanceUrl: string, token: string, newPassword: string) =>
+    axios.post(`${instanceUrl}/api/auth/reset-password`, { token, new_password: newPassword }),
 }
 
 // ── Feed ──────────────────────────────────────────────────────────────────────
