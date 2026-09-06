@@ -442,6 +442,17 @@ export default function ProfileViewScreen() {
               <Ionicons name="chevron-forward" size={16} color={c.textLight} style={{ marginLeft: 'auto' }} />
             </TouchableOpacity>
           )}
+          {/* AMOBILE-186: Wall requires auth, same gate web uses. */}
+          {!!me && (
+            <TouchableOpacity
+              onPress={() => router.push(`/wall/${username}`)}
+              style={[s.albumsRow, { borderTopColor: c.border, borderTopWidth: showAlbums ? 0 : StyleSheet.hairlineWidth }]}
+            >
+              <Ionicons name="create-outline" size={16} color={c.primary} />
+              <Text style={[s.albumsText, { color: c.primary }]}>Wall</Text>
+              <Ionicons name="chevron-forward" size={16} color={c.textLight} style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Timeline */}

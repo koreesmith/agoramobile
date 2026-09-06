@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { timeAgo } from '../../utils/handle'
 import { Screen, Header, Spinner, EmptyState, renderName, SearchIconButton } from '../../components/ui'
 import { notificationsApi, friendsApi } from '../../api'
+import { useAuthStore } from '../../store/auth'
 
 import { C } from '../../constants/colors'
 import { useC } from '../../constants/ColorContext'
@@ -126,6 +127,7 @@ function formatActorLabel(n: any): React.ReactNode {
 export default function NotificationsScreen() {
   const c = useC()
   const qc = useQueryClient()
+  const { user: me } = useAuthStore()
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['notifications'],
     queryFn: () => notificationsApi.list().then(r => r.data),
@@ -189,6 +191,11 @@ export default function NotificationsScreen() {
       router.push({ pathname: '/admin', params: { tab: 'federation' } } as any)
     } else if (n.type.startsWith('custom_domain_')) {
       router.push({ pathname: '/settings', params: { tab: 'bluesky' } } as any)
+    } else if (n.type === 'wall_post_pending') {
+      // AMOBILE-186: this fires on the wall owner's own account, so the
+      // queue to review is always the recipient's own wall, regardless of
+      // which pending post triggered the notification.
+      if (me?.username) router.push(`/wall/${me.username}`)
     } else if (GROUP_TYPES.includes(n.type)) {
       router.push(n.data ? `/groups/${n.data}` : '/groups')
     } else if (n.type === 'page_member_invite') {
