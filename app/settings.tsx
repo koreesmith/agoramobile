@@ -249,6 +249,7 @@ export default function SettingsScreen() {
         <Row icon="eye-off-outline" label="Hidden posts" onPress={() => router.push('/hidden-posts')} />
         <Row icon="mail-outline" label="Change email" onPress={() => setSection('email')} />
         <Row icon="key-outline" label="Change password" onPress={() => setSection('password')} />
+        <Row icon="globe-outline" label="Custom domain" onPress={() => router.push('/custom-domain')} />
         {invitesEnabled && (
           <Row icon="mail-outline" label="Invite a friend" onPress={() => router.push('/invite-friend')} />
         )}

@@ -279,6 +279,15 @@ export const atprotoApi = {
   searchBlueskyPosts:  (q: string) => api.get('/atproto/search/posts', { params: { q } }),
 }
 
+// ── Custom domain handles (AGORA-278) ────────────────────────────────────────
+// One claim per account: the endpoints are singular and take no id.
+export const customDomainApi = {
+  get:     ()               => api.get('/custom-domain'),
+  claim:   (domain: string) => api.post('/custom-domain', { domain }),
+  verify:  ()               => api.post('/custom-domain/verify'),
+  release: ()               => api.delete('/custom-domain'),
+}
+
 // ── Instance rules ────────────────────────────────────────────────────────────
 export const rulesApi = {
   list: () => api.get('/instance/rules'),
@@ -315,6 +324,10 @@ export const adminApi = {
   updateRule:     (id: string, data: any)        => api.patch(`/admin/rules/${id}`, data),
   deleteRule:     (id: string)                   => api.delete(`/admin/rules/${id}`),
   moveRule:       (id: string, direction: 'up' | 'down') => api.patch(`/admin/rules/${id}/move`, { direction }),
+  // Custom domain handles (AGORA-286)
+  listCustomDomains:   (status?: string)            => api.get('/admin/custom-domains', { params: { status } }),
+  approveCustomDomain: (id: string)                 => api.post(`/admin/custom-domains/${id}/approve`),
+  rejectCustomDomain:  (id: string, reason: string) => api.post(`/admin/custom-domains/${id}/reject`, { reason }),
   // Invites
   listInvites:    ()                             => api.get('/admin/invites'),
   createInvite:   ()                             => api.post('/admin/invites'),

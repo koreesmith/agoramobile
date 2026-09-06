@@ -8,7 +8,7 @@ import { moderationApi, adminApi, waitlistApi, pagesApi, adminPagesApi } from '.
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
 
-type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'federation' | 'invites' | 'rules' | 'settings' | 'audit' | 'pages' | 'media'
+type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'federation' | 'domains' | 'invites' | 'rules' | 'settings' | 'audit' | 'pages' | 'media'
 
 // GetSettings (internal/admin/admin.go) serializes every instance_settings
 // value as a string ("true"/"false", not a JSON boolean), so `typeof value
@@ -30,6 +30,11 @@ const ENUM_SETTINGS: Record<string, { value: string; label: string; desc: string
   friend_requests_from: [
     { value: 'everyone',    label: 'Anyone',      desc: 'Any instance may send your users friend requests' },
     { value: 'peered_only', label: 'Peers only',  desc: 'Only instances in your Federation tab' },
+  ],
+  // AMOBILE-183, mirroring web's toggle on the Domains tab (AGORA-286).
+  custom_domain_approval: [
+    { value: 'auto',   label: 'Approve automatically', desc: 'A domain goes live as soon as it verifies' },
+    { value: 'manual', label: 'Review manually',       desc: 'Every verified domain waits in the Domains tab for a decision' },
   ],
 }
 
@@ -58,6 +63,9 @@ export default function AdminScreen() {
   const [relayInboxUrl, setRelayInboxUrl] = useState('')
   const [orphanScan, setOrphanScan] = useState<{ count: number; total_bytes: number; orphans: { path: string; size: number; mod_time: string }[] } | null>(null)
   const [orphanScanning, setOrphanScanning] = useState(false)
+  const [domainFilter, setDomainFilter] = useState<'pending' | 'all'>('pending')
+  const [domainRejectReasons, setDomainRejectReasons] = useState<Record<string, string>>({})
+  const [rejectingDomain, setRejectingDomain] = useState<string | null>(null)
 
   if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
     return (
@@ -129,6 +137,12 @@ export default function AdminScreen() {
     queryKey: ['admin-relays'],
     queryFn: () => adminApi.listRelays().then(r => r.data),
     enabled: tab === 'fediverse',
+  })
+
+  const { data: domainsData, isLoading: domainsLoading } = useQuery({
+    queryKey: ['admin-custom-domains', domainFilter],
+    queryFn: () => adminApi.listCustomDomains(domainFilter).then(r => r.data),
+    enabled: tab === 'domains',
   })
 
   const { data: adminPagesData, isLoading: adminPagesLoading } = useQuery({
@@ -251,7 +265,12 @@ export default function AdminScreen() {
 
   const updateSettings = useMutation({
     mutationFn: (data: any) => adminApi.updateSettings(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-settings'] }); Alert.alert('Saved') },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-settings'] })
+      // custom_domain_approval also drives the Domains tab's own header text.
+      qc.invalidateQueries({ queryKey: ['admin-custom-domains'] })
+      Alert.alert('Saved')
+    },
     onError: () => Alert.alert('Error', 'Could not save settings'),
   })
 
@@ -305,6 +324,21 @@ export default function AdminScreen() {
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) => adminApi.setInstanceTimeline(id, enabled),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-fed'] }),
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not change timeline exchange'),
+  })
+
+  const approveCustomDomain = useMutation({
+    mutationFn: (id: string) => adminApi.approveCustomDomain(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-custom-domains'] }),
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not approve domain'),
+  })
+
+  const rejectCustomDomain = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => adminApi.rejectCustomDomain(id, reason),
+    onSuccess: () => {
+      setRejectingDomain(null)
+      qc.invalidateQueries({ queryKey: ['admin-custom-domains'] })
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not reject domain'),
   })
 
   const addRelay = useMutation({
@@ -440,6 +474,8 @@ export default function AdminScreen() {
   )
   const relays: any[] = relaysData?.relays || []
   const adminPages: any[] = adminPagesData?.pages || []
+  const customDomains: any[] = domainsData?.domains || []
+  const domainApprovalMode: string = domainsData?.approval_mode || 'manual'
 
   return (
     <Screen>
@@ -450,7 +486,7 @@ export default function AdminScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={[s.tabBar, { backgroundColor: c.card, borderBottomColor: c.border }]}
         contentContainerStyle={{ flexDirection: 'row' }}>
-        {(['overview', 'reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'federation', 'invites', 'rules', 'settings', 'audit', 'pages', 'media'] as Tab[]).map(t => (
+        {(['overview', 'reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'federation', 'domains', 'invites', 'rules', 'settings', 'audit', 'pages', 'media'] as Tab[]).map(t => (
           <TouchableOpacity key={t} onPress={() => setTab(t)}
             style={[s.tabItem, tab === t && { borderBottomColor: c.primary }]}>
             <Text style={[s.tabText, { color: tab === t ? c.primary : c.textMuted }]}>
@@ -1108,6 +1144,110 @@ export default function AdminScreen() {
               ))}
             </>
           )}
+        </ScrollView>
+      )}
+
+      {/* Custom domain handles approval queue (AGORA-286) */}
+      {tab === 'domains' && (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+          <View style={[s.card, { backgroundColor: c.card, borderColor: c.border, marginBottom: 12 }]}>
+            <Text style={[s.sectionTitle, { color: c.textMuted, marginBottom: 4 }]}>Custom domain handles</Text>
+            <Text style={{ fontSize: 13, color: c.textMuted, lineHeight: 18 }}>
+              Users can point a domain they own at their account so it becomes their handle on Bluesky and the
+              wider AT Protocol network. Ownership is proven by a DNS record or a file on the domain before a
+              request reaches this queue, approving is a decision about whether this instance wants to publish
+              that handle, not a second ownership check. The auto/manual approval switch lives in the Settings tab.
+            </Text>
+            <Text style={{ fontSize: 12, color: c.textLight, marginTop: 8 }}>
+              Currently {domainApprovalMode === 'auto' ? 'approving verified domains automatically' : 'reviewing every verified domain by hand'}.
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+            {(['pending', 'all'] as const).map(f => (
+              <TouchableOpacity key={f} onPress={() => setDomainFilter(f)}
+                style={[s.smallBtn, { backgroundColor: domainFilter === f ? c.primary : c.bg, borderColor: domainFilter === f ? c.primary : c.border }]}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: domainFilter === f ? 'white' : c.textMd }}>
+                  {f === 'pending' ? 'Awaiting review' : 'All requests'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {domainsLoading ? <Spinner /> : customDomains.length === 0 ? (
+            <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>
+              {domainFilter === 'pending' ? 'Nothing waiting for review.' : 'No custom domain requests yet.'}
+            </Text>
+          ) : customDomains.map((d: any) => {
+            const statusLabel = d.live ? '✓ Live'
+              : d.approval_status === 'rejected' ? 'Rejected'
+              : d.verification_status === 'verified' ? '⏳ Awaiting review'
+              : d.verification_status === 'failed' ? 'Not verifying'
+              : 'Unverified'
+            const statusColor = d.live ? '#15803d'
+              : d.approval_status === 'rejected' || d.verification_status === 'failed' ? '#dc2626'
+              : d.verification_status === 'verified' ? '#b45309'
+              : c.textMuted
+            return (
+              <View key={d.id} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: c.text }}>{d.domain}</Text>
+                    <Text style={{ fontSize: 13, color: c.textMuted, marginTop: 2 }}>
+                      Requested by {d.display_name || d.username} · @{d.username}
+                    </Text>
+                    {!!d.verified_at && (
+                      <Text style={{ fontSize: 12, color: c.textLight, marginTop: 2 }}>
+                        Verified via {d.verification_method} on {new Date(d.verified_at).toLocaleDateString()}
+                      </Text>
+                    )}
+                    {!!d.last_error && d.verification_status === 'failed' && (
+                      <Text style={{ fontSize: 12, color: '#dc2626', marginTop: 2 }}>{d.last_error}</Text>
+                    )}
+                    {!!d.rejection_reason && (
+                      <Text style={{ fontSize: 12, color: c.textMuted, fontStyle: 'italic', marginTop: 2 }}>
+                        Reason: {d.rejection_reason}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: statusColor }}>{statusLabel}</Text>
+                </View>
+
+                {d.verification_status === 'verified' && d.approval_status === 'pending' && (
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                    <TouchableOpacity
+                      onPress={() => approveCustomDomain.mutate(d.id)}
+                      disabled={approveCustomDomain.isPending}
+                      style={[s.actionBtn, { backgroundColor: '#15803d', flex: 1 }]}>
+                      <Text style={{ color: 'white', fontSize: 14, fontWeight: '600' }}>Approve</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setRejectingDomain(rejectingDomain === d.id ? null : d.id)}
+                      style={[s.actionBtn, { borderWidth: 1, borderColor: c.border, backgroundColor: c.bg, flex: 1 }]}>
+                      <Text style={{ color: c.textMd, fontSize: 14, fontWeight: '600' }}>Reject</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {rejectingDomain === d.id && (
+                  <View style={[s.actionSection, { borderColor: c.border, marginTop: 10 }]}>
+                    <TextInput
+                      style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
+                      placeholder="Reason (shown to the user)" placeholderTextColor={c.textLight}
+                      value={domainRejectReasons[d.id] || ''}
+                      onChangeText={t => setDomainRejectReasons(f => ({ ...f, [d.id]: t }))}
+                    />
+                    <TouchableOpacity
+                      disabled={rejectCustomDomain.isPending}
+                      onPress={() => rejectCustomDomain.mutate({ id: d.id, reason: domainRejectReasons[d.id] || '' })}
+                      style={[s.actionBtn, { backgroundColor: '#ef4444' }]}>
+                      <Text style={{ color: 'white', fontSize: 14, fontWeight: '600' }}>Confirm reject</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )
+          })}
         </ScrollView>
       )}
 
