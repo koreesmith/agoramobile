@@ -295,6 +295,8 @@ export const adminApi = {
   getStats:       ()                             => api.get('/admin/stats'),
   listUsers:      (q?: string)                   => api.get('/admin/users', { params: { q } }),
   setRole:        (userID: string, role: string) => api.patch(`/admin/users/${userID}/role`, { role }),
+  deleteUser:         (userID: string)           => api.delete(`/admin/users/${userID}`),
+  resendVerification: (userID: string)           => api.post(`/admin/users/${userID}/resend-verification`),
   // Settings
   getSettings:    ()                             => api.get('/admin/settings'),
   updateSettings: (data: any)                    => api.patch('/admin/settings', data),

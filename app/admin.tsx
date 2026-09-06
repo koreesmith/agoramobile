@@ -194,6 +194,17 @@ export default function AdminScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
   })
 
+  const deleteUser = useMutation({
+    mutationFn: (id: string) => adminApi.deleteUser(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
+  })
+
+  const resendVerification = useMutation({
+    mutationFn: (id: string) => adminApi.resendVerification(id),
+    onSuccess: () => Alert.alert('Sent', 'Verification email resent.'),
+    onError: () => Alert.alert('Error', 'Failed to resend verification email.'),
+  })
+
   const approveWaitlist = useMutation({
     mutationFn: (id: string) => waitlistApi.approve(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-waitlist'] }),
@@ -671,6 +682,27 @@ export default function AdminScreen() {
                       ])}
                       style={[s.actionBtn, { backgroundColor: c.bg, borderWidth: 1, borderColor: c.border }]}>
                       <Text style={{ color: c.textMd, fontSize: 15, fontWeight: '600' }}>Change role</Text>
+                    </TouchableOpacity>
+
+                    {/* Resend verification */}
+                    {!u.email_verified && (
+                      <TouchableOpacity
+                        disabled={resendVerification.isPending}
+                        onPress={() => resendVerification.mutate(u.id)}
+                        style={[s.actionBtn, { backgroundColor: c.bg, borderWidth: 1, borderColor: c.border }]}>
+                        <Text style={{ color: c.textMd, fontSize: 15, fontWeight: '600' }}>Resend verification email</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Delete user */}
+                    <TouchableOpacity
+                      disabled={deleteUser.isPending}
+                      onPress={() => Alert.alert('Delete user?', `This will permanently delete @${u.username}.`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: () => deleteUser.mutate(u.id) },
+                      ])}
+                      style={[s.actionBtn, { backgroundColor: '#ef4444' }]}>
+                      <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>Delete user</Text>
                     </TouchableOpacity>
 
                     {/* Unsuspend / Unban quick actions */}
