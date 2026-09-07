@@ -470,12 +470,15 @@ export default function FeedScreen() {
   const pickVideo = async () => {
     if (videoUrl || videoProcessing) return
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      mediaTypes: ['videos'],
       allowsEditing: false,
     })
     if (result.canceled) return
     const asset = result.assets[0]
-    if (asset.duration && asset.duration > 120) {
+    // AMOBILE-187: asset.duration is milliseconds, not seconds. This was
+    // comparing it straight against 120 and rejecting every video with any
+    // real length at all.
+    if (asset.duration && asset.duration > 120_000) {
       Alert.alert('Video too long', 'Please select a video that is 2 minutes or less.')
       return
     }
