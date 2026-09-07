@@ -93,6 +93,9 @@ export default function ConnectionsScreen() {
   // account it was tapped for — this opens a per-account add/remove picker
   // instead, mirroring web's FriendListModal.
   const [listPickerFriend, setListPickerFriend] = useState<{ id: string; username: string; display_name?: string; avatar_url?: string; emojis?: Record<string, string> } | null>(null)
+  // AGORA-364: previews from directly federated Agora instances have no
+  // local id yet, so "sent" tracking keys off username@instance instead.
+  const [federatedSent, setFederatedSent] = useState<Set<string>>(new Set())
 
   const { data: friendsData, isLoading: fl, refetch: rf, isRefetching: rfr } = useQuery({ queryKey: ['friends'], queryFn: () => friendsApi.listFriends().then(r => r.data) })
   const { data: reqData, refetch: rr } = useQuery({ queryKey: ['requests'], queryFn: () => friendsApi.listRequests().then(r => r.data) })
@@ -117,11 +120,26 @@ export default function ConnectionsScreen() {
     },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not cancel the request'),
   })
+  // AGORA-364: resolves the preview through LookupUser first (the same
+  // handle-lookup path unified search uses), which creates the local stub
+  // and hands back an id, then sends the request against that id.
+  const addFederatedFriend = useMutation({
+    mutationFn: async (u: { username: string; instance: string }) => {
+      const res = await federationApi.lookupUser(`${u.username}@${u.instance}`)
+      const id = res.data?.user?.id
+      if (!id) throw new Error('could not resolve this account')
+      await friendsApi.sendRequest(id)
+      return u
+    },
+    onSuccess: (u) => setFederatedSent(prev => new Set(prev).add(`${u.username}@${u.instance}`)),
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not add this friend'),
+  })
 
   const friends = friendsData?.friends || []
   const incoming = reqData?.incoming || []
   const outgoing = reqData?.outgoing || []
   const discover = discoverData?.users || []
+  const federatedSuggestions: any[] = discoverData?.federated_suggestions || []
   const pendingCount = incoming.length
 
   const filtered = friends.filter((f: any) => !search || f.username.toLowerCase().includes(search.toLowerCase()) || (f.display_name || '').toLowerCase().includes(search.toLowerCase()))
@@ -330,8 +348,44 @@ export default function ConnectionsScreen() {
           dl ? <Spinner /> : (
             <FlatList data={discover} keyExtractor={(u: any) => u.id}
               refreshControl={<RefreshControl refreshing={false} onRefresh={dr} tintColor={c.primary} />}
-              ListEmptyComponent={<EmptyState icon="🔍" title="No suggestions" />}
-              ListFooterComponent={invitesEnabled ? <View style={{ height: 88 }} /> : null}
+              ListEmptyComponent={federatedSuggestions.length === 0 ? <EmptyState icon="🔍" title="No suggestions" /> : null}
+              ListFooterComponent={
+                <>
+                  {/* AGORA-364: previews from directly federated Agora
+                      instances, kept separate since they have no local id,
+                      mutual-friend count, or friend status the way the
+                      suggestions above do. */}
+                  {federatedSuggestions.length > 0 && (
+                    <View>
+                      <Text style={[s.sectionHeader, { color: c.textMuted }]}>On federated Agora instances</Text>
+                      {federatedSuggestions.map((u: any) => {
+                        const key = `${u.username}@${u.instance}`
+                        const sent = federatedSent.has(key)
+                        return (
+                          <View key={key} style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
+                            <Avatar url={u.avatar_url} name={u.display_name || u.username} size={44} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={[s.name, { color: c.text }]}>{u.display_name ? renderName(u.display_name, u.emojis) : u.username}</Text>
+                              <Text style={[s.username, { color: c.textMuted }]}>@{u.username}@{u.instance}</Text>
+                            </View>
+                            {sent ? (
+                              <Text style={{ fontSize: 13, color: c.textMuted, fontWeight: '500' }}>Sent</Text>
+                            ) : (
+                              <TouchableOpacity
+                                onPress={() => addFederatedFriend.mutate({ username: u.username, instance: u.instance })}
+                                disabled={addFederatedFriend.isPending}
+                                style={[s.acceptBtn, { backgroundColor: c.primary }]}>
+                                <Text style={s.acceptBtnText}>Add</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        )
+                      })}
+                    </View>
+                  )}
+                  {invitesEnabled && <View style={{ height: 88 }} />}
+                </>
+              }
               renderItem={({ item: u }) => <PersonRow user={u} right={
                 u.friend_status === 'pending' ? (
                   <TouchableOpacity onPress={() => cancelReq.mutate(u.id)} disabled={cancelReq.isPending}
@@ -858,6 +912,7 @@ const s = StyleSheet.create({
   searchWrap:    { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
   searchInput:   { flex: 1, fontSize: 16 },
   row:           { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
+  sectionHeader: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
   name:          { fontWeight: '600', fontSize: 16 },
   username:      { fontSize: 13 },
   acceptBtn:     { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
