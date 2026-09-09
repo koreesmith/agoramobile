@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, StyleSheet, Image } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { router } from 'expo-router'
-import { useAuthStore } from '../../store/auth'
+import { router, useLocalSearchParams } from 'expo-router'
+import { useAuthStore, MAX_ACCOUNTS } from '../../store/auth'
 import { authApi } from '../../api'
 import { useC } from '../../constants/ColorContext'
 
@@ -18,7 +18,15 @@ const FEATURED_INSTANCES = [
 
 export default function LoginScreen() {
   const c = useC()
-  const { setAuth } = useAuthStore()
+  const { addAccount, setAddingAccount } = useAuthStore()
+  // AMOBILE-191: ?add=1 means we came here to add another account, not to
+  // do a first sign-in. Tell the store so the (auth) redirect guard stands
+  // down while we're here.
+  const { add } = useLocalSearchParams<{ add?: string }>()
+  const isAdding = add === '1'
+  useEffect(() => {
+    if (isAdding) setAddingAccount(true)
+  }, [isAdding])
   const [instanceUrl, setInstanceUrl] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -62,7 +70,18 @@ export default function LoginScreen() {
     try {
       const res = await authApi.login(instanceUrl, username.trim(), password)
       const me = await authApi.meWithUrl(instanceUrl, res.data.token)
-      await setAuth(me.data, res.data.token, instanceUrl)
+      const result = await addAccount(me.data, res.data.token, instanceUrl)
+      if (result.status === 'limit') {
+        Alert.alert(
+          'Account limit reached',
+          `You can be signed in to ${MAX_ACCOUNTS} accounts at once. Remove one from Manage accounts, then try again.`,
+        )
+        return
+      }
+      if (result.status === 'exists') {
+        Alert.alert('Already signed in', `You're already signed in as @${me.data.username}. Switched to that account.`)
+      }
+      setAddingAccount(false)
       router.replace('/(tabs)')
     } catch (err: any) {
       const raw = err?.response?.data?.error || 'Login failed. Check your credentials.'
