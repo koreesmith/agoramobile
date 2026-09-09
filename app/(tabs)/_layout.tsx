@@ -9,6 +9,7 @@ import { useAuthStore } from '../../store/auth'
 import { notificationsApi, dmApi } from '../../api'
 import { light, dark } from '../../constants/colors'
 import { useThemeStore } from '../../store/theme'
+import AccountSwitcherModal from '../../components/AccountSwitcherModal'
 
 export default function TabsLayout() {
   const { isAuthenticated } = useAuthStore()
@@ -17,10 +18,17 @@ export default function TabsLayout() {
   const isDark = preference === 'dark' || (preference === 'system' && systemScheme === 'dark')
   const c = isDark ? dark : light
   const [notificationsReady, setNotificationsReady] = useState(false)
+  const [switcherOpen, setSwitcherOpen] = useState(false)
   const insets = useSafeAreaInsets()
 
   useEffect(() => {
     if (!isAuthenticated) router.replace('/(auth)')
+  }, [isAuthenticated])
+
+  // AMOBILE-191: landing back on the tabs means any add-account trip through
+  // the (auth) stack is over, whether it completed or was backed out of.
+  useEffect(() => {
+    if (isAuthenticated) useAuthStore.getState().setAddingAccount(false)
   }, [isAuthenticated])
 
   useEffect(() => {
@@ -50,26 +58,35 @@ export default function TabsLayout() {
   }, [unread, unreadData, notificationsReady])
 
   return (
-    <Tabs screenOptions={{
-      headerShown: false,
-      tabBarStyle: {
-        backgroundColor: c.card,
-        borderTopColor: c.border,
-        paddingBottom: Platform.OS === 'ios' ? 20 : insets.bottom + 8,
-        paddingTop: 8,
-        height: Platform.OS === 'ios' ? 84 : 64 + insets.bottom,
-      },
-      tabBarActiveTintColor: c.primary,
-      tabBarInactiveTintColor: c.textLight,
-      tabBarLabelStyle: { fontSize: 12, fontWeight: '500' },
-    }}>
-      <Tabs.Screen name="index" options={{ title: 'Feed', tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} /> }} />
-      <Tabs.Screen name="notifications" options={{ title: 'Alerts', tabBarIcon: ({ color, size }) => <Ionicons name="notifications-outline" size={size} color={color} />, tabBarBadge: unread > 0 ? (unread > 9 ? '9+' : unread) : undefined }} />
-      <Tabs.Screen name="groups" options={{ title: 'Groups', tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" size={size} color={color} /> }} />
-      <Tabs.Screen name="connections" options={{ title: 'Connections', tabBarIcon: ({ color, size }) => <Ionicons name="person-add-outline" size={size} color={color} /> }} />
-      <Tabs.Screen name="messages" options={{ title: 'Messages', tabBarIcon: ({ color, size }) => <Ionicons name="chatbubble-outline" size={size} color={color} />, tabBarBadge: unreadMessages > 0 ? (unreadMessages > 9 ? '9+' : unreadMessages) : undefined }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} /> }} />
-    </Tabs>
+    <>
+      <Tabs screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: c.card,
+          borderTopColor: c.border,
+          paddingBottom: Platform.OS === 'ios' ? 20 : insets.bottom + 8,
+          paddingTop: 8,
+          height: Platform.OS === 'ios' ? 84 : 64 + insets.bottom,
+        },
+        tabBarActiveTintColor: c.primary,
+        tabBarInactiveTintColor: c.textLight,
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '500' },
+      }}>
+        <Tabs.Screen name="index" options={{ title: 'Feed', tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} /> }} />
+        <Tabs.Screen name="notifications" options={{ title: 'Alerts', tabBarIcon: ({ color, size }) => <Ionicons name="notifications-outline" size={size} color={color} />, tabBarBadge: unread > 0 ? (unread > 9 ? '9+' : unread) : undefined }} />
+        <Tabs.Screen name="groups" options={{ title: 'Groups', tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" size={size} color={color} /> }} />
+        <Tabs.Screen name="connections" options={{ title: 'Connections', tabBarIcon: ({ color, size }) => <Ionicons name="person-add-outline" size={size} color={color} /> }} />
+        <Tabs.Screen name="messages" options={{ title: 'Messages', tabBarIcon: ({ color, size }) => <Ionicons name="chatbubble-outline" size={size} color={color} />, tabBarBadge: unreadMessages > 0 ? (unreadMessages > 9 ? '9+' : unreadMessages) : undefined }} />
+        {/* AMOBILE-192: press and hold Profile to switch accounts. A normal
+            tap still just opens the Profile tab. */}
+        <Tabs.Screen
+          name="profile"
+          options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} /> }}
+          listeners={{ tabLongPress: () => setSwitcherOpen(true) }}
+        />
+      </Tabs>
+      <AccountSwitcherModal visible={switcherOpen} onClose={() => setSwitcherOpen(false)} />
+    </>
   )
 }
 
