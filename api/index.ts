@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/auth'
+import { useToastStore } from '../store/toast'
 
 // Create a dynamic axios instance that reads instanceUrl from store at call time
 const api = axios.create()
@@ -15,7 +16,28 @@ api.interceptors.response.use(
   r => r,
   err => {
     if (err.response?.status === 401) {
-      useAuthStore.getState().logout()
+      // AMOBILE-196: a 401 expires one account's session, not the app.
+      // Drop only the account the request went out as (match on its token,
+      // then its instance), promote another if that one was active, and
+      // fall back to a full logout only if nothing matched.
+      const store = useAuthStore.getState()
+      const auth = err.config?.headers?.Authorization as string | undefined
+      const bearer = auth?.replace(/^Bearer\s+/i, '')
+      const baseURL = err.config?.baseURL as string | undefined
+      const hit =
+        store.accounts.find(a => a.token === bearer) ||
+        store.accounts.find(a => baseURL && baseURL.startsWith(a.instanceUrl)) ||
+        store.accounts.find(a => a.id === store.activeAccountId)
+      if (hit) {
+        const wasActive = hit.id === store.activeAccountId
+        const hadOthers = store.accounts.length > 1
+        store.removeAccount(hit.id)
+        if (wasActive && hadOthers) {
+          useToastStore.getState().show(`Signed out of @${hit.user.username} — the session expired`, 'error')
+        }
+      } else {
+        store.logout()
+      }
     }
     return Promise.reject(err)
   }
