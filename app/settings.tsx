@@ -11,6 +11,7 @@ import { Screen } from '../components/ui'
 import { usersApi, authApi, instanceApi, interactionsApi } from '../api'
 import { resetWhatsNew } from '../components/WhatsNewModal'
 import { useAuthStore } from '../store/auth'
+import { promptSignOut } from '../utils/signOut'
 import { useWhatsNewStore } from '../store/whatsNew'
 import { useToastStore } from '../store/toast'
 import { C } from '../constants/colors'
@@ -23,7 +24,8 @@ export default function SettingsScreen() {
   const c = useC()
   const qc = useQueryClient()
   const showToast = useToastStore(s => s.show)
-  const { user, updateUser, logout } = useAuthStore()
+  const { user, updateUser } = useAuthStore()
+  const accountCount = useAuthStore((s) => s.accounts.length)
   const { preference, setPreference } = useThemeStore()
   const { enabled: diagnostics, setEnabled: setDiagnostics } = useDiagnosticsStore()
   const [currentPassword, setCurrentPassword] = useState('')
@@ -242,6 +244,14 @@ export default function SettingsScreen() {
       <ScrollView>
         <Text style={[s.section, { color: c.textMuted }]}>Account</Text>
         <Row icon="person-outline" label="Edit profile" onPress={() => router.push('/edit-profile')} />
+        <Row
+          icon="people-circle-outline"
+          label="Accounts"
+          onPress={() => router.push('/manage-accounts')}
+          right={accountCount > 1
+            ? <Text style={{ color: c.textLight, fontSize: 15 }}>{accountCount}</Text>
+            : undefined}
+        />
         <Row icon="people-outline" label="Friend lists" onPress={() => router.push('/friend-lists')} />
         <Row icon="ban-outline" label="Blocked users" onPress={() => router.push('/blocked-users')} />
         {/* AGORA-309: sits next to blocked users, since both are things the
@@ -364,10 +374,7 @@ export default function SettingsScreen() {
         <Row icon="server-outline" label={`Instance: ${useAuthStore.getState().instanceUrl?.replace(/^https?:\/\//, '')}`} onPress={() => {}} right={<View />} />
         <Row icon="information-circle-outline" label={`Version ${Constants.expoConfig?.version ?? '—'}`} onPress={() => {}} right={<View />} />
         <View style={{ marginTop: 8 }}>
-          <Row icon="log-out-outline" label="Sign out" destructive onPress={() => Alert.alert('Sign out?', undefined, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Sign out', style: 'destructive', onPress: logout },
-          ])} right={<View />} />
+          <Row icon="log-out-outline" label={accountCount > 1 ? 'Sign out…' : 'Sign out'} destructive onPress={promptSignOut} right={<View />} />
         </View>
       </ScrollView>
     </Screen>
