@@ -5,10 +5,9 @@ import { useColorScheme, StyleSheet, View, AppState, AppStateStatus } from 'reac
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import * as Notifications from 'expo-notifications'
-import * as Device from 'expo-device'
 import * as SecureStore from 'expo-secure-store'
 import { useAuthStore } from '../store/auth'
-import { usersApi } from '../api'
+import { registerActivePush, clearPushForAccount } from '../utils/push'
 import { ColorProvider } from '../constants/ColorContext'
 import { useThemeStore } from '../store/theme'
 import { useBlockStore } from '../store/blocks'
@@ -63,12 +62,14 @@ AppState.addEventListener('change', (status: AppStateStatus) => {
 
 function AppContent() {
   const { isAuthenticated, loadFromStorage } = useAuthStore()
+  const activeAccountId = useAuthStore((s) => s.activeAccountId)
   const { loadPreference } = useThemeStore()
   const { loadBlocked } = useBlockStore()
   const { loadPreference: loadDiagnosticsPreference } = useDiagnosticsStore()
   const scheme = useColorScheme()
   const notifListener = useRef<any>()
   const responseListener = useRef<any>()
+  const lastSeenAccountRef = useRef<string | null>(null)
 
   useEffect(() => {
     // Synchronous reads — avoids async generator execution in Hermes at startup
@@ -87,14 +88,36 @@ function AppContent() {
     return () => clearTimeout(t)
   }, [])
 
+  // AMOBILE-194: the Expo push token follows the active account. Whenever the
+  // active account settles, register it and best-effort clear the token from
+  // every other account, so only one server ever pushes to this device (and
+  // rapid switching can't strand a token on the wrong account). Still
+  // deferred past the startup HadesGC crash window on iOS 26.3.1 — calling
+  // getExpoPushTokenAsync() immediately at startup generates a native ObjC
+  // exception that React Native cannot catch on the bridge queue.
   useEffect(() => {
     if (!isAuthenticated) return
-    // Defer past the startup HadesGC crash window on iOS 26.3.1 — calling
-    // getExpoPushTokenAsync() immediately at startup generates a native ObjC
-    // exception that React Native cannot catch on the bridge queue.
-    const t = setTimeout(registerForPushNotifications, 1500)
+    const t = setTimeout(() => {
+      const { accounts, activeAccountId: aid } = useAuthStore.getState()
+      for (const a of accounts) {
+        if (a.id !== aid) clearPushForAccount(a)
+      }
+      registerActivePush(aid)
+    }, 1500)
     return () => clearTimeout(t)
-  }, [isAuthenticated])
+  }, [isAuthenticated, activeAccountId])
+
+  // AMOBILE-195: a switch changes identity for every account-scoped query,
+  // so drop the cache rather than let the previous account's data linger.
+  // Only a genuine A -> B switch clears; login (null -> A) and logout
+  // (A -> null) do not.
+  useEffect(() => {
+    const prev = lastSeenAccountRef.current
+    lastSeenAccountRef.current = activeAccountId
+    if (prev && activeAccountId && prev !== activeAccountId) {
+      queryClient.clear()
+    }
+  }, [activeAccountId])
 
   // AMOBILE-182: resume a group-invite redemption that had to pause for
   // login. 'agora_pending_invite' must match app/invite/[token].tsx's key.
@@ -202,20 +225,3 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
 })
-
-async function registerForPushNotifications() {
-  if (!Device.isDevice) return
-  const { status: existing } = await Notifications.getPermissionsAsync()
-  let finalStatus = existing
-  if (existing !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync({
-      ios: { allowAlert: true, allowBadge: true, allowSound: true },
-    })
-    finalStatus = status
-  }
-  if (finalStatus !== 'granted') return
-  try {
-    const token = (await Notifications.getExpoPushTokenAsync()).data
-    await usersApi.updateProfile({ expo_push_token: token })
-  } catch {}
-}
