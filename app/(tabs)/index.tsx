@@ -93,6 +93,13 @@ export default function FeedScreen() {
   const [pollExpiresHours, setPollExpiresHours] = useState(24)
   const [visibility, setVisibility] = useState<'public'|'friends'|'group'>('friends')
   const [friendListId, setFriendListId] = useState('')
+  // AMOBILE-198: per-post network targeting, only meaningful for Public.
+  // All three default on — the untouched state that sends the same payload
+  // (no federate_activitypub/federate_atproto/external_only at all) as
+  // before this control existed.
+  const [agoraEnabled, setAgoraEnabled] = useState(true)
+  const [federateAP, setFederateAP] = useState(true)
+  const [federateATProto, setFederateATProto] = useState(true)
   const [showVisibilitySheet, setShowVisibilitySheet] = useState(false)
   const [showListSheet, setShowListSheet] = useState(false)
   const [linkPreview, setLinkPreview] = useState<{url:string,title:string,description:string,image:string,domain:string}|null>(null)
@@ -178,6 +185,7 @@ export default function FeedScreen() {
     setShowPoll(false); setPollOptions(['', '']); setPollMultiple(false)
     setPollAllowsNew(false); setPollExpiresHours(24)
     setVisibility('friends'); setFriendListId('')
+    setAgoraEnabled(true); setFederateAP(true); setFederateATProto(true)
     setLinkPreview(null); setLinkFetching(false)
     setPostAsPageSlug(null)
     setMentionQuery(null); setBlueskyQuery(null); setFediverseQuery(null)
@@ -352,6 +360,25 @@ export default function FeedScreen() {
   const posts = (data?.pages.flatMap(p => p?.posts ?? []) ?? [])
     .filter((p: any) => p && !blockedIds.includes(p.author_id))
 
+  // AMOBILE-198: same source app/settings.tsx already reads these two off
+  // of, rather than a fresh fetch — matches this file's own existing
+  // (user as any)?.atproto_enabled use for the poll/Bluesky hint below.
+  const apEnabled = (user as any)?.activitypub_enabled
+  const atprotoEnabled = (user as any)?.atproto_enabled
+  // At least one of Agora/Fediverse/Bluesky must stay on — turning all of
+  // them off would post nowhere at all. Irrelevant outside Public, where the
+  // targeting control isn't shown and the three flags stay at their default
+  // "on".
+  const validTargeting = visibility !== 'public' || agoraEnabled || federateAP || federateATProto
+  // Omit the targeting fields entirely when the author left the control at
+  // its default (everything on, or posting as a page, which never shows the
+  // control at all) — the payload for anyone who never touches it is
+  // exactly what it was before this control existed.
+  const usingDefaultTargeting = agoraEnabled && federateAP && federateATProto
+  const targeting = !postAsPageSlug && visibility === 'public' && !usingDefaultTargeting
+    ? { federate_activitypub: federateAP, federate_atproto: federateATProto, external_only: !agoraEnabled }
+    : {}
+
   const postData = {
     content,
     image_url: imageUrls[0] || '',
@@ -370,6 +397,7 @@ export default function FeedScreen() {
     link_description: linkPreview?.description ?? '',
     link_image: linkPreview?.image ?? '',
     link_domain: linkPreview?.domain ?? '',
+    ...targeting,
   }
 
   const createPost = useMutation({
@@ -707,8 +735,8 @@ export default function FeedScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => createPost.mutate()}
-                disabled={(!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || createPost.isPending || videoProcessing}
-                style={[s.submitBtn, ((!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || videoProcessing) && s.submitBtnDisabled]}
+                disabled={(!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || !validTargeting || createPost.isPending || videoProcessing}
+                style={[s.submitBtn, ((!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || !validTargeting || videoProcessing) && s.submitBtnDisabled]}
               >
                 <Text style={s.submitBtnText}>{createPost.isPending ? '…' : 'Post'}</Text>
               </TouchableOpacity>
@@ -778,6 +806,11 @@ export default function FeedScreen() {
                       onPress={() => {
                         setVisibility(opt.value as any)
                         if (opt.value !== 'group') setFriendListId('')
+                        // AMOBILE-198: the targeting control only ever applies
+                        // to Public — reset it going into or out of that
+                        // visibility so a choice made earlier can't linger
+                        // and silently apply to a later post.
+                        if (opt.value !== 'public') { setAgoraEnabled(true); setFederateAP(true); setFederateATProto(true) }
                         setShowVisibilitySheet(false)
                         if (opt.value === 'group') setShowListSheet(true)
                       }}
@@ -831,6 +864,36 @@ export default function FeedScreen() {
                   warning on every one of them trains people to ignore it,
                   which costs the warning its value on the post that needs it. */}
               <AudienceReach list={visibility === 'group' ? selectedFriendList : null} />
+
+              {/* AMOBILE-198: per-post network targeting, offered only for
+                  Public — Friends/Friend List posts can't reach an external
+                  network at all, so the control stays hidden there rather
+                  than offering choices that would do nothing. Hidden
+                  entirely when the account has neither network enabled:
+                  there is nothing to choose between, only Agora. */}
+              {visibility === 'public' && (apEnabled || atprotoEnabled) && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8 }}>
+                  <Text style={{ fontSize: 13, color: c.textMuted }}>Post to:</Text>
+                  <NetworkChip label="Agora" active={agoraEnabled} onPress={() => setAgoraEnabled(v => !v)} c={c} />
+                  {apEnabled && (
+                    <NetworkChip label="Fediverse" active={federateAP} onPress={() => setFederateAP(v => !v)} c={c} />
+                  )}
+                  {atprotoEnabled && (
+                    <NetworkChip label="Bluesky" active={federateATProto} onPress={() => setFederateATProto(v => !v)} c={c} />
+                  )}
+                </View>
+              )}
+              {visibility === 'public' && !agoraEnabled && (
+                <Text style={{ fontSize: 13, color: validTargeting ? c.textMuted : c.red, paddingHorizontal: 16, paddingBottom: 8 }}>
+                  {!validTargeting
+                    ? 'Pick at least one place for this post to go.'
+                    : federateAP && federateATProto
+                    ? 'This post will only appear on the Fediverse and Bluesky, not on Agora.'
+                    : federateAP
+                    ? 'This post will only appear on the Fediverse, not on Agora.'
+                    : 'This post will only appear on Bluesky, not on Agora.'}
+                </Text>
+              )}
             </>
           )}
 
@@ -1060,6 +1123,22 @@ export default function FeedScreen() {
         </View>
       </Modal>
     </Screen>
+  )
+}
+
+// NetworkChip is one toggle in AMOBILE-198's network-targeting control.
+function NetworkChip({ label, active, onPress, c }: { label: string; active: boolean; onPress: () => void; c: any }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={{
+        paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1,
+        borderColor: active ? c.primary : c.border,
+        backgroundColor: active ? c.primaryBg : 'transparent',
+      }}
+    >
+      <Text style={{ fontSize: 13, fontWeight: '500', color: active ? c.primary : c.textMuted }}>{label}</Text>
+    </TouchableOpacity>
   )
 }
 
