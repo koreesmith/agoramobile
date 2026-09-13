@@ -501,7 +501,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               )}
               {pronouns ? <Text style={[s.pronouns, { color: c.textLight }]}>({pronouns})</Text> : null}
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
               <Text style={[s.authorMeta, { color: c.textMuted }]}>
                 {[
                   isPagePost ? (post.page_type || 'Page') : handle(username, post.is_remote, post.remote_instance),
@@ -517,6 +517,16 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 size={11}
                 color={c.textLight}
               />
+              {/* AMOBILE-199/AGORA-372: only ever set on the viewer's own
+                  view of an external_only post — no other viewer's post
+                  list can contain one of these rows. Renders the server's
+                  own label rather than re-deriving it from federate_ap/
+                  federate_atproto, so the wording stays in one place. */}
+              {post.external_only && post.only_on && (
+                <View style={{ backgroundColor: c.primaryBg, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '500', color: c.primary }}>{post.only_on}</Text>
+                </View>
+              )}
             </View>
           </View>
           <TouchableOpacity onPress={() => setShowMenu(true)} style={{ padding: 4 }}>
