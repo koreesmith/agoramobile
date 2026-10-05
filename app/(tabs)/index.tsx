@@ -24,6 +24,7 @@ import { useWhatsNewStore } from '../../store/whatsNew'
 
 import { C } from '../../constants/colors'
 import { useC } from '../../constants/ColorContext'
+import { findFirstUrl } from '../../utils/linkify'
 
 // AMOBILE-167: the feed the user was last reading, so relaunching the app does
 // not silently drop them back to Home. Mirrors the /feed?f=<id> URL state the
@@ -55,8 +56,6 @@ function isGifUrl(url: string): boolean {
   }
   return false
 }
-
-const URL_RE = /https?:\/\/[^\s]+/g
 
 // Max gap between two Feed tab presses to count as a double tap.
 const DOUBLE_TAP_MS = 300
@@ -210,9 +209,10 @@ export default function FeedScreen() {
   // Auto-detect URLs pasted into content: GIFs become inline images, others become link preview cards
   useEffect(() => {
     if (imageUrls.length > 0) return
-    const match = content.match(URL_RE)
-    if (!match) return
-    const url = match[0].replace(/[.,!?)]+$/, '')
+    // First URL, scheme-less ones like bit.ly/... included (AMOBILE-200).
+    const found = findFirstUrl(content)
+    if (!found) return
+    const url = found.href
 
     if (isGifUrl(url)) {
       // Call preview API to resolve share URLs (tenor.com/xPpM.gif) to direct media URLs
@@ -220,10 +220,10 @@ export default function FeedScreen() {
         const preview = res.data
         const resolvedUrl = preview?.image || url
         setImageUrls([resolvedUrl])
-        setContent(c => c.replace(url, '').trim())
+        setContent(c => c.replace(found.text, '').trim())
       }).catch(() => {
         setImageUrls([url])
-        setContent(c => c.replace(url, '').trim())
+        setContent(c => c.replace(found.text, '').trim())
       })
       return
     }

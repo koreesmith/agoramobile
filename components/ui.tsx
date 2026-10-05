@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
 import { imgUrl } from '../api'
+import { URL_TOKEN, linkHref, trimUrl } from '../utils/linkify'
 
 /**
  * `locked` (AMOBILE-171) marks a fediverse account that approves follow
@@ -59,11 +60,12 @@ export function Avatar({ url, name, size = 40, online, locked }: { url?: string;
 // linkifying URLs. The dotted alternatives must come before the bare-local
 // one so a full remote handle is captured as one token rather than just its
 // @handle portion (AGORA-163 hit the equivalent ordering bug server-side).
-const LINK_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+|@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+|@[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)+|@[a-zA-Z0-9_-]+|\+[a-zA-Z0-9_-]+|#[a-zA-Z0-9_]+|:[a-zA-Z0-9_]+:)/g
+// URLs include scheme-less ones like bit.ly/... (AMOBILE-200, see
+// utils/linkify).
+const LINK_REGEX = new RegExp(`(${URL_TOKEN}|@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9.-]+|@[a-zA-Z0-9_-]+(?:\\.[a-zA-Z0-9_-]+)+|@[a-zA-Z0-9_-]+|\\+[a-zA-Z0-9_-]+|#[a-zA-Z0-9_]+|:[a-zA-Z0-9_]+:)`, 'g')
 const MENTION_RE = /^@[a-zA-Z0-9_-]+$|^@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+$|^@[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)+$/
 const GROUP_TAG_RE = /^\+[a-zA-Z0-9_-]+$/
 const HASHTAG_RE = /^#[a-zA-Z0-9_]+$/
-const URL_PART_RE = /^https?:\/\//i
 const EMOJI_RE = /^:[a-zA-Z0-9_]+:$/
 
 // AGORA-258: Mastodon custom emoji — a shortcode like ":stl_blues:" in a
@@ -123,11 +125,17 @@ export function LinkedText({ text, style, linkStyle, emojis, numberOfLines }: { 
         if (emojis && EMOJI_RE.test(part) && emojis[part]) {
           return emojiImg(part, emojis[part], i)
         }
-        if (URL_PART_RE.test(part)) {
+        // Odd indexes are the captured tokens; even ones are the text between.
+        const url = trimUrl(part)
+        const href = i % 2 === 1 && url ? linkHref(url, parts[i - 1] || parts[i - 2] || '') : null
+        if (href) {
           return (
-            <Text key={i} style={[{ color: '#3b82f6', textDecorationLine: 'underline' }, linkStyle]}
-              onPress={() => Linking.openURL(part)}>
-              {part}
+            <Text key={i}>
+              <Text style={[{ color: '#3b82f6', textDecorationLine: 'underline' }, linkStyle]}
+                onPress={() => Linking.openURL(href)}>
+                {url}
+              </Text>
+              {part.slice(url.length)}
             </Text>
           )
         }
