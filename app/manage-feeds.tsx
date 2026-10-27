@@ -289,8 +289,8 @@ export default function ManageFeedsScreen() {
           }
           ListFooterComponent={
             <TouchableOpacity onPress={openCreate} style={[s.createBtn, { backgroundColor: c.primary }]}>
-              <Ionicons name="add" size={18} color="white" />
-              <Text style={s.createBtnText}>New Feed</Text>
+              <Ionicons name="add" size={18} color={c.onPrimary} />
+              <Text style={[s.createBtnText, { color: c.onPrimary }]}>New Feed</Text>
             </TouchableOpacity>
           }
           contentContainerStyle={{ paddingBottom: 24 }}

@@ -100,7 +100,7 @@ export default function CustomDomainScreen() {
                   disabled={claim.isPending || !domain.trim()}
                   style={[s.btn, { backgroundColor: (!domain.trim() || claim.isPending) ? c.primaryLt : c.primary }]}
                 >
-                  <Text style={s.btnText}>{claim.isPending ? 'Saving…' : 'Continue'}</Text>
+                  <Text style={[s.btnText, { color: c.onPrimary }]}>{claim.isPending ? 'Saving…' : 'Continue'}</Text>
                 </TouchableOpacity>
                 <Text style={[s.hint, { color: c.textLight }]}>
                   Enter the domain itself, not a URL. You'll get a record to add at your DNS provider on the next
@@ -150,7 +150,7 @@ export default function CustomDomainScreen() {
                       disabled={verify.isPending}
                       style={[s.btn, { backgroundColor: c.primary, flex: 1 }]}
                     >
-                      <Text style={s.btnText}>{verify.isPending ? 'Checking…' : 'Check verification'}</Text>
+                      <Text style={[s.btnText, { color: c.onPrimary }]}>{verify.isPending ? 'Checking…' : 'Check verification'}</Text>
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity

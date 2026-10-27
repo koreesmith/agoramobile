@@ -11,7 +11,7 @@ import { markWhatsNewSeen } from '../components/WhatsNewModal'
 import { useC } from '../constants/ColorContext'
 import { ALL_STEPS } from '../components/welcome/steps'
 import { meQueryKey, useMe } from '../components/welcome/useMe'
-import { WizButton, useIsDark } from '../components/welcome/parts'
+import { WizButton } from '../components/welcome/parts'
 import type { FinishTo, InstanceInfo, StepId, StepProps, WizardNotes } from '../components/welcome/types'
 
 // AMOBILE-202: the getting started wizard (AMOBILE-201), the mobile
@@ -23,7 +23,6 @@ const EMPTY_NOTES: WizardNotes = { domainReminder: false, requestsSent: 0, follo
 
 export default function WelcomeScreen() {
   const c = useC()
-  const isDark = useIsDark()
   const qc = useQueryClient()
   const insets = useSafeAreaInsets()
   const accountId = useAuthStore((s) => s.activeAccountId)
@@ -130,7 +129,7 @@ export default function WelcomeScreen() {
             <View style={[s.logo, { backgroundColor: c.primary }]}>
               {logo
                 ? <Image source={{ uri: logo }} style={s.logoImage} />
-                : <Text style={[s.logoLetter, { color: isDark ? c.bg : c.white }]}>{instanceName[0]?.toUpperCase()}</Text>}
+                : <Text style={[s.logoLetter, { color: c.onPrimary }]}>{instanceName[0]?.toUpperCase()}</Text>}
             </View>
             <Text numberOfLines={1} style={[s.brandName, { color: c.text }]}>{instanceName}</Text>
           </View>

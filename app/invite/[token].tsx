@@ -69,7 +69,7 @@ export default function InviteScreen() {
             <Text style={[s.title, { color: c.text }]}>You're in!</Text>
             <Text style={[s.msg, { color: c.textMuted }]}>You've successfully joined the group.</Text>
             <TouchableOpacity style={[s.btn, { backgroundColor: c.primary }]} onPress={goToGroup}>
-              <Text style={s.btnText}>Go to Group</Text>
+              <Text style={[s.btnText, { color: c.onPrimary }]}>Go to Group</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -80,7 +80,7 @@ export default function InviteScreen() {
             <Text style={[s.title, { color: c.text }]}>Already a member</Text>
             <Text style={[s.msg, { color: c.textMuted }]}>You're already in this group.</Text>
             <TouchableOpacity style={[s.btn, { backgroundColor: c.primary }]} onPress={goToGroup}>
-              <Text style={s.btnText}>{slug ? 'Go to Group' : 'Browse Groups'}</Text>
+              <Text style={[s.btnText, { color: c.onPrimary }]}>{slug ? 'Go to Group' : 'Browse Groups'}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -91,7 +91,7 @@ export default function InviteScreen() {
             <Text style={[s.title, { color: c.text }]}>Invite not valid</Text>
             <Text style={[s.msg, { color: c.textMuted }]}>{errorMsg}</Text>
             <TouchableOpacity style={[s.btn, { backgroundColor: c.primary }]} onPress={() => router.replace('/(tabs)/groups')}>
-              <Text style={s.btnText}>Browse Groups</Text>
+              <Text style={[s.btnText, { color: c.onPrimary }]}>Browse Groups</Text>
             </TouchableOpacity>
           </View>
         )}

@@ -74,10 +74,10 @@ export default function InviteFriendScreen() {
           disabled={!email.trim() || send.isPending}
         >
           {send.isPending
-            ? <ActivityIndicator color="white" />
+            ? <ActivityIndicator color={c.onPrimary} />
             : <>
-                <Ionicons name="send" size={16} color="white" />
-                <Text style={s.btnText}>Send invitation</Text>
+                <Ionicons name="send" size={16} color={c.onPrimary} />
+                <Text style={[s.btnText, { color: c.onPrimary }]}>Send invitation</Text>
               </>
           }
         </TouchableOpacity>

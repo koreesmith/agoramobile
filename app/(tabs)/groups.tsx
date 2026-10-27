@@ -188,7 +188,7 @@ export default function GroupsScreen() {
                 disabled={!newName.trim() || createGroup.isPending}
                 style={[s.modalBtn, { backgroundColor: (!newName.trim() || createGroup.isPending) ? c.primaryLt : c.primary, borderColor: 'transparent' }]}
               >
-                <Text style={{ color: 'white', fontWeight: '600' }}>{createGroup.isPending ? 'Creating…' : 'Create'}</Text>
+                <Text style={{ color: c.onPrimary, fontWeight: '600' }}>{createGroup.isPending ? 'Creating…' : 'Create'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -223,7 +223,7 @@ export default function GroupsScreen() {
                 disabled={!inviteInput.trim()}
                 style={[s.modalBtn, { backgroundColor: !inviteInput.trim() ? c.primaryLt : c.primary, borderColor: 'transparent' }]}
               >
-                <Text style={{ color: 'white', fontWeight: '600' }}>Join</Text>
+                <Text style={{ color: c.onPrimary, fontWeight: '600' }}>Join</Text>
               </TouchableOpacity>
             </View>
           </View>

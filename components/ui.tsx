@@ -46,7 +46,7 @@ export function Avatar({ url, name, size = 40, online, locked }: { url?: string;
             backgroundColor: c.primary, borderColor: c.card,
           }]}
         >
-          <Ionicons name="lock-closed" size={Math.round(lockSize * 0.6)} color="white" />
+          <Ionicons name="lock-closed" size={Math.round(lockSize * 0.6)} color={c.onPrimary} />
         </View>
       )}
     </View>

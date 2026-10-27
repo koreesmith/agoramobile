@@ -104,7 +104,7 @@ export default function AllSetStep({ steps, instance, me, notes, goTo, back, fin
     <StepScroll>
       <View style={{ gap: 12 }}>
         <View style={[st.check, { backgroundColor: c.primary }]}>
-          <Ionicons name="checkmark" size={28} color={isDark ? c.bg : c.white} />
+          <Ionicons name="checkmark" size={28} color={c.onPrimary} />
         </View>
         <StepHeader title={`You're all set, ${firstName}`}>
           Here's a quick recap. Anything here can be changed later in Settings.

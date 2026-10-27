@@ -118,7 +118,7 @@ export default function UserAlbumsScreen() {
             <Text style={[s.emptyText, { color: c.textLight }]}>No albums yet</Text>
             {isSelf && (
               <TouchableOpacity onPress={openCreate} style={[s.createBtn, { backgroundColor: c.primary }]}>
-                <Text style={s.createBtnText}>Create album</Text>
+                <Text style={[s.createBtnText, { color: c.onPrimary }]}>Create album</Text>
               </TouchableOpacity>
             )}
           </View>

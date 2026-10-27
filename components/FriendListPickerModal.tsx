@@ -155,7 +155,7 @@ export default function FriendListPickerModal({ friend, visible, onClose }: {
                   style={[s.listRow, { backgroundColor: isSelected ? c.primaryBg : 'transparent', borderBottomColor: c.border }]}
                 >
                   <View style={[s.checkbox, { borderColor: isSelected ? c.primary : c.border, backgroundColor: isSelected ? c.primary : 'transparent' }]}>
-                    {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
+                    {isSelected && <Ionicons name="checkmark" size={12} color={c.onPrimary} />}
                   </View>
                   <Text style={[s.listName, { color: c.text }]}>{list.name}</Text>
                   <Text style={[s.listMeta, { color: c.textMuted }]}>
@@ -182,7 +182,7 @@ export default function FriendListPickerModal({ friend, visible, onClose }: {
             disabled={!newListName.trim() || createList.isPending}
             style={[s.addBtn, { backgroundColor: c.primary }, (!newListName.trim() || createList.isPending) && { opacity: 0.5 }]}
           >
-            <Ionicons name="add" size={18} color="#fff" />
+            <Ionicons name="add" size={18} color={c.onPrimary} />
           </TouchableOpacity>
         </View>
 
@@ -195,7 +195,7 @@ export default function FriendListPickerModal({ friend, visible, onClose }: {
             disabled={saving || !membershipLoaded}
             style={[s.saveBtn, { backgroundColor: c.primary }, (saving || !membershipLoaded) && { opacity: 0.5 }]}
           >
-            <Text style={s.saveText}>{saving ? 'Saving…' : hasChanges ? 'Save changes' : 'Done'}</Text>
+            <Text style={[s.saveText, { color: c.onPrimary }]}>{saving ? 'Saving…' : hasChanges ? 'Save changes' : 'Done'}</Text>
           </TouchableOpacity>
         </View>
       </View>

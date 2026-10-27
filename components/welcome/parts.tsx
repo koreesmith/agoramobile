@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, ScrollView, Switch, StyleSheet, type Styl
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useC, useIsDark } from '../../constants/ColorContext'
-import { dark } from '../../constants/colors'
 
 // AMOBILE-202: building blocks shared by the getting started wizard's steps,
 // the mobile counterpart of web's WizardParts.
@@ -54,10 +53,7 @@ export function WizButton({ label, onPress, variant = 'primary', icon, iconRight
   style?: StyleProp<ViewStyle>
 }) {
   const c = useC()
-  const isDark = useIsDark()
-  // The dark palette's primary is a light blue, which white text on top of
-  // would barely contrast with.
-  const fg = variant === 'primary' ? (isDark ? c.bg : c.white) : c.primary
+  const fg = variant === 'primary' ? c.onPrimary : c.primary
   const bg = variant === 'primary' ? c.primary : variant === 'secondary' ? c.primaryBg : 'transparent'
   return (
     <TouchableOpacity onPress={onPress} disabled={disabled} accessibilityRole="button"
@@ -165,7 +161,7 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
           <TouchableOpacity key={o.value} onPress={() => onChange(o.value)} accessibilityRole="radio"
             accessibilityState={{ selected }}
             style={[p.segment, selected && { backgroundColor: c.primary }]}>
-            <Text style={[p.segmentText, { color: selected ? (c === dark ? c.bg : c.white) : c.textMuted }]}>{o.label}</Text>
+            <Text style={[p.segmentText, { color: selected ? c.onPrimary : c.textMuted }]}>{o.label}</Text>
           </TouchableOpacity>
         )
       })}

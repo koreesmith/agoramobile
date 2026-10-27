@@ -92,7 +92,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
                 <TouchableOpacity onPress={() => edit.mutate()} disabled={!editContent.trim() || edit.isPending}
                   style={[s.actionBtn, { backgroundColor: c.primary, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6 }]}>
-                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>{edit.isPending ? 'Saving…' : 'Save'}</Text>
+                  <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>{edit.isPending ? 'Saving…' : 'Save'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => { setIsEditing(false); setEditContent(comment.content) }} style={[s.actionBtn, { paddingHorizontal: 12, paddingVertical: 5 }]}>
                   <Text style={{ color: c.textMuted, fontSize: 15 }}>Cancel</Text>

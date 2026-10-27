@@ -220,7 +220,7 @@ export default function ManageGroupScreen() {
         disabled={updateGroup.isPending || !name.trim()}
         style={[s.saveBtn, { backgroundColor: (!name.trim() || updateGroup.isPending) ? c.primaryLt : c.primary }]}
       >
-        <Text style={s.saveBtnText}>{updateGroup.isPending ? 'Saving…' : 'Save Changes'}</Text>
+        <Text style={[s.saveBtnText, { color: c.onPrimary }]}>{updateGroup.isPending ? 'Saving…' : 'Save Changes'}</Text>
       </TouchableOpacity>
 
       <View style={[s.divider, { backgroundColor: c.border }]} />
@@ -320,7 +320,7 @@ export default function ManageGroupScreen() {
                 disabled={!addUsername.trim() || addMember.isPending}
                 style={[s.modalBtn, { backgroundColor: c.primary, borderColor: c.primary }]}
               >
-                <Text style={{ color: 'white', fontWeight: '600' }}>{addMember.isPending ? '…' : 'Add'}</Text>
+                <Text style={{ color: c.onPrimary, fontWeight: '600' }}>{addMember.isPending ? '…' : 'Add'}</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -146,7 +146,7 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
             disabled={!newOptionText.trim() || addOption.isPending}
             style={[pw.addBtn, { backgroundColor: c.primary }]}
           >
-            <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>
+            <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>
               {addOption.isPending ? '…' : 'Add'}
             </Text>
           </TouchableOpacity>

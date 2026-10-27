@@ -109,7 +109,7 @@ export default function WallScreen() {
                     disabled={!content.trim() || posting}
                     style={[s.btn, { backgroundColor: (!content.trim() || posting) ? c.primaryLt : c.primary }]}
                   >
-                    <Text style={{ color: 'white', fontWeight: '600', fontSize: 14 }}>{posting ? 'Posting…' : 'Post to wall'}</Text>
+                    <Text style={{ color: c.onPrimary, fontWeight: '600', fontSize: 14 }}>{posting ? 'Posting…' : 'Post to wall'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -144,8 +144,8 @@ export default function WallScreen() {
                       disabled={approve.isPending}
                       style={[s.smallBtn, { backgroundColor: c.primary }]}
                     >
-                      <Ionicons name="checkmark-circle-outline" size={13} color="white" />
-                      <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>Approve</Text>
+                      <Ionicons name="checkmark-circle-outline" size={13} color={c.onPrimary} />
+                      <Text style={{ color: c.onPrimary, fontSize: 13, fontWeight: '600' }}>Approve</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => reject.mutate(p.id)}

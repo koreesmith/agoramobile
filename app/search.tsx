@@ -378,7 +378,7 @@ function BlueskyActorRow({ actor: a, c, onFollow, followPending }: {
         onPress={handleFollow}
         style={[s.followBtn, { backgroundColor: c.primary, opacity: followPending || followed ? 0.6 : 1 }]}
       >
-        <Text style={s.followBtnText}>{followed ? 'Following' : 'Follow'}</Text>
+        <Text style={[s.followBtnText, { color: c.onPrimary }]}>{followed ? 'Following' : 'Follow'}</Text>
       </TouchableOpacity>
     </TouchableOpacity>
   )

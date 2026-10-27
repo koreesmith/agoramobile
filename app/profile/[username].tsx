@@ -228,7 +228,7 @@ export default function ProfileViewScreen() {
                       <Ionicons
                         name={(profile as any).following ? 'checkmark' : followPending ? 'time-outline' : 'person-add-outline'}
                         size={15}
-                        color={(profile as any).following || followPending ? c.textMd : 'white'}
+                        color={(profile as any).following || followPending ? c.textMd : c.onPrimary}
                       />
                       <Text style={[s.actionBtnText, { color: (profile as any).following || followPending ? c.textMd : 'white' }]}>
                         {(profile as any).following ? 'Following' : followPending ? 'Requested' : 'Follow'}
@@ -268,7 +268,7 @@ export default function ProfileViewScreen() {
                       <Ionicons
                         name={(profile as any).following ? 'checkmark' : 'person-add-outline'}
                         size={15}
-                        color={(profile as any).following ? c.textMd : 'white'}
+                        color={(profile as any).following ? c.textMd : c.onPrimary}
                       />
                       <Text style={[s.actionBtnText, { color: (profile as any).following ? c.textMd : 'white' }]}>
                         {(profile as any).following ? 'Following' : 'Follow'}
@@ -310,7 +310,7 @@ export default function ProfileViewScreen() {
                     {!status && (
                       <TouchableOpacity onPress={() => sendReq.mutate()} disabled={sendReq.isPending}
                         style={[s.primaryBtn, { backgroundColor: c.primary }]}>
-                        <Text style={s.primaryBtnText}>Add friend</Text>
+                        <Text style={[s.primaryBtnText, { color: c.onPrimary }]}>Add friend</Text>
                       </TouchableOpacity>
                     )}
                     {status === 'pending' && (
@@ -338,7 +338,7 @@ export default function ProfileViewScreen() {
                     {status === 'pending_incoming' && (
                       <TouchableOpacity onPress={() => accept.mutate()}
                         style={[s.primaryBtn, { backgroundColor: c.primary }]}>
-                        <Text style={s.primaryBtnText}>Accept</Text>
+                        <Text style={[s.primaryBtnText, { color: c.onPrimary }]}>Accept</Text>
                       </TouchableOpacity>
                     )}
                     {status === 'accepted' && (

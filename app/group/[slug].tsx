@@ -144,7 +144,7 @@ export default function GroupScreen() {
                 </View>
                 {!group.is_member && (
                   <TouchableOpacity onPress={() => join.mutate()} disabled={join.isPending} style={[s.joinBtn, { backgroundColor: c.primary }]}>
-                    <Text style={s.joinBtnText}>Join</Text>
+                    <Text style={[s.joinBtnText, { color: c.onPrimary }]}>Join</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -211,7 +211,7 @@ export default function GroupScreen() {
                           <Text style={[s.cancelBtnText, { color: c.textMd }]}>Cancel</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => createPost.mutate()} disabled={(!content.trim() && imageUrls.length === 0) || createPost.isPending} style={[s.postBtn, { backgroundColor: c.primary }, (!content.trim() && imageUrls.length === 0) && { backgroundColor: c.primaryLt }]}>
-                          <Text style={s.postBtnText}>{createPost.isPending ? '…' : 'Post'}</Text>
+                          <Text style={[s.postBtnText, { color: c.onPrimary }]}>{createPost.isPending ? '…' : 'Post'}</Text>
                         </TouchableOpacity>
                       </View>
                     </View>

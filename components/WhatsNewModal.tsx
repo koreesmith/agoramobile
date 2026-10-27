@@ -108,7 +108,7 @@ export default function WhatsNewModal({ visible, onDismiss }: { visible: boolean
         </ScrollView>
         <View style={[s.footer, { borderTopColor: c.border }]}>
           <TouchableOpacity style={[s.gotItBtn, { backgroundColor: c.primary }]} onPress={handleDismiss}>
-            <Text style={s.gotItText}>Got it!</Text>
+            <Text style={[s.gotItText, { color: c.onPrimary }]}>Got it!</Text>
           </TouchableOpacity>
         </View>
       </View>

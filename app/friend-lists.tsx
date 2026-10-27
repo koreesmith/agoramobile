@@ -288,7 +288,7 @@ export default function FriendListsScreen() {
               disabled={!newName.trim() || createList.isPending}
               style={[s.createBtn, { backgroundColor: c.primary }, (!newName.trim() || createList.isPending) && { opacity: 0.5 }]}
             >
-              <Text style={s.createBtnText}>{createList.isPending ? 'Creating…' : 'Create'}</Text>
+              <Text style={[s.createBtnText, { color: c.onPrimary }]}>{createList.isPending ? 'Creating…' : 'Create'}</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

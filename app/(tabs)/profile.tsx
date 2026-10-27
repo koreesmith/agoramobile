@@ -111,8 +111,8 @@ export default function ProfileScreen() {
             style={[s.fab, { backgroundColor: c.primary }]}
             activeOpacity={0.85}
           >
-            <Ionicons name="mail" size={20} color="white" />
-            <Text style={s.fabText}>Invite a Friend</Text>
+            <Ionicons name="mail" size={20} color={c.onPrimary} />
+            <Text style={[s.fabText, { color: c.onPrimary }]}>Invite a Friend</Text>
           </TouchableOpacity>
         )}
       </View>

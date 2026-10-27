@@ -288,7 +288,7 @@ export default function SettingsScreen() {
             {(['light', 'system', 'dark'] as const).map(opt => (
               <TouchableOpacity key={opt} onPress={() => setPreference(opt)}
                 style={[s.themeOption, preference === opt && { backgroundColor: c.primary }]}>
-                <Text style={[s.themeOptionText, { color: preference === opt ? c.white : c.textMuted }]}>
+                <Text style={[s.themeOptionText, { color: preference === opt ? c.onPrimary : c.textMuted }]}>
                   {opt.charAt(0).toUpperCase() + opt.slice(1)}
                 </Text>
               </TouchableOpacity>

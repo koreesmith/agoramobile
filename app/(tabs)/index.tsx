@@ -616,7 +616,7 @@ export default function FeedScreen() {
             onPress={() => selectFeed(null)}
             style={[s.feedTab, { borderColor: c.border }, activeFeedId === null && { backgroundColor: c.primary, borderColor: c.primary }]}
           >
-            <Text style={[s.feedTabText, { color: activeFeedId === null ? 'white' : c.textMuted }]}>Home</Text>
+            <Text style={[s.feedTabText, { color: activeFeedId === null ? c.onPrimary : c.textMuted }]}>Home</Text>
           </TouchableOpacity>
           {pillFeeds.map((feed: any) => (
             <TouchableOpacity
@@ -624,7 +624,7 @@ export default function FeedScreen() {
               onPress={() => selectFeed(feed.id)}
               style={[s.feedTab, { borderColor: c.border }, activeFeedId === feed.id && { backgroundColor: c.primary, borderColor: c.primary }]}
             >
-              <Text style={[s.feedTabText, { color: activeFeedId === feed.id ? 'white' : c.textMuted }]}>{feed.name}</Text>
+              <Text style={[s.feedTabText, { color: activeFeedId === feed.id ? c.onPrimary : c.textMuted }]}>{feed.name}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -719,8 +719,8 @@ export default function FeedScreen() {
             style={[s.fab, { backgroundColor: c.primary }]}
             activeOpacity={0.85}
           >
-            <Ionicons name="mail" size={20} color="white" />
-            <Text style={s.fabText}>Invite a Friend</Text>
+            <Ionicons name="mail" size={20} color={c.onPrimary} />
+            <Text style={[s.fabText, { color: c.onPrimary }]}>Invite a Friend</Text>
           </TouchableOpacity>
         )}
       </View>

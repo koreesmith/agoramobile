@@ -600,7 +600,7 @@ export default function AdminScreen() {
                             <TouchableOpacity
                               disabled={!sf.reason || suspendUser.isPending}
                               onPress={() => suspendUser.mutate({ id: r.reported_user_id, data: { reason: sf.reason, notes: sf.notes, days: parseInt(sf.days) || 0 } })}
-                              style={[s.actionBtn, { backgroundColor: '#f59e0b', opacity: !sf.reason ? 0.5 : 1 }]}>
+                              style={[s.actionBtn, { backgroundColor: '#b45309', opacity: !sf.reason ? 0.5 : 1 }]}>
                               <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>
                                 ⏸ Suspend {sf.days && sf.days !== '0' ? `for ${sf.days}d` : 'indefinitely'}
                               </Text>
@@ -778,7 +778,7 @@ export default function AdminScreen() {
                         <TouchableOpacity
                           disabled={!sf.reason || suspendUserDirect.isPending}
                           onPress={() => suspendUserDirect.mutate({ id: u.id, data: { reason: sf.reason, notes: sf.notes, days: parseInt(sf.days) || 0 } })}
-                          style={[s.actionBtn, { backgroundColor: '#f59e0b', opacity: !sf.reason ? 0.5 : 1 }]}>
+                          style={[s.actionBtn, { backgroundColor: '#b45309', opacity: !sf.reason ? 0.5 : 1 }]}>
                           <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>
                             Suspend {sf.days && sf.days !== '0' ? `for ${sf.days}d` : 'indefinitely'}
                           </Text>

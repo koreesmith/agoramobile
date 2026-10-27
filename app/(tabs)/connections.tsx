@@ -328,7 +328,7 @@ export default function ConnectionsScreen() {
             renderItem={({ item: f }) => <PersonRow user={f} right={
               f._type === 'incoming' ? (
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity onPress={() => accept.mutate(f.id)} style={[s.acceptBtn, { backgroundColor: c.primary }]}><Text style={s.acceptBtnText}>Accept</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => accept.mutate(f.id)} style={[s.acceptBtn, { backgroundColor: c.primary }]}><Text style={[s.acceptBtnText, { color: c.onPrimary }]}>Accept</Text></TouchableOpacity>
                   <TouchableOpacity onPress={() => decline.mutate(f.id)} style={[s.declineBtn, { backgroundColor: c.bg, borderColor: c.border }]}><Text style={[s.declineBtnText, { color: c.textMd }]}>Decline</Text></TouchableOpacity>
                 </View>
               ) : (
@@ -375,7 +375,7 @@ export default function ConnectionsScreen() {
                                 onPress={() => addFederatedFriend.mutate({ username: u.username, instance: u.instance })}
                                 disabled={addFederatedFriend.isPending}
                                 style={[s.acceptBtn, { backgroundColor: c.primary }]}>
-                                <Text style={s.acceptBtnText}>Add</Text>
+                                <Text style={[s.acceptBtnText, { color: c.onPrimary }]}>Add</Text>
                               </TouchableOpacity>
                             )}
                           </View>
@@ -394,7 +394,7 @@ export default function ConnectionsScreen() {
                   </TouchableOpacity>
                 )
                 : u.friend_status === 'accepted' ? <Text style={{ fontSize: 13, color: '#22c55e', fontWeight: '500' }}>Friends</Text>
-                : <TouchableOpacity onPress={() => sendReq.mutate(u.id)} style={[s.acceptBtn, { backgroundColor: c.primary }]}><Text style={s.acceptBtnText}>Add</Text></TouchableOpacity>
+                : <TouchableOpacity onPress={() => sendReq.mutate(u.id)} style={[s.acceptBtn, { backgroundColor: c.primary }]}><Text style={[s.acceptBtnText, { color: c.onPrimary }]}>Add</Text></TouchableOpacity>
               } />}
             />
           )
@@ -460,7 +460,7 @@ export default function ConnectionsScreen() {
                     onPress={() => { setTab('bluesky'); setBskyHandle(fediPreview.preferred_username); setFediPreview(null); setFediHandle('') }}
                     style={[s.followBtn, { backgroundColor: c.primary }]}
                   >
-                    <Text style={s.followBtnText}>Go to Bluesky</Text>
+                    <Text style={[s.followBtnText, { color: c.onPrimary }]}>Go to Bluesky</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -483,7 +483,7 @@ export default function ConnectionsScreen() {
                     disabled={followFedi.isPending || !!alreadyFollowingFedi}
                     style={[s.followBtn, { backgroundColor: alreadyFollowingFedi ? c.border : c.primary }]}
                   >
-                    <Text style={[s.followBtnText, alreadyFollowingFedi && { color: c.textMuted }]}>
+                    <Text style={[s.followBtnText, { color: c.onPrimary }, alreadyFollowingFedi && { color: c.textMuted }]}>
                       {alreadyFollowingFedi ? 'Following' : followFedi.isPending ? 'Following…' : 'Follow'}
                     </Text>
                   </TouchableOpacity>
@@ -645,7 +645,7 @@ export default function ConnectionsScreen() {
                           disabled={followFedi.isPending}
                           style={[s.followBtn, { backgroundColor: c.primary, marginLeft: 8 }]}
                         >
-                          <Text style={s.followBtnText}>Follow back</Text>
+                          <Text style={[s.followBtnText, { color: c.onPrimary }]}>Follow back</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -723,7 +723,7 @@ export default function ConnectionsScreen() {
                     disabled={followBsky.isPending || !!alreadyFollowingBsky}
                     style={[s.followBtn, { backgroundColor: alreadyFollowingBsky ? c.border : c.primary }]}
                   >
-                    <Text style={[s.followBtnText, alreadyFollowingBsky && { color: c.textMuted }]}>
+                    <Text style={[s.followBtnText, { color: c.onPrimary }, alreadyFollowingBsky && { color: c.textMuted }]}>
                       {alreadyFollowingBsky ? 'Following' : followBsky.isPending ? 'Following…' : 'Follow'}
                     </Text>
                   </TouchableOpacity>
@@ -865,7 +865,7 @@ export default function ConnectionsScreen() {
                           disabled={followBsky.isPending}
                           style={[s.followBtn, { backgroundColor: c.primary, marginLeft: 8 }]}
                         >
-                          <Text style={s.followBtnText}>Follow back</Text>
+                          <Text style={[s.followBtnText, { color: c.onPrimary }]}>Follow back</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -890,8 +890,8 @@ export default function ConnectionsScreen() {
             style={[s.fab, { backgroundColor: c.primary }]}
             activeOpacity={0.85}
           >
-            <Ionicons name="mail" size={20} color="white" />
-            <Text style={s.fabText}>Invite a Friend</Text>
+            <Ionicons name="mail" size={20} color={c.onPrimary} />
+            <Text style={[s.fabText, { color: c.onPrimary }]}>Invite a Friend</Text>
           </TouchableOpacity>
         )}
       </View>
