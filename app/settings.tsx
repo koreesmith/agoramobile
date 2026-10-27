@@ -274,11 +274,16 @@ export default function SettingsScreen() {
           </>
         )}
         <Text style={[s.section, { color: c.textMuted }]}>Appearance</Text>
+        {/* AMOBILE-210: the picker drops to a line of its own when it and the
+            label don't both fit, which only happens at large text sizes.
+            Squeezed beside it, "Theme" broke one letter per line. */}
         <View style={[s.themeRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-          <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
-            <Ionicons name="color-palette-outline" size={18} color={c.primary} />
+          <View style={s.themeLabel}>
+            <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
+              <Ionicons name="color-palette-outline" size={18} color={c.primary} />
+            </View>
+            <Text style={[s.themeLabelText, { color: c.text }]}>Theme</Text>
           </View>
-          <Text style={[s.rowLabel, { color: c.text }]}>Theme</Text>
           <View style={[s.themePicker, { backgroundColor: c.bg, borderColor: c.border }]}>
             {(['light', 'system', 'dark'] as const).map(opt => (
               <TouchableOpacity key={opt} onPress={() => setPreference(opt)}
@@ -398,8 +403,13 @@ export default function SettingsScreen() {
 const s = StyleSheet.create({
   section: { fontSize: 12, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 6 },
   sectionHint: { fontSize: 13, lineHeight: 17, paddingHorizontal: 16, paddingBottom: 10 },
-  themeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
-  themePicker: { flexDirection: 'row', borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
+  themeRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
+  // Takes the label's natural width (not rowLabel's flex: 1, which would let
+  // it shrink to nothing), so the row wraps instead of squeezing it.
+  themeLabel: { flexDirection: 'row', alignItems: 'center', gap: 12, flexGrow: 1 },
+  themeLabelText: { fontSize: 17 },
+  // Keeps the picker at the right edge, on the label's line or its own.
+  themePicker: { flexDirection: 'row', borderWidth: 1, borderRadius: 10, overflow: 'hidden', marginLeft: 'auto' },
   themeOption: { paddingHorizontal: 12, paddingVertical: 6 },
   themeOptionText: { fontSize: 15, fontWeight: '500' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
