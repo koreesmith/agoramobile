@@ -13,6 +13,7 @@ import { router, useIsFocused, useNavigation } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Header, Spinner, EmptyState, UploadingModal, Avatar } from '../../components/ui'
+import { useActiveAccount } from '../../components/ActiveAccount'
 import AutoGrowInput from '../../components/AutoGrowInput'
 import PostCard from '../../components/PostCard'
 import { feedApi, feedsApi, friendsApi, instanceApi, usersApi, pagesApi, groupMentionApi, atprotoApi, federationApi, imgUrl } from '../../api'
@@ -66,6 +67,7 @@ export default function FeedScreen() {
   const c = useC()
   const insets = useSafeAreaInsets()
   const { user } = useAuthStore()
+  const { multi: multiAccount, handle: accountHandle } = useActiveAccount()
   const { blockedIds } = useBlockStore()
   const { data: instanceData } = useQuery({
     queryKey: ['instance-info'],
@@ -773,9 +775,12 @@ export default function FeedScreen() {
             </View>
           </View>
 
-          {/* Identity switcher */}
-          {myPages.length > 0 && (
+          {/* Identity switcher. AMOBILE-212: also shown, as a plain label,
+              whenever more than one account is signed in, naming the account
+              the post goes out from. */}
+          {(myPages.length > 0 || multiAccount) && (
             <TouchableOpacity
+              disabled={myPages.length === 0}
               onPress={() => {
                 const options = [
                   { label: `${user?.display_name || user?.username} (personal)`, value: null },
@@ -795,13 +800,22 @@ export default function FeedScreen() {
               }}
               style={[s.identityRow, { borderBottomColor: c.border, backgroundColor: c.card }]}
             >
-              <Ionicons name="person-circle-outline" size={16} color={c.primary} />
-              <Text style={[s.identityLabel, { color: c.text }]}>
-                Posting as: <Text style={{ color: c.primary, fontWeight: '700' }}>
-                  {postAsPageSlug ? (myPages.find((p: any) => p.slug === postAsPageSlug)?.display_name ?? postAsPageSlug) : (user?.display_name || user?.username)}
+              {multiAccount && !postAsPageSlug
+                ? <Avatar url={user?.avatar_url} name={user?.display_name || user?.username} size={24} />
+                : <Ionicons name="person-circle-outline" size={16} color={c.primary} />}
+              <View style={{ flex: 1 }}>
+                <Text style={[s.identityLabel, { color: c.text }]} numberOfLines={1}>
+                  Posting as: <Text style={{ color: c.primary, fontWeight: '700' }}>
+                    {postAsPageSlug ? (myPages.find((p: any) => p.slug === postAsPageSlug)?.display_name ?? postAsPageSlug) : (user?.display_name || user?.username)}
+                  </Text>
                 </Text>
-              </Text>
-              <Ionicons name="chevron-down" size={13} color={c.textMuted} style={{ marginLeft: 'auto' }} />
+                {multiAccount && (
+                  <Text style={[s.identityAccount, { color: c.textMuted }]} numberOfLines={1}>
+                    {postAsPageSlug ? `via ${accountHandle}` : accountHandle}
+                  </Text>
+                )}
+              </View>
+              {myPages.length > 0 && <Ionicons name="chevron-down" size={13} color={c.textMuted} />}
             </TouchableOpacity>
           )}
 
@@ -1310,5 +1324,6 @@ const s = StyleSheet.create({
   videoPreviewOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' },
   identityRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 1 },
   identityLabel: { fontSize: 15 },
+  identityAccount: { fontSize: 13, marginTop: 1 },
 })
 

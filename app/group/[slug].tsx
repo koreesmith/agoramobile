@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Spinner, Avatar, UploadingModal } from '../../components/ui'
+import { PostingAsLine } from '../../components/ActiveAccount'
 import PostCard from '../../components/PostCard'
 import { groupsApi, feedApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
@@ -156,6 +157,7 @@ export default function GroupScreen() {
               <View style={[s.composer, { backgroundColor: c.card }]}>
                 {showCompose ? (
                   <>
+                    <PostingAsLine style={{ marginBottom: 8 }} />
                     {showCW && (
                       <View style={{ borderWidth: 1, borderColor: '#fcd34d', backgroundColor: '#fffbeb', borderRadius: 8, padding: 8, marginBottom: 8 }}>
                         <Text style={{ fontSize: 11, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>⚠️ Trigger warning</Text>

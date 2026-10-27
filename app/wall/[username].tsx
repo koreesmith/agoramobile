@@ -4,6 +4,7 @@ import { useLocalSearchParams, Stack } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Spinner, Avatar, LinkedText, renderName } from '../../components/ui'
+import { PostingAsLine } from '../../components/ActiveAccount'
 import PostCard from '../../components/PostCard'
 import { feedApi, usersApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
@@ -88,6 +89,7 @@ export default function WallScreen() {
             showComposer ? (
               <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
                 <Text style={[s.cardTitle, { color: c.textMd }]}>Write on {profile.display_name}'s wall</Text>
+                <PostingAsLine style={{ marginBottom: 8 }} />
                 <TextInput
                   style={[s.textarea, { backgroundColor: c.bg, color: c.text, borderColor: c.border }]}
                   placeholder={`Write something on ${profile.display_name}'s wall…`}

@@ -11,6 +11,7 @@ import { light, dark } from '../../constants/colors'
 import { useThemeStore } from '../../store/theme'
 import { useWelcomeStore } from '../../store/welcome'
 import AccountSwitcherModal from '../../components/AccountSwitcherModal'
+import { ProfileTabIcon, useActiveAccount } from '../../components/ActiveAccount'
 import { useMe } from '../../components/welcome/useMe'
 
 export default function TabsLayout() {
@@ -22,6 +23,7 @@ export default function TabsLayout() {
   const c = isDark ? dark : light
   const [notificationsReady, setNotificationsReady] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
+  const { handle } = useActiveAccount()
   const insets = useSafeAreaInsets()
 
   useEffect(() => {
@@ -108,10 +110,15 @@ export default function TabsLayout() {
         <Tabs.Screen name="connections" options={{ title: 'Connections', tabBarIcon: ({ color, size }) => <Ionicons name="person-add-outline" size={size} color={color} /> }} />
         <Tabs.Screen name="messages" options={{ title: 'Messages', tabBarIcon: ({ color, size }) => <Ionicons name="chatbubble-outline" size={size} color={color} />, tabBarBadge: unreadMessages > 0 ? (unreadMessages > 9 ? '9+' : unreadMessages) : undefined }} />
         {/* AMOBILE-192: press and hold Profile to switch accounts. A normal
-            tap still just opens the Profile tab. */}
+            tap still just opens the Profile tab. AMOBILE-212: its icon is
+            the active account's photo, so who's active is always in view. */}
         <Tabs.Screen
           name="profile"
-          options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} /> }}
+          options={{
+            title: 'Profile',
+            tabBarIcon: ({ focused, color, size }) => <ProfileTabIcon focused={focused} color={color} size={size} />,
+            tabBarAccessibilityLabel: handle ? `Profile, signed in as ${handle}` : 'Profile',
+          }}
           listeners={{ tabLongPress: () => setSwitcherOpen(true) }}
         />
       </Tabs>
