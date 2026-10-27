@@ -21,6 +21,9 @@ export const light = {
   green:     '#22c55e',
   amber:     '#f59e0b',
   white:     '#ffffff',
+  // AMOBILE-214: text and icons on a primary fill. Not always white: dark
+  // mode's primary is a light blue that white can't be read on.
+  onPrimary: '#ffffff',
   gray100:   '#f3f4f6',
   gray200:   '#e5e7eb',
 }
@@ -46,6 +49,7 @@ export const dark = {
   green:     '#4ade80',
   amber:     '#fbbf24',
   white:     '#ffffff',
+  onPrimary: '#0a1929',  // = bg
   gray100:   '#1e3a55',
   gray200:   '#243b53',
 }

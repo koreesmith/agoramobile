@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, Switch, Alert, StyleSheet } from 'react-native'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminApi } from '../api'
-import { useC, useIsDark } from '../constants/ColorContext'
+import { useC } from '../constants/ColorContext'
 import { useToastStore } from '../store/toast'
 
 // AMOBILE-213: the Remote Media Cache card from web's Storage tab
@@ -22,9 +22,6 @@ const parseLimit = (v: string) => (/^\d+$/.test(v.trim()) ? Number(v.trim()) : N
 
 export default function RemoteMediaCacheCard() {
   const c = useC()
-  // The dark palette's primary is a light blue that white text can't be read
-  // on, so the Save button's text goes dark there (as in the wizard).
-  const isDark = useIsDark()
   const qc = useQueryClient()
   const toast = useToastStore((s) => s.show)
   const { data, error } = useQuery<{ settings: CacheSettings, stats: CacheStats }>({
@@ -150,7 +147,7 @@ export default function RemoteMediaCacheCard() {
           disabled={!dirty || !valid || save.isPending}
           onPress={() => save.mutate({ enabled: form.enabled, max_mb: maxMB, max_file_mb: maxFileMB })}
           style={[s.btn, { backgroundColor: c.primary, opacity: !dirty || !valid || save.isPending ? 0.5 : 1 }]}>
-          <Text style={[s.btnText, { color: isDark ? c.bg : c.white }]}>{save.isPending ? 'Saving…' : 'Save'}</Text>
+          <Text style={[s.btnText, { color: c.onPrimary }]}>{save.isPending ? 'Saving…' : 'Save'}</Text>
         </TouchableOpacity>
         <TouchableOpacity disabled={busy} onPress={() => prune.mutate()}
           style={[s.btn, { borderWidth: 1, borderColor: c.border, backgroundColor: c.bg, opacity: busy ? 0.5 : 1 }]}>

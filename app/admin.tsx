@@ -574,7 +574,7 @@ export default function AdminScreen() {
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                           <TouchableOpacity onPress={() => reviewRep.mutate({ id: r.id, action: 'actioned' })}
                             style={[s.actionBtn, { backgroundColor: c.primary, flex: 1 }]}>
-                            <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>Mark actioned</Text>
+                            <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>Mark actioned</Text>
                           </TouchableOpacity>
                           <TouchableOpacity onPress={() => reviewRep.mutate({ id: r.id, action: 'dismissed' })}
                             style={[s.actionBtn, { backgroundColor: c.bg, borderWidth: 1, borderColor: c.border, flex: 1 }]}>
@@ -901,7 +901,7 @@ export default function AdminScreen() {
               disabled={!relayInboxUrl.trim() || addRelay.isPending}
               onPress={() => addRelay.mutate(relayInboxUrl.trim())}
               style={[s.actionBtn, { backgroundColor: c.primary, opacity: !relayInboxUrl.trim() ? 0.5 : 1 }]}>
-              <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>
+              <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>
                 {addRelay.isPending ? 'Requesting…' : 'Add new relay'}
               </Text>
             </TouchableOpacity>
@@ -1106,7 +1106,7 @@ export default function AdminScreen() {
               disabled={!fedDomain.trim() || addInstance.isPending}
               onPress={() => addInstance.mutate(fedDomain.trim())}
               style={[s.actionBtn, { backgroundColor: c.primary, opacity: !fedDomain.trim() ? 0.5 : 1 }]}>
-              <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>
+              <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>
                 {addInstance.isPending ? 'Connecting…' : 'Add Instance'}
               </Text>
             </TouchableOpacity>
@@ -1172,7 +1172,7 @@ export default function AdminScreen() {
             {(['pending', 'all'] as const).map(f => (
               <TouchableOpacity key={f} onPress={() => setDomainFilter(f)}
                 style={[s.smallBtn, { backgroundColor: domainFilter === f ? c.primary : c.bg, borderColor: domainFilter === f ? c.primary : c.border }]}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: domainFilter === f ? 'white' : c.textMd }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: domainFilter === f ? c.onPrimary : c.textMd }}>
                   {f === 'pending' ? 'Awaiting review' : 'All requests'}
                 </Text>
               </TouchableOpacity>
@@ -1261,7 +1261,7 @@ export default function AdminScreen() {
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
           <TouchableOpacity onPress={() => createInvite.mutate()} disabled={createInvite.isPending}
             style={[s.actionBtn, { backgroundColor: c.primary, marginBottom: 16 }]}>
-            <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>
+            <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>
               {createInvite.isPending ? 'Creating…' : '+ Create Invite Code'}
             </Text>
           </TouchableOpacity>
@@ -1320,7 +1320,7 @@ export default function AdminScreen() {
             <TouchableOpacity disabled={!newRuleForm.title.trim() || createRule.isPending}
               onPress={() => createRule.mutate()}
               style={[s.actionBtn, { backgroundColor: c.primary, opacity: !newRuleForm.title.trim() ? 0.5 : 1 }]}>
-              <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>Add rule</Text>
+              <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>Add rule</Text>
             </TouchableOpacity>
           </View>
 
@@ -1339,7 +1339,7 @@ export default function AdminScreen() {
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <TouchableOpacity onPress={() => updateRule.mutate()} disabled={updateRule.isPending}
                       style={[s.actionBtn, { backgroundColor: c.primary, flex: 1 }]}>
-                      <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>Save</Text>
+                      <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>Save</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => setEditingRule(null)}
                       style={[s.actionBtn, { borderWidth: 1, borderColor: c.border, flex: 1 }]}>
