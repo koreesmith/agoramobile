@@ -178,6 +178,11 @@ export const friendsApi = {
   getFriendListMembers: (groupId: string)               => api.get(`/friend-groups/${groupId}/members`),
   addFriendToList:    (groupId: string, friendId: string) => api.post(`/friend-groups/${groupId}/members/${friendId}`),
   removeFriendFromList: (groupId: string, friendId: string) => api.delete(`/friend-groups/${groupId}/members/${friendId}`),
+  // AMOBILE-216 (server side AGORA-395): one account's lists in one request,
+  // and an all-or-nothing change to them. Both answer { group_ids }. Servers
+  // older than that answer 404; FriendListPickerModal falls back.
+  getFriendListMemberships: (friendId: string)          => api.get(`/friend-groups/memberships/${friendId}`),
+  setFriendListMemberships: (friendId: string, changes: { add: string[], remove: string[] }) => api.put(`/friend-groups/memberships/${friendId}`, changes),
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────
