@@ -340,7 +340,7 @@ export default function ManageFeedsScreen() {
               />
               <FilterSection
                 title="INCLUDE FROM THE FEDIVERSE"
-                items={[{ id: 'true', name: 'Everyone I follow on the fediverse' }]}
+                items={[{ id: 'true', name: 'Everyone I follow on the Fediverse' }]}
                 type="fediverse_all"
                 labelKey="name"
               />

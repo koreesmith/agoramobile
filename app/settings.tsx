@@ -315,17 +315,17 @@ export default function SettingsScreen() {
         </View>
         <Text style={[s.section, { color: c.textMuted }]}>Fediverse</Text>
         <Text style={[s.sectionHint, { color: c.textMuted }]}>
-          Agora can talk to Mastodon and the rest of the fediverse over ActivityPub. Turning this on lets people
+          Agora can talk to Mastodon and the rest of the Fediverse over ActivityPub. Turning this on lets people
           out there find, follow, and see your public posts. Private and friends-only posts are never federated.
         </Text>
         <Row icon="planet-outline" label="Fediverse (ActivityPub)"
           right={<Switch value={(user as any)?.activitypub_enabled ?? true} onValueChange={() => toggleActivityPub.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleActivityPub.isPending} />} />
         <Row icon="notifications-outline" label="Fediverse post notifications"
           right={<Switch value={(user as any)?.fediverse_notifications_enabled ?? true} onValueChange={() => toggleFediverseNotifications.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleFediverseNotifications.isPending} />} />
-        <Row icon="people-outline" label="Manage fediverse follows" onPress={() => router.push('/connections?tab=fediverse' as any)} />
+        <Row icon="people-outline" label="Manage Fediverse follows" onPress={() => router.push('/connections?tab=fediverse' as any)} />
         <Text style={[s.section, { color: c.textMuted }]}>Bluesky</Text>
         <Text style={[s.sectionHint, { color: c.textMuted }]}>
-          Agora can also talk to Bluesky over AT Protocol, a separate network from the fediverse. Turning this on
+          Agora can also talk to Bluesky over AT Protocol, a separate network from the Fediverse. Turning this on
           lets people on Bluesky find, follow, and see your public posts.
         </Text>
         <Row icon="cloud-outline" label="Bluesky (AT Protocol)"

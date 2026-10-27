@@ -863,7 +863,7 @@ export default function AdminScreen() {
               <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>Fediverse (ActivityPub)</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ color: c.textMd, fontSize: 13, flex: 1, marginRight: 8 }}>
-                  Let Mastodon and other fediverse apps discover, follow, and interact with users on this instance.
+                  Let Mastodon and other Fediverse apps discover, follow, and interact with users on this instance.
                   Separate from Agora-to-Agora federation in Settings; users can also opt out individually in their own Settings.
                 </Text>
                 <Switch
@@ -885,7 +885,7 @@ export default function AdminScreen() {
             <Text style={{ color: c.textMd, fontSize: 13 }}>
               A federation relay is an intermediary server that exchanges large volumes of public posts between
               servers that subscribe and publish to it. It can help small and medium servers discover content
-              from the fediverse, which would otherwise require local users manually following other people on
+              from the Fediverse, which would otherwise require local users manually following other people on
               remote servers.
             </Text>
             <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
@@ -1083,7 +1083,7 @@ export default function AdminScreen() {
             <Text style={{ color: c.textMd, fontSize: 13 }}>
               Enter the domain of another Agora instance to federate with. Both instances must have federation
               enabled. This is specifically for Agora-to-Agora peering; to block a Mastodon or other standard
-              fediverse instance, use the Fediverse tab's Instance Bans instead.
+              Fediverse instance, use the Fediverse tab's Instance Bans instead.
             </Text>
             {/* AMOBILE-176 (AGORA-322): peering can carry a timeline now, but
                 only when an admin turns it on for that peer. Saying so is what

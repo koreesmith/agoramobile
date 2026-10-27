@@ -416,10 +416,10 @@ export default function ConnectionsScreen() {
 
             {fediSubTab === 'following' && (<>
             <View style={[s.card, { backgroundColor: c.card }]}>
-              <Text style={[s.cardTitle, { color: c.text }]}>Follow a fediverse account</Text>
+              <Text style={[s.cardTitle, { color: c.text }]}>Follow a Fediverse account</Text>
               <Text style={[s.cardSubtitle, { color: c.textMuted, marginBottom: 12 }]}>
                 Enter a full handle (e.g. user@mastodon.social) or a profile URL. There's no way to search the
-                fediverse by name — like Mastodon's own remote search, you need the exact handle.
+                Fediverse by name — like Mastodon's own remote search, you need the exact handle.
               </Text>
               <View style={s.searchRow}>
                 <TextInput
@@ -453,7 +453,7 @@ export default function ConnectionsScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={[s.previewName, { color: '#92400e' }]}>This is a Bluesky account</Text>
                     <Text style={[s.previewSummary, { color: '#92400e', marginTop: 2 }]}>
-                      @{fediPreview.preferred_username} is a Bluesky account bridged into the fediverse — follow it natively from the Bluesky tab instead.
+                      @{fediPreview.preferred_username} is a Bluesky account bridged into the Fediverse — follow it natively from the Bluesky tab instead.
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -500,7 +500,7 @@ export default function ConnectionsScreen() {
               )}
               {following.length === 0 ? (
                 <Text style={[s.emptyText, { color: c.textMuted, borderColor: c.border }]}>
-                  You're not following anyone on the fediverse yet.
+                  You're not following anyone on the Fediverse yet.
                 </Text>
               ) : (
                 <View style={{ marginTop: 8 }}>
@@ -611,7 +611,7 @@ export default function ConnectionsScreen() {
               <Text style={[s.cardTitle, { color: c.text }]}>Your followers</Text>
               {followers.length === 0 ? (
                 <Text style={[s.emptyText, { color: c.textMuted, borderColor: c.border }]}>
-                  No one on the fediverse follows you yet.
+                  No one on the Fediverse follows you yet.
                 </Text>
               ) : (
                 <View style={{ marginTop: 8 }}>
@@ -657,7 +657,7 @@ export default function ConnectionsScreen() {
 
             <TouchableOpacity onPress={() => router.push('/settings?tab=fediverse' as any)}>
               <Text style={[s.hintLink, { color: c.textMuted }]}>
-                Want to opt out of the fediverse entirely? That toggle lives in <Text style={{ textDecorationLine: 'underline' }}>Settings → Fediverse</Text>.
+                Want to opt out of the Fediverse entirely? That toggle lives in <Text style={{ textDecorationLine: 'underline' }}>Settings → Fediverse</Text>.
               </Text>
             </TouchableOpacity>
           </ScrollView>
