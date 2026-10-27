@@ -9,10 +9,13 @@ import { useAuthStore } from '../../store/auth'
 import { notificationsApi, dmApi } from '../../api'
 import { light, dark } from '../../constants/colors'
 import { useThemeStore } from '../../store/theme'
+import { useWelcomeStore } from '../../store/welcome'
 import AccountSwitcherModal from '../../components/AccountSwitcherModal'
+import { useMe } from '../../components/welcome/useMe'
 
 export default function TabsLayout() {
   const { isAuthenticated } = useAuthStore()
+  const activeAccountId = useAuthStore((s) => s.activeAccountId)
   const systemScheme = useColorScheme()
   const { preference } = useThemeStore()
   const isDark = preference === 'dark' || (preference === 'system' && systemScheme === 'dark')
@@ -35,6 +38,33 @@ export default function TabsLayout() {
     const t = setTimeout(() => setNotificationsReady(true), 1500)
     return () => clearTimeout(t)
   }, [])
+
+  const { data: me } = useMe()
+
+  // AMOBILE-202: the stored account is whatever /auth/me said at sign-in.
+  // Fold the fresh copy back in so Settings shows what's actually saved
+  // (including changes made on web or in the wizard), but only while it
+  // still belongs to the active account: a switch can land between the
+  // request and its response.
+  useEffect(() => {
+    if (!me) return
+    const { user, updateUser } = useAuthStore.getState()
+    if (!user || user.id !== me.id) return
+    const changed = Object.keys(me).some(k => JSON.stringify((user as any)[k]) !== JSON.stringify(me[k]))
+    if (changed) updateUser(me)
+  }, [me])
+
+  // AMOBILE-202: an account that hasn't finished or skipped the getting
+  // started wizard goes through it, once per launch. Only an explicit false
+  // counts: an older server doesn't send the field, and its accounts never
+  // see the wizard.
+  useEffect(() => {
+    if (!me || !activeAccountId || me.onboarding_completed !== false) return
+    if (useAuthStore.getState().user?.id !== me.id) return
+    if (useWelcomeStore.getState().shownFor.includes(activeAccountId)) return
+    useWelcomeStore.getState().markShown(activeAccountId)
+    router.push('/welcome')
+  }, [me, activeAccountId])
 
   const { data: unreadData } = useQuery({
     queryKey: ['unread-count'],

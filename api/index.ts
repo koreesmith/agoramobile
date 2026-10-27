@@ -246,6 +246,14 @@ export const inviteApi = {
   send: (email: string) => api.post('/invites/send', { email }),
 }
 
+// ── Getting started wizard (AMOBILE-202) ─────────────────────────────────────
+// Server side is AGORA-387. Finishing or skipping on either web or here
+// counts for both, since the state lives on the account.
+export const onboardingApi = {
+  complete:    () => api.post('/onboarding/complete'),
+  suggestions: () => api.get('/onboarding/suggestions'),
+}
+
 // ── Instance ──────────────────────────────────────────────────────────────────
 export const instanceApi = {
   getInfo: () => api.get('/instance'),

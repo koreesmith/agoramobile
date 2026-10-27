@@ -197,6 +197,10 @@ function AppContent() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        {/* AMOBILE-202: no swipe back out of the getting started wizard.
+            Leaving it is "Skip setup", or Android's back button on the first
+            step. */}
+        <Stack.Screen name="welcome" options={{ gestureEnabled: false }} />
       </Stack>
     </>
   )

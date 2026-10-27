@@ -21,6 +21,7 @@ import WhatsNewModal, { shouldShowWhatsNew } from '../../components/WhatsNewModa
 import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
 import { useWhatsNewStore } from '../../store/whatsNew'
+import { useMe } from '../../components/welcome/useMe'
 
 import { C } from '../../constants/colors'
 import { useC } from '../../constants/ColorContext'
@@ -193,9 +194,16 @@ export default function FeedScreen() {
 
   const MAX_IMAGES = 10
 
+  // AMOBILE-202: What's New waits while the getting started wizard is
+  // pending for this account, so it can't open on top of it. Finishing the
+  // wizard decides which way it goes (a returning member still gets it). A
+  // failed fetch doesn't hold it back for good.
+  const { data: me, isError: meFailed } = useMe()
+  const onboardingSettled = (!!me && me.onboarding_completed !== false) || meFailed
   useEffect(() => {
+    if (!onboardingSettled) return
     shouldShowWhatsNew().then(should => { if (should) setShowWhatsNew(true) })
-  }, [])
+  }, [onboardingSettled])
 
   const forceShowWhatsNew = useWhatsNewStore(s => s.forceShow)
   const consumeWhatsNew = useWhatsNewStore(s => s.consume)

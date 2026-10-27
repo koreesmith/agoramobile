@@ -350,6 +350,11 @@ export default function SettingsScreen() {
             ])} right={<View />} />
         )}
         <Text style={[s.section, { color: c.textMuted }]}>Help</Text>
+        {/* AMOBILE-202: replay the getting started wizard. Only offered when
+            the server has it, which is when /auth/me reports the field. */}
+        {(user as any)?.onboarding_completed !== undefined && (
+          <Row icon="compass-outline" label="Getting started tour" onPress={() => router.push('/welcome')} />
+        )}
         <Row icon="help-circle-outline" label="Help & Documentation" onPress={() => {
           const instanceUrl = useAuthStore.getState().instanceUrl
           if (instanceUrl) WebBrowser.openBrowserAsync(`${instanceUrl}/docs#user/index`)
