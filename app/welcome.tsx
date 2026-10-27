@@ -163,7 +163,9 @@ const s = StyleSheet.create({
   center:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 32 },
   loadError:     { fontSize: 17, lineHeight: 24, textAlign: 'center', marginBottom: 8 },
   header:        { paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, gap: 8 },
-  headerRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  // Held at the Skip button's height, so the header doesn't shrink on the
+  // last step, where that button isn't shown.
+  headerRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 48 },
   brand:         { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },
   logo:          { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   logoImage:     { width: 34, height: 34 },

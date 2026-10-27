@@ -123,7 +123,9 @@ function NetworkStep({ network, steps, instance, me, notes, setNotes, next, back
     save({ [copy.enabledKey]: v }, () => setOn(!v))
   }
 
-  const Choice = ({ value, title, desc, isDefault }: { value: boolean; title: string; desc: string; isDefault?: boolean }) => {
+  // A plain render function rather than a component: one defined in here
+  // would be a new type every render, remounting both choices each time.
+  const choice = (value: boolean, title: string, desc: string, isDefault?: boolean) => {
     const selected = on === value
     return (
       <TouchableOpacity onPress={() => choose(value)} accessibilityRole="radio" accessibilityState={{ selected }}
@@ -132,7 +134,7 @@ function NetworkStep({ network, steps, instance, me, notes, setNotes, next, back
         <View style={{ flex: 1, gap: 3 }}>
           <View style={st.choiceTitleRow}>
             <Text style={[st.choiceTitle, { color: c.text }]}>{title}</Text>
-            {isDefault && <Text style={[st.defaultBadge, { backgroundColor: c.bg, color: c.textMd }]}>Default</Text>}
+            {isDefault && <Text style={[st.defaultBadge, { backgroundColor: c.border, color: c.textMd }]}>Default</Text>}
           </View>
           <Text style={[p.small, { color: c.textMuted }]}>{desc}</Text>
         </View>
@@ -175,9 +177,8 @@ function NetworkStep({ network, steps, instance, me, notes, setNotes, next, back
 
         <View accessibilityRole="radiogroup" style={{ gap: 10 }}>
           <SectionTitle title={`Do you want your public posts on ${where}?`} />
-          <Choice value={true} title={copy.yes} desc={copy.yesDesc} isDefault />
-          <Choice value={false} title={copy.no}
-            desc={`Nothing you post reaches ${where}. You can change your mind anytime in Settings.`} />
+          {choice(true, copy.yes, copy.yesDesc, true)}
+          {choice(false, copy.no, `Nothing you post reaches ${where}. You can change your mind anytime in Settings.`)}
         </View>
 
         {on ? (

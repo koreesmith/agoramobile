@@ -9,7 +9,7 @@ import * as SecureStore from 'expo-secure-store'
 import { Image } from 'expo-image'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import { router, useNavigation } from 'expo-router'
+import { router, useIsFocused, useNavigation } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Header, Spinner, EmptyState, UploadingModal, Avatar } from '../../components/ui'
@@ -201,21 +201,31 @@ export default function FeedScreen() {
   // failed fetch doesn't hold it back for good. AMOBILE-205: it also waits
   // for the composer, which the wizard's "Write a post" opens on the way
   // out, since two sheets can't be up at once.
+  //
+  // Both sheets open only once the feed is in focus and a moment has passed
+  // for the wizard to finish animating away: iOS won't present a sheet from
+  // a screen that's covered or mid-transition, and Modal doesn't retry, so
+  // it would sit "visible" and never appear.
   const { data: me, isError: meFailed } = useMe()
   const onboardingSettled = (!!me && me.onboarding_completed !== false) || meFailed
-  useEffect(() => {
-    if (!onboardingSettled || showCompose) return
-    shouldShowWhatsNew().then(should => {
-      if (should && !useWelcomeStore.getState().composeRequested) setShowWhatsNew(true)
-    })
-  }, [onboardingSettled, showCompose])
-
   const composeRequested = useWelcomeStore(s => s.composeRequested)
+  const isFocused = useIsFocused()
   useEffect(() => {
-    if (!composeRequested) return
-    useWelcomeStore.getState().consumeCompose()
-    setShowCompose(true)
-  }, [composeRequested])
+    if (!onboardingSettled || showCompose || composeRequested || !isFocused) return
+    const t = setTimeout(() => {
+      shouldShowWhatsNew().then(should => { if (should) setShowWhatsNew(true) })
+    }, 500)
+    return () => clearTimeout(t)
+  }, [onboardingSettled, showCompose, composeRequested, isFocused])
+
+  useEffect(() => {
+    if (!composeRequested || !isFocused) return
+    const t = setTimeout(() => {
+      useWelcomeStore.getState().consumeCompose()
+      setShowCompose(true)
+    }, 500)
+    return () => clearTimeout(t)
+  }, [composeRequested, isFocused])
 
   const forceShowWhatsNew = useWhatsNewStore(s => s.forceShow)
   const consumeWhatsNew = useWhatsNewStore(s => s.consume)
