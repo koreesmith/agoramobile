@@ -22,6 +22,7 @@ import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
 import { useWhatsNewStore } from '../../store/whatsNew'
 import { useMe } from '../../components/welcome/useMe'
+import { useWelcomeStore } from '../../store/welcome'
 
 import { C } from '../../constants/colors'
 import { useC } from '../../constants/ColorContext'
@@ -197,13 +198,24 @@ export default function FeedScreen() {
   // AMOBILE-202: What's New waits while the getting started wizard is
   // pending for this account, so it can't open on top of it. Finishing the
   // wizard decides which way it goes (a returning member still gets it). A
-  // failed fetch doesn't hold it back for good.
+  // failed fetch doesn't hold it back for good. AMOBILE-205: it also waits
+  // for the composer, which the wizard's "Write a post" opens on the way
+  // out, since two sheets can't be up at once.
   const { data: me, isError: meFailed } = useMe()
   const onboardingSettled = (!!me && me.onboarding_completed !== false) || meFailed
   useEffect(() => {
-    if (!onboardingSettled) return
-    shouldShowWhatsNew().then(should => { if (should) setShowWhatsNew(true) })
-  }, [onboardingSettled])
+    if (!onboardingSettled || showCompose) return
+    shouldShowWhatsNew().then(should => {
+      if (should && !useWelcomeStore.getState().composeRequested) setShowWhatsNew(true)
+    })
+  }, [onboardingSettled, showCompose])
+
+  const composeRequested = useWelcomeStore(s => s.composeRequested)
+  useEffect(() => {
+    if (!composeRequested) return
+    useWelcomeStore.getState().consumeCompose()
+    setShowCompose(true)
+  }, [composeRequested])
 
   const forceShowWhatsNew = useWhatsNewStore(s => s.forceShow)
   const consumeWhatsNew = useWhatsNewStore(s => s.consume)

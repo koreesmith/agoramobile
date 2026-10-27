@@ -8,6 +8,12 @@ interface WelcomeState {
   // tabs remount.
   shownFor: string[]
   markShown: (accountId: string) => void
+  // AMOBILE-205: "Write a post" on the last step. The feed opens its
+  // composer once it's back on screen, the same hand-off Settings uses to
+  // open What's New there.
+  composeRequested: boolean
+  requestCompose: () => void
+  consumeCompose: () => void
 }
 
 export const useWelcomeStore = create<WelcomeState>((set, get) => ({
@@ -15,4 +21,7 @@ export const useWelcomeStore = create<WelcomeState>((set, get) => ({
   markShown: (accountId) => {
     if (!get().shownFor.includes(accountId)) set({ shownFor: [...get().shownFor, accountId] })
   },
+  composeRequested: false,
+  requestCompose: () => set({ composeRequested: true }),
+  consumeCompose: () => set({ composeRequested: false }),
 }))

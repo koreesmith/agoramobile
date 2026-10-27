@@ -73,9 +73,12 @@ export default function WelcomeScreen() {
   const setNotes: StepProps['setNotes'] = (update) =>
     setNotesState(n => ({ ...n, ...(typeof update === 'function' ? update(n) : update) }))
 
-  const leave = (_to: FinishTo) => {
+  // Back to the tabs whatever led here (the launch redirect or Settings),
+  // then on to the feed, or to the custom domain screen over it.
+  const leave = (to: FinishTo) => {
     if (router.canDismiss()) router.dismissAll()
-    router.navigate('/')
+    if (to === 'custom-domain') router.push('/custom-domain')
+    else router.navigate('/')
   }
 
   const finish = async (to: FinishTo = 'feed') => {
@@ -85,9 +88,11 @@ export default function WelcomeScreen() {
     try { await onboardingApi.complete() } catch { /* see above */ }
     // For a brand-new account What's New would only repeat the wizard, but a
     // returning member (AGORA-393) hasn't seen what changed, so theirs still
-    // shows on the feed afterwards. This has to land before the cache update
-    // below, which is what releases the feed's What's New check.
+    // shows on the feed afterwards. Both of these have to land before the
+    // cache update below, which is what releases the feed's What's New
+    // check: it waits for a requested composer to close.
     if (!me?.onboarding_returning) await markWhatsNewSeen()
+    if (to === 'compose') useWelcomeStore.getState().requestCompose()
     qc.setQueryData(meQueryKey(accountId), (old: any) => old && { ...old, onboarding_completed: true })
     leave(to)
   }

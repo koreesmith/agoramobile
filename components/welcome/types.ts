@@ -25,8 +25,9 @@ export interface WizardNotes {
   groupsJoined: number
 }
 
-// Where finishing leaves for.
-export type FinishTo = 'feed'
+// Where finishing leaves for: the feed, the feed with its composer open, or
+// the custom domain screen (the Bluesky step's saved reminder).
+export type FinishTo = 'feed' | 'compose' | 'custom-domain'
 
 export interface StepProps {
   current: StepId
