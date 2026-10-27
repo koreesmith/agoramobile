@@ -382,6 +382,12 @@ export const adminApi = {
   // Storage / orphaned media
   scanOrphans:    ()                             => api.get('/admin/media/orphans'),
   deleteOrphans:  ()                             => api.delete('/admin/media/orphans'),
+  // Remote media cache (AMOBILE-213, from web's AGORA-380/381)
+  getRemoteMediaCache:    ()          => api.get('/admin/media/remote-cache'),
+  updateRemoteMediaCache: (data: any) => api.put('/admin/media/remote-cache', data),
+  pruneRemoteMediaCache:  ()          => api.post('/admin/media/remote-cache/prune'),
+  clearRemoteMediaCache:  ()          => api.delete('/admin/media/remote-cache'),
+  refreshRemoteProfiles:  ()          => api.post('/admin/federation/refresh-profiles'),
   // Fediverse relays (AMOBILE-134)
   listRelays:   ()                 => api.get('/admin/relays'),
   addRelay:     (inboxUrl: string) => api.post('/admin/relays', { inbox_url: inboxUrl }),

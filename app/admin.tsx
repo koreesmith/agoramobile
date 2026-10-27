@@ -4,11 +4,16 @@ import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Spinner } from '../components/ui'
+import RemoteMediaCacheCard from '../components/RemoteMediaCacheCard'
 import { moderationApi, adminApi, waitlistApi, pagesApi, adminPagesApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
 
 type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'federation' | 'domains' | 'invites' | 'rules' | 'settings' | 'audit' | 'pages' | 'media'
+
+// Tabs whose label isn't just the id capitalized. 'media' keeps its id (as on
+// web) but is called Storage there, and now here too (AMOBILE-213).
+const TAB_LABELS: Partial<Record<Tab, string>> = { media: 'Storage' }
 
 // GetSettings (internal/admin/admin.go) serializes every instance_settings
 // value as a string ("true"/"false", not a JSON boolean), so `typeof value
@@ -490,7 +495,7 @@ export default function AdminScreen() {
           <TouchableOpacity key={t} onPress={() => setTab(t)}
             style={[s.tabItem, tab === t && { borderBottomColor: c.primary }]}>
             <Text style={[s.tabText, { color: tab === t ? c.primary : c.textMuted }]}>
-              {t.charAt(0).toUpperCase() + t.slice(1)}
+              {TAB_LABELS[t] ?? t.charAt(0).toUpperCase() + t.slice(1)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -1482,9 +1487,12 @@ export default function AdminScreen() {
         </ScrollView>
       )}
 
-      {/* Storage/Media tab: orphaned media scan/cleanup */}
+      {/* Storage tab: orphaned media scan/cleanup, and (AMOBILE-213) the
+          remote media cache, as on web. The cache card's number fields sit
+          low on the screen, hence the keyboard insets. */}
       {tab === 'media' && (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}
+          automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
           <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>Orphaned Media</Text>
             <Text style={{ color: c.textMd, fontSize: 13, marginBottom: 10 }}>
@@ -1546,6 +1554,8 @@ export default function AdminScreen() {
               </View>
             )}
           </View>
+
+          <RemoteMediaCacheCard />
         </ScrollView>
       )}
 
