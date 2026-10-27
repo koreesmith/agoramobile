@@ -1,14 +1,14 @@
 import { useEffect, useState, useRef } from 'react'
 import { Stack, router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { useColorScheme, StyleSheet, View, AppState, AppStateStatus } from 'react-native'
+import { StyleSheet, View, AppState, AppStateStatus } from 'react-native'
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import * as Notifications from 'expo-notifications'
 import * as SecureStore from 'expo-secure-store'
 import { useAuthStore } from '../store/auth'
 import { registerActivePush, clearPushForAccount } from '../utils/push'
-import { ColorProvider } from '../constants/ColorContext'
+import { ColorProvider, useIsDark } from '../constants/ColorContext'
 import { useThemeStore } from '../store/theme'
 import { useBlockStore } from '../store/blocks'
 import { useDiagnosticsStore } from '../store/diagnostics'
@@ -66,7 +66,9 @@ function AppContent() {
   const { loadPreference } = useThemeStore()
   const { loadBlocked } = useBlockStore()
   const { loadPreference: loadDiagnosticsPreference } = useDiagnosticsStore()
-  const scheme = useColorScheme()
+  // AMOBILE-209: the in-app Theme, not the phone's appearance, or the status
+  // bar is drawn dark on dark (or light on light) whenever the two differ.
+  const isDark = useIsDark()
   const notifListener = useRef<any>()
   const responseListener = useRef<any>()
   const lastSeenAccountRef = useRef<string | null>(null)
@@ -193,7 +195,7 @@ function AppContent() {
 
   return (
     <>
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />

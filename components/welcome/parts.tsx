@@ -2,15 +2,13 @@ import type { ReactNode } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, Switch, StyleSheet, type StyleProp, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { useC } from '../../constants/ColorContext'
+import { useC, useIsDark } from '../../constants/ColorContext'
 import { dark } from '../../constants/colors'
 
 // AMOBILE-202: building blocks shared by the getting started wizard's steps,
 // the mobile counterpart of web's WizardParts.
 
-export function useIsDark() {
-  return useC() === dark
-}
+export { useIsDark }
 
 // A step's scrolling body. Its footer sits outside it, pinned to the bottom.
 export function StepScroll({ children }: { children: ReactNode }) {
