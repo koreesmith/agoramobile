@@ -44,9 +44,13 @@ export default function SettingsScreen() {
     onSuccess: () => updateUser({ hide_timeline: !(user as any)?.hide_timeline } as any),
   })
 
+  // AMOBILE-206: wall_approval_required and dm_privacy (below) are the
+  // server's field names. This screen used to send approve_wall_posts and
+  // message_permissions, which PATCH /users/me silently ignores, so neither
+  // setting ever saved and both always showed their defaults.
   const toggleApproveWallPosts = useMutation({
-    mutationFn: () => usersApi.updateProfile({ approve_wall_posts: !(user as any)?.approve_wall_posts }),
-    onSuccess: () => updateUser({ approve_wall_posts: !(user as any)?.approve_wall_posts } as any),
+    mutationFn: () => usersApi.updateProfile({ wall_approval_required: !(user as any)?.wall_approval_required }),
+    onSuccess: () => updateUser({ wall_approval_required: !(user as any)?.wall_approval_required } as any),
   })
 
   const toggleActivityPub = useMutation({
@@ -74,10 +78,10 @@ export default function SettingsScreen() {
     { label: 'Friends only', value: 'friends' },
     { label: 'Nobody', value: 'nobody' },
   ]
-  const currentMsgPerm = (user as any)?.message_permissions ?? 'everyone'
+  const currentMsgPerm = (user as any)?.dm_privacy ?? 'everyone'
   const setMsgPerm = useMutation({
-    mutationFn: (value: string) => usersApi.updateProfile({ message_permissions: value }),
-    onSuccess: (_, value) => updateUser({ message_permissions: value } as any),
+    mutationFn: (value: string) => usersApi.updateProfile({ dm_privacy: value }),
+    onSuccess: (_, value) => updateUser({ dm_privacy: value } as any),
   })
 
   const { data: instanceData } = useQuery({
@@ -292,7 +296,7 @@ export default function SettingsScreen() {
         <Row icon="eye-off-outline" label="Hide timeline"
           right={<Switch value={!!(user as any)?.hide_timeline} onValueChange={() => toggleHideTimeline.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleHideTimeline.isPending} />} />
         <Row icon="checkmark-circle-outline" label="Approve wall posts"
-          right={<Switch value={!!(user as any)?.approve_wall_posts} onValueChange={() => toggleApproveWallPosts.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleApproveWallPosts.isPending} />} />
+          right={<Switch value={!!(user as any)?.wall_approval_required} onValueChange={() => toggleApproveWallPosts.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleApproveWallPosts.isPending} />} />
         <View style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
           <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
             <Ionicons name="chatbubble-ellipses-outline" size={18} color={c.primary} />
