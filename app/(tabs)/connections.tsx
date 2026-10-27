@@ -906,7 +906,9 @@ export default function ConnectionsScreen() {
 }
 
 const s = StyleSheet.create({
-  tabBar:        { flexDirection: 'row', borderBottomWidth: 1 },
+  // AMOBILE-211: a ScrollView grows by default, which left a tall blank band
+  // under the tabs. No fixed height (unlike admin's), so large text still fits.
+  tabBar:        { flexDirection: 'row', flexGrow: 0, flexShrink: 0, borderBottomWidth: 1 },
   tabItem:       { paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabText:       { fontSize: 15, fontWeight: '500', textTransform: 'capitalize' },
   searchWrap:    { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
