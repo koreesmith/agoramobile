@@ -1,5 +1,8 @@
 import type { StepDef, StepProps } from './types'
 import { StepFooter, StepHeader, StepScroll } from './parts'
+import WelcomeStep from './WelcomeStep'
+import ProfileStep from './ProfileStep'
+import PrivacyStep from './PrivacyStep'
 
 // AMOBILE-202: the wizard's steps, in order. Each one is built by its own
 // story (AMOBILE-203 to 205); until then a placeholder stands in for it.
@@ -20,9 +23,9 @@ function PlaceholderStep({ current, steps, next, back, finish, finishing }: Step
 }
 
 export const ALL_STEPS: StepDef[] = [
-  { id: 'welcome',   label: 'Welcome',      Component: PlaceholderStep },
-  { id: 'profile',   label: 'Your profile', Component: PlaceholderStep },
-  { id: 'privacy',   label: 'Privacy',      Component: PlaceholderStep },
+  { id: 'welcome',   label: 'Welcome',      Component: WelcomeStep },
+  { id: 'profile',   label: 'Your profile', Component: ProfileStep },
+  { id: 'privacy',   label: 'Privacy',      Component: PrivacyStep },
   { id: 'bluesky',   label: 'Bluesky',      Component: PlaceholderStep },
   { id: 'fediverse', label: 'Fediverse',    Component: PlaceholderStep },
   { id: 'people',    label: 'Find people',  Component: PlaceholderStep },
