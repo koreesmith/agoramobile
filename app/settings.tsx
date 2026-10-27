@@ -297,12 +297,17 @@ export default function SettingsScreen() {
           right={<Switch value={!!(user as any)?.hide_timeline} onValueChange={() => toggleHideTimeline.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleHideTimeline.isPending} />} />
         <Row icon="checkmark-circle-outline" label="Approve wall posts"
           right={<Switch value={!!(user as any)?.wall_approval_required} onValueChange={() => toggleApproveWallPosts.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleApproveWallPosts.isPending} />} />
-        <View style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-          <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
-            <Ionicons name="chatbubble-ellipses-outline" size={18} color={c.primary} />
+        {/* AMOBILE-208: the choices sit on a line of their own under the
+            label. Beside it they took most of a phone's width and squeezed
+            "Messages from" until it broke mid-word. */}
+        <View style={[s.stackedRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
+          <View style={s.stackedRowTop}>
+            <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
+              <Ionicons name="chatbubble-ellipses-outline" size={18} color={c.primary} />
+            </View>
+            <Text style={[s.rowLabel, { color: c.text }]}>Messages from</Text>
           </View>
-          <Text style={[s.rowLabel, { color: c.text }]}>Messages from</Text>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
+          <View style={s.stackedChoices}>
             {MESSAGE_PERM_OPTIONS.map(opt => (
               <TouchableOpacity key={opt.value} onPress={() => setMsgPerm.mutate(opt.value)}
                 style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1,
@@ -398,6 +403,10 @@ const s = StyleSheet.create({
   themeOption: { paddingHorizontal: 12, paddingVertical: 6 },
   themeOptionText: { fontSize: 15, fontWeight: '500' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
+  stackedRow: { gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
+  stackedRowTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  // Indented by the icon and its gap, so the choices line up under the label.
+  stackedChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 46 },
   rowIcon: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { flex: 1, fontSize: 17, color: C.text },
   label: { fontSize: 16, fontWeight: '500', color: C.textMd, marginBottom: 6 },
