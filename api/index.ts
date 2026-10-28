@@ -141,6 +141,9 @@ export const feedApi = {
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const usersApi = {
   getProfile:      (username: string) => api.get(`/users/${username}`),
+  // AMOBILE-220 (server side AGORA-381): fetch a Fediverse account's profile,
+  // avatar and cover again now instead of waiting for the hourly sync.
+  refreshRemoteProfile: (username: string) => api.post(`/users/${username}/refresh`),
   updateProfile:   (data: any)        => api.patch('/users/me', data),
   uploadAvatar:    (file: any)        => {
     const form = new FormData()

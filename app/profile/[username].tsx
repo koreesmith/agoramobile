@@ -49,6 +49,13 @@ export default function ProfileViewScreen() {
     qc.invalidateQueries({ queryKey: ['friends'] })
     qc.invalidateQueries({ queryKey: ['requests'] })
   }
+  // AMOBILE-220, mirroring web: re-fetch a remote account now, for when its
+  // name, avatar or cover look out of date.
+  const refreshRemote = useMutation({
+    mutationFn: () => usersApi.refreshRemoteProfile(username!),
+    onSuccess: inv,
+    onError: () => Alert.alert("Couldn't refresh", "Couldn't reach their server. Try again later."),
+  })
   const sendReq  = useMutation({
     mutationFn: () => friendsApi.sendRequest(profile!.id),
     onSuccess: inv,
@@ -388,6 +395,18 @@ export default function ProfileViewScreen() {
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <Text style={[s.username, { color: c.textMuted }]}>{handle(profile.username, (profile as any).is_remote, (profile as any).remote_instance)}</Text>
+            {/* AMOBILE-220: same rule as web, a remote account that isn't on
+                Bluesky (the refresh re-fetches an ActivityPub actor). */}
+            {me && !isSelf && (profile as any).is_remote && !isBluesky && (
+              <TouchableOpacity
+                onPress={() => refreshRemote.mutate()}
+                disabled={refreshRemote.isPending}
+                accessibilityLabel="Refresh this profile from its server"
+                hitSlop={8}
+              >
+                <Ionicons name="refresh" size={15} color={c.textMuted} style={refreshRemote.isPending ? { opacity: 0.4 } : undefined} />
+              </TouchableOpacity>
+            )}
             {/* AMOBILE-160: full size here, where identity lives, as on web. */}
             <CustomHandle domain={(profile as any).custom_domain} size="md" />
             {/* AGORA-249: fediverse/Bluesky mutual-follow indicator — meaningful
