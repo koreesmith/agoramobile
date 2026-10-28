@@ -8,6 +8,7 @@ import PostCard from '../components/PostCard'
 import { searchApi, pagesApi, atprotoApi, federationApi, imgUrl } from '../api'
 import { useC } from '../constants/ColorContext'
 import { handle, timeAgo } from '../utils/handle'
+import CustomHandle from '../components/CustomHandle'
 
 type Tab = 'users' | 'posts' | 'pages'
 
@@ -119,6 +120,7 @@ export default function SearchScreen() {
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={[s.displayName, { color: c.text }]}>{item.display_name ? renderName(item.display_name, item.emojis) : item.username}</Text>
           <Text style={[s.username, { color: c.textMuted }]}>{handle(item.username, item.is_remote, item.remote_instance)}</Text>
+          <CustomHandle domain={item.custom_domain} />
         </View>
         {label && (
           <View style={[s.badge, { backgroundColor: c.primaryBg, borderColor: c.primaryLt }]}>

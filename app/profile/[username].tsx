@@ -9,6 +9,7 @@ import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
 import { useC } from '../../constants/ColorContext'
 import { handle } from '../../utils/handle'
+import CustomHandle from '../../components/CustomHandle'
 
 export default function ProfileViewScreen() {
   const c = useC()
@@ -387,6 +388,8 @@ export default function ProfileViewScreen() {
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <Text style={[s.username, { color: c.textMuted }]}>{handle(profile.username, (profile as any).is_remote, (profile as any).remote_instance)}</Text>
+            {/* AMOBILE-160: full size here, where identity lives, as on web. */}
+            <CustomHandle domain={(profile as any).custom_domain} size="md" />
             {/* AGORA-249: fediverse/Bluesky mutual-follow indicator — meaningful
                 regardless of whether the viewer follows them back. */}
             {(isFediverse || isBluesky) && (profile as any).follows_back && (

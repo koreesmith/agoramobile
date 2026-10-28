@@ -17,6 +17,7 @@ import { useAuthStore } from '../store/auth'
 import { useBlockStore } from '../store/blocks'
 import { useToastStore } from '../store/toast'
 import { Avatar, LinkedText, renderName } from './ui'
+import CustomHandle from './CustomHandle'
 import { useC } from '../constants/ColorContext'
 import ReactorsModal from './ReactorsModal'
 import { REACTIONS, reactionDisplay, pickerMetrics } from '../utils/reactions'
@@ -517,6 +518,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 size={11}
                 color={c.textLight}
               />
+              {!isPagePost && <CustomHandle domain={post.author_custom_domain} />}
               {/* AMOBILE-199/AGORA-372: only ever set on the viewer's own
                   view of an external_only post — no other viewer's post
                   list can contain one of these rows. Renders the server's
@@ -576,6 +578,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 <Text style={[s.pronouns, { color: c.textLight }]}>({post.repost_author_pronouns})</Text>
               ) : null}
               <Text style={[s.quotedAuthorMeta, { color: c.textMuted }]}>{handle(post.repost_author_username)}</Text>
+              <CustomHandle domain={post.repost_author_custom_domain} />
             </View>
             {post.repost_content ? (
               <LinkedText text={post.repost_content} style={[s.quotedContent, { color: c.textMd }]} emojis={post.repost_content_emojis} />
