@@ -15,6 +15,7 @@ import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Header, Spinner, EmptyState, UploadingModal, Avatar } from '../../components/ui'
 import { useActiveAccount } from '../../components/ActiveAccount'
 import AutoGrowInput from '../../components/AutoGrowInput'
+import { AltTextModal, AltEditButton } from '../../components/AltText'
 import PostCard from '../../components/PostCard'
 import { feedApi, feedsApi, friendsApi, instanceApi, usersApi, pagesApi, groupMentionApi, atprotoApi, federationApi, imgUrl } from '../../api'
 import { trackInteraction } from '../../utils/interactions'
@@ -79,6 +80,10 @@ export default function FeedScreen() {
   const [showCompose, setShowCompose] = useState(false)
   const [content, setContent] = useState('')
   const [imageUrls, setImageUrls] = useState<string[]>([])
+  // AMOBILE-224: each photo's description, keyed by its uploaded URL so
+  // removing a photo can't shift another's description onto the wrong one.
+  const [altByUrl, setAltByUrl] = useState<Record<string, string>>({})
+  const [altEditing, setAltEditing] = useState<string | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [videoThumbUrl, setVideoThumbUrl] = useState<string | null>(null)
   // AMOBILE-180: a video upload returns a job id and transcodes in the
@@ -183,7 +188,7 @@ export default function FeedScreen() {
     stopVideoPolling()
     SecureStore.deleteItemAsync(PENDING_VIDEO_KEY)
     setVideoProcessing(false)
-    setContent(''); setImageUrls([]); setVideoUrl(null); setVideoThumbUrl(null)
+    setContent(''); setImageUrls([]); setAltByUrl({}); setVideoUrl(null); setVideoThumbUrl(null)
     setShowCW(false); setCwLabel('')
     setShowPoll(false); setPollOptions(['', '']); setPollMultiple(false)
     setPollAllowsNew(false); setPollExpiresHours(24)
@@ -415,6 +420,7 @@ export default function FeedScreen() {
     content,
     image_url: imageUrls[0] || '',
     image_urls: imageUrls,
+    image_alts: imageUrls.map(u => altByUrl[u] || ''), // AMOBILE-224; older servers ignore it
     video_url: videoUrl ?? '',
     video_thumb_url: videoThumbUrl ?? '',
     visibility: postAsPageSlug ? 'public' : visibility,
@@ -1095,6 +1101,7 @@ export default function FeedScreen() {
                       source={{ uri: imgUrl(url) }}
                       style={[s.imagePreview, { width: imageUrls.length > 1 ? Dimensions.get('window').width * 0.6 : Dimensions.get('window').width - 32 }]}
                       contentFit="cover"
+                      accessibilityLabel={altByUrl[url] || undefined}
                     />
                     <TouchableOpacity
                       onPress={() => setImageUrls(prev => prev.filter((_, j) => j !== i))}
@@ -1102,10 +1109,18 @@ export default function FeedScreen() {
                     >
                       <Ionicons name="close" size={14} color="white" />
                     </TouchableOpacity>
+                    <AltEditButton hasAlt={!!altByUrl[url]} onPress={() => setAltEditing(url)} />
                   </View>
                 ))}
               </ScrollView>
             ) : null}
+            <AltTextModal
+              visible={!!altEditing}
+              imageUri={altEditing ? imgUrl(altEditing) ?? undefined : undefined}
+              initial={altEditing ? altByUrl[altEditing] || '' : ''}
+              onSave={alt => { const url = altEditing; if (url) setAltByUrl(prev => ({ ...prev, [url]: alt })) }}
+              onClose={() => setAltEditing(null)}
+            />
 
             {!showPoll && videoUrl ? (
               <View style={{ marginTop: 12, position: 'relative' }}>

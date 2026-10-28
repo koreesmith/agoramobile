@@ -8,6 +8,7 @@ import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Spinner, Avatar, UploadingModal } from '../../components/ui'
 import { PostingAsLine } from '../../components/ActiveAccount'
 import PostCard from '../../components/PostCard'
+import { AltTextModal, AltEditButton } from '../../components/AltText'
 import { groupsApi, feedApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { C } from '../../constants/colors'
@@ -20,11 +21,14 @@ export default function GroupScreen() {
   const qc = useQueryClient()
   const [content, setContent] = useState('')
   const [imageUrls, setImageUrls] = useState<string[]>([])
+  // AMOBILE-224: each photo's description, keyed by its uploaded URL
+  const [altByUrl, setAltByUrl] = useState<Record<string, string>>({})
+  const [altEditing, setAltEditing] = useState<string | null>(null)
   const [showCW, setShowCW] = useState(false)
   const [cwLabel, setCwLabel] = useState('')
   const MAX_IMAGES = 10
 
-  const resetCompose = () => { setContent(''); setImageUrls([]); setShowCW(false); setCwLabel(''); setShowCompose(false) }
+  const resetCompose = () => { setContent(''); setImageUrls([]); setAltByUrl({}); setShowCW(false); setCwLabel(''); setShowCompose(false) }
   const [uploading, setUploading] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showCompose, setShowCompose] = useState(false)
@@ -50,6 +54,7 @@ export default function GroupScreen() {
       content,
       image_url: imageUrls[0] || '',
       image_urls: imageUrls,
+      image_alts: imageUrls.map(u => altByUrl[u] || ''), // AMOBILE-224; older servers ignore it
       content_warning: showCW && cwLabel.trim() ? cwLabel.trim() : '',
     }),
     onSuccess: () => { resetCompose(); qc.invalidateQueries({ queryKey: ['group-feed', slug] }) },
@@ -180,6 +185,7 @@ export default function GroupScreen() {
                               source={{ uri: url }}
                               style={[{ height: 100, borderRadius: 8 }, imageUrls.length > 1 ? { width: Dimensions.get('window').width * 0.45 } : { width: '100%' }]}
                               resizeMode="cover"
+                              accessibilityLabel={altByUrl[url] || undefined}
                             />
                             <TouchableOpacity
                               onPress={() => setImageUrls(prev => prev.filter((_, j) => j !== i))}
@@ -187,10 +193,18 @@ export default function GroupScreen() {
                             >
                               <Ionicons name="close" size={12} color="white" />
                             </TouchableOpacity>
+                            <AltEditButton hasAlt={!!altByUrl[url]} onPress={() => setAltEditing(url)} />
                           </View>
                         ))}
                       </ScrollView>
                     ) : null}
+                    <AltTextModal
+                      visible={!!altEditing}
+                      imageUri={altEditing ? imgUrl(altEditing) ?? undefined : undefined}
+                      initial={altEditing ? altByUrl[altEditing] || '' : ''}
+                      onSave={alt => { const url = altEditing; if (url) setAltByUrl(prev => ({ ...prev, [url]: alt })) }}
+                      onClose={() => setAltEditing(null)}
+                    />
                     <View style={[s.composeActions, { borderTopColor: c.border }]}>
                       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                         <TouchableOpacity onPress={pickImage} disabled={uploading || imageUrls.length >= MAX_IMAGES}>

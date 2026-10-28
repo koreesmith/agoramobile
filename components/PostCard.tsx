@@ -20,6 +20,7 @@ import { useBlockStore } from '../store/blocks'
 import { useToastStore } from '../store/toast'
 import { Avatar, LinkedText, renderName } from './ui'
 import CustomHandle from './CustomHandle'
+import { AltBadge } from './AltText'
 import { useC } from '../constants/ColorContext'
 import ReactorsModal from './ReactorsModal'
 import { REACTIONS, reactionDisplay, pickerMetrics } from '../utils/reactions'
@@ -400,7 +401,14 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
 
   // Normalize image URLs: prefer photo_urls array (AGORA-93), fall back to single image_url
   const rawImageUrls: string[] = post.photo_urls?.length ? post.photo_urls : post.image_url ? [post.image_url] : []
-  const postImageUrls = rawImageUrls.map((u: string) => imgUrl(u)).filter(Boolean) as string[]
+  // AMOBILE-224: photo_alts lines up with photo_urls; group and page feeds
+  // carry a lone image's description as image_alt instead. Paired before
+  // filtering so a dropped URL can't shift the descriptions after it.
+  const postImages = rawImageUrls
+    .map((u: string, i: number) => ({ uri: imgUrl(u), alt: (post.photo_alts?.[i] || (i === 0 ? post.image_alt : '') || '') as string }))
+    .filter(img => img.uri)
+  const postImageUrls = postImages.map(img => img.uri) as string[]
+  const postImageAlts = postImages.map(img => img.alt)
   const imageUrl = postImageUrls[0]
 
   const [videoPlaying, setVideoPlaying] = useState(false)
@@ -639,9 +647,12 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         {(!post.content_warning || twExpanded) && postImageUrls.length > 0 ? (
           <View style={s.imageWrapper}>
             {postImageUrls.length === 1 ? (
-              <TouchableOpacity onPress={() => openLightbox(0)} activeOpacity={0.9}>
-                <Image source={{ uri: postImageUrls[0] }} style={s.image} contentFit="cover" />
-              </TouchableOpacity>
+              <View>
+                <TouchableOpacity onPress={() => openLightbox(0)} activeOpacity={0.9} accessibilityRole="imagebutton" accessibilityLabel={postImageAlts[0] || undefined}>
+                  <Image source={{ uri: postImageUrls[0] }} style={s.image} contentFit="cover" />
+                </TouchableOpacity>
+                <AltBadge alt={postImageAlts[0]} />
+              </View>
             ) : (
               <ScrollView
                 horizontal
@@ -649,9 +660,12 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 contentContainerStyle={{ gap: 2 }}
               >
                 {postImageUrls.map((url, i) => (
-                  <TouchableOpacity key={i} onPress={() => openLightbox(i)} activeOpacity={0.9}>
-                    <Image source={{ uri: url }} style={s.imageMulti} contentFit="cover" />
-                  </TouchableOpacity>
+                  <View key={i}>
+                    <TouchableOpacity onPress={() => openLightbox(i)} activeOpacity={0.9} accessibilityRole="imagebutton" accessibilityLabel={postImageAlts[i] || undefined}>
+                      <Image source={{ uri: url }} style={s.imageMulti} contentFit="cover" />
+                    </TouchableOpacity>
+                    <AltBadge alt={postImageAlts[i]} />
+                  </View>
                 ))}
               </ScrollView>
             )}
@@ -683,6 +697,11 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                     </TouchableOpacity>
                   </View>
                 )}
+                {postImageAlts[lightboxIndex] ? (
+                  <ScrollView style={s.lightboxAltWrap}>
+                    <Text style={s.lightboxAlt}>{postImageAlts[lightboxIndex]}</Text>
+                  </ScrollView>
+                ) : null}
                 <Text style={s.lightboxClose}>✕ tap to close · pinch to zoom · hold to save</Text>
               </View>
             </Modal>
@@ -1204,6 +1223,8 @@ const s = StyleSheet.create({
   pickerItemActive: { borderRadius: 10 },
   lightboxBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' },
   lightboxClose: { color: 'rgba(255,255,255,0.5)', fontSize: 15, marginTop: 16 },
+  lightboxAltWrap: { maxHeight: 96, flexGrow: 0, marginTop: 12, paddingHorizontal: 20 },
+  lightboxAlt:   { color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 20 },
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
   menuSheet: { borderRadius: 16, borderWidth: 1, overflow: 'hidden', minWidth: 220 },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16 },
