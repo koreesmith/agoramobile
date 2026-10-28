@@ -5,10 +5,20 @@ import * as SecureStore from 'expo-secure-store'
 import { Ionicons } from '@expo/vector-icons'
 import { useC } from '../constants/ColorContext'
 
-const WHATS_NEW_VERSION = '4.0.0'
+// AMOBILE-217: the list grew after 4.0.0 first reached people, so the stored
+// marker moved on once to show the fuller list to anyone who had already
+// dismissed the original.
+const WHATS_NEW_VERSION = '4.0.0-2'
 const STORAGE_KEY = 'last_seen_whats_new'
 
 const FEATURES: { icon: string; title: string; desc: string; link?: string; linkText?: string }[] = [
+  {
+    icon: 'send-outline',
+    title: 'Choose where each post goes',
+    desc: 'Pick Agora, the Fediverse, Bluesky, or any mix of them for each post. You can even post to the Fediverse or Bluesky without posting on Agora.',
+    link: '/',
+    linkText: 'Try it in the composer →',
+  },
   {
     icon: 'git-network-outline',
     title: 'Friends across Agora instances',
@@ -24,6 +34,39 @@ const FEATURES: { icon: string; title: string; desc: string; link?: string; link
     linkText: 'Open Messages →',
   },
   {
+    icon: 'people-circle-outline',
+    title: 'More than one account',
+    desc: 'Sign in to several accounts, on one server or many, and switch between them by pressing and holding the Profile tab.',
+    link: '/manage-accounts',
+    linkText: 'Manage accounts →',
+  },
+  {
+    icon: 'compass-outline',
+    title: 'Find people on other Agora instances',
+    desc: 'Find Friends now suggests people from Agora instances this one connects with, and you can find a private profile by its exact handle to send a friend request.',
+    link: '/connections?tab=discover',
+    linkText: 'Find friends →',
+  },
+  {
+    icon: 'search-outline',
+    title: 'Search from anywhere',
+    desc: 'Search now sits above your feed pills, one tap away from every tab.',
+    link: '/search',
+    linkText: 'Try a search →',
+  },
+  {
+    icon: 'globe-outline',
+    title: 'Bring your own domain',
+    desc: "Use your own domain as your Bluesky handle. Once it's verified, it's your handle everywhere on Bluesky.",
+    link: '/custom-domain',
+    linkText: 'Set it up →',
+  },
+  {
+    icon: 'create-outline',
+    title: 'Wall posts',
+    desc: "Write on a friend's wall from their profile, and choose in Settings whether posts on your own wall wait for your approval.",
+  },
+  {
     icon: 'pin-outline',
     title: 'Pinned feed pills',
     desc: 'Pin your favorite feeds to the top of your feed bar, with an overflow sheet for the rest.',
@@ -34,11 +77,18 @@ const FEATURES: { icon: string; title: string; desc: string; link?: string; link
   {
     icon: 'eye-outline',
     title: 'See your followers',
-    desc: 'View your Fediverse and Bluesky follower and following lists, now with a dedicated Followers segment in each tab.',
+    desc: "View your Fediverse and Bluesky follower and following lists, now with a dedicated Followers segment in each tab. You'll also get a notification when someone new follows you.",
     link: '/connections?tab=fediverse&sub=followers',
     linkText: 'Check your followers →',
   },
   { icon: 'eye-off-outline', title: 'Hide a post', desc: 'Remove a post from your own timeline without deleting it.' },
+  {
+    icon: 'map-outline',
+    title: 'Getting started tour',
+    desc: 'A short tour for setting up your profile, privacy, and networks. Take it again anytime from Settings, under Help.',
+    link: '/welcome',
+    linkText: 'Take the tour →',
+  },
 ]
 
 export async function shouldShowWhatsNew(): Promise<boolean> {
