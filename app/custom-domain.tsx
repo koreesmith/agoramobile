@@ -43,6 +43,15 @@ export default function CustomDomainScreen() {
     onError: fail,
   })
 
+  // AMOBILE-219, mirroring web (AGORA-361): a single-user instance's own
+  // domain already resolves through it, so claiming it needs no DNS record or
+  // well-known file, just one call.
+  const claimInstanceDomain = useMutation({
+    mutationFn: () => customDomainApi.useInstanceDomain(),
+    onSuccess: () => { setErr(''); refresh() },
+    onError: fail,
+  })
+
   const claimed = data?.claim
   const inst = data?.instructions
 
@@ -79,6 +88,28 @@ export default function CustomDomainScreen() {
             {!!err && (
               <View style={[s.errorBox]}>
                 <Text style={{ color: '#b91c1c', fontSize: 14 }}>{err}</Text>
+              </View>
+            )}
+
+            {/* Offered only when an admin has turned this on and the instance
+                really has one user, and hidden once it's already the claimed
+                domain, since there's nothing left to do. Same rule as web. */}
+            {data?.single_user_domain_available && claimed?.domain !== data?.instance_domain && (
+              <View style={[s.infoBox, { backgroundColor: c.bg, flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
+                <Text style={[s.body, { color: c.text }]}>
+                  This instance has one user, so you can use{' '}
+                  <Text style={{ fontWeight: '600' }}>{data?.instance_domain}</Text> as your handle instantly, with no
+                  DNS setup.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => claimInstanceDomain.mutate()}
+                  disabled={claimInstanceDomain.isPending}
+                  style={[s.btn, { backgroundColor: claimInstanceDomain.isPending ? c.primaryLt : c.primary }]}
+                >
+                  <Text style={[s.btnText, { color: c.onPrimary }]}>
+                    {claimInstanceDomain.isPending ? 'Setting up…' : `Use ${data?.instance_domain}`}
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
 

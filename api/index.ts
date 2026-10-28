@@ -327,6 +327,9 @@ export const customDomainApi = {
   claim:   (domain: string) => api.post('/custom-domain', { domain }),
   verify:  ()               => api.post('/custom-domain/verify'),
   release: ()               => api.delete('/custom-domain'),
+  // AMOBILE-219 (server side AGORA-361): only offered when the server says
+  // single_user_domain_available, so older servers never see the call.
+  useInstanceDomain: ()     => api.post('/custom-domain/use-instance-domain'),
 }
 
 // ── Instance rules ────────────────────────────────────────────────────────────
