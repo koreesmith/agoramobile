@@ -569,7 +569,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         )}
 
         {(!post.content_warning || twExpanded) && content ? (
-          <LinkedText text={content} style={[s.content, { color: c.textMd }]} emojis={post.content_emojis} />
+          <LinkedText text={content} style={[s.content, { color: c.textMd }]} emojis={post.content_emojis} mentionDomains={post.mention_domains} />
         ) : null}
 
         {/* Quoted post — the original post being shared, nested so it reads as quoted material rather than the reposter's own words */}
@@ -591,7 +591,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               <CustomHandle domain={post.repost_author_custom_domain} />
             </View>
             {post.repost_content ? (
-              <LinkedText text={post.repost_content} style={[s.quotedContent, { color: c.textMd }]} emojis={post.repost_content_emojis} />
+              <LinkedText text={post.repost_content} style={[s.quotedContent, { color: c.textMd }]} emojis={post.repost_content_emojis} mentionDomains={post.mention_domains} />
             ) : null}
             {post.repost_image_url ? (
               <Image source={{ uri: imgUrl(post.repost_image_url) }} style={s.quotedImage} contentFit="cover" />
@@ -1124,7 +1124,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 {post.author_display_name ? renderName(post.author_display_name, post.author_emojis) : post.author_username}
                 <Text style={{ color: c.textMuted, fontWeight: '400' }}> {handle(post.author_username, post.is_remote, post.remote_instance)}</Text>
               </Text>
-              {post.content ? <LinkedText text={post.content} style={[s.sharePreviewContent, { color: c.textMd }]} emojis={post.content_emojis} numberOfLines={3} /> : null}
+              {post.content ? <LinkedText text={post.content} style={[s.sharePreviewContent, { color: c.textMd }]} emojis={post.content_emojis} numberOfLines={3} mentionDomains={post.mention_domains} /> : null}
               {(post.photo_urls?.length > 1 ? true : post.image_url) ? (
                 <Text style={{ fontSize: 13, color: c.textMuted, marginTop: 4 }}>
                   📷 {post.photo_urls?.length > 1 ? `${post.photo_urls.length} photos` : 'Photo'}

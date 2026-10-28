@@ -3,7 +3,7 @@ import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { C } from '../constants/colors'
-import { useC } from '../constants/ColorContext'
+import { useC, useIsDark } from '../constants/ColorContext'
 import { imgUrl } from '../api'
 import { URL_TOKEN, linkHref, trimUrl } from '../utils/linkify'
 
@@ -86,18 +86,28 @@ function emojiImg(shortcode: string, url: string, key: string | number) {
 /** Renders a string with URLs, @mentions, +group-slug tags as tappable
  * links, and (AGORA-258) recognized :shortcode: custom emoji as inline
  * images -- URLs open externally; mentions and group tags navigate in-app. */
-export function LinkedText({ text, style, linkStyle, emojis, numberOfLines }: { text: string; style?: object; linkStyle?: object; emojis?: EmojiMap; numberOfLines?: number }) {
+// mentionDomains (AMOBILE-225, mirroring web's AGORA-401) maps a mentioned
+// local username, lowercased, to its live custom domain, so a mention carries
+// the same verified mark CustomHandle puts beside a name.
+export function LinkedText({ text, style, linkStyle, emojis, numberOfLines, mentionDomains }: { text: string; style?: object; linkStyle?: object; emojis?: EmojiMap; numberOfLines?: number; mentionDomains?: Record<string, string> }) {
   const router = useRouter()
+  // CustomHandle's color: web's sky-600 and sky-400.
+  const badgeColor = useIsDark() ? '#38bdf8' : '#0284c7'
   const parts = text.split(LINK_REGEX)
 
   return (
     <Text style={style} numberOfLines={numberOfLines}>
       {parts.map((part, i) => {
         if (MENTION_RE.test(part)) {
+          // Only a bare @name is a local account; the name half of a dotted or
+          // Fediverse handle is someone else (the server skips those too).
+          const domain = /^@[a-zA-Z0-9_-]+$/.test(part) ? mentionDomains?.[part.slice(1).toLowerCase()] : undefined
           return (
             <Text key={i} style={[{ color: '#3b82f6', fontWeight: '600' }, linkStyle]}
-              onPress={() => router.push(`/profile/${part.slice(1)}` as any)}>
+              onPress={() => router.push(`/profile/${part.slice(1)}` as any)}
+              accessibilityLabel={domain ? `${part}, verified as ${domain}` : undefined}>
               {part}
+              {domain ? <Text>{' '}<Ionicons name="checkmark-circle" size={13} color={badgeColor} /></Text> : null}
             </Text>
           )
         }

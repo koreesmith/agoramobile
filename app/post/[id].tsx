@@ -100,7 +100,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
               </View>
             </View>
           ) : (
-            <Text style={[s.commentText, { color: c.textMd }]}><LinkedText text={comment.content} emojis={comment.content_emojis} />{comment.edited_at ? <Text style={{ color: c.textLight, fontSize: 12 }}> (edited)</Text> : null}</Text>
+            <Text style={[s.commentText, { color: c.textMd }]}><LinkedText text={comment.content} emojis={comment.content_emojis} mentionDomains={comment.mention_domains} />{comment.edited_at ? <Text style={{ color: c.textLight, fontSize: 12 }}> (edited)</Text> : null}</Text>
           )}
           {comment.image_url ? (
             <>
