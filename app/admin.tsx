@@ -7,7 +7,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../utils/image'
 import { Screen, Header, Spinner } from '../components/ui'
 import RemoteMediaCacheCard from '../components/RemoteMediaCacheCard'
-import { moderationApi, adminApi, waitlistApi, pagesApi, adminPagesApi, feedApi } from '../api'
+import { moderationApi, adminApi, waitlistApi, pagesApi, adminPagesApi, feedApi, imgUrl } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
 
@@ -1411,7 +1411,9 @@ export default function AdminScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                   <View style={[s.logoPreview, { backgroundColor: c.bg, borderColor: c.border }]}>
                     {settings.logo_url
-                      ? <Image source={{ uri: settings.logo_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      // logo_url is stored relative (/uploads/...); web resolves
+                      // it against its own origin, the app has to add the server.
+                      ? <Image source={{ uri: imgUrl(settings.logo_url) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                       : <Text style={{ fontSize: 22, fontWeight: '700', color: c.textLight }}>{String(settings.instance_name || 'A')[0].toUpperCase()}</Text>}
                   </View>
                   <View style={{ flex: 1, gap: 6 }}>
