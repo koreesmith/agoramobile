@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { feedApi, imgUrl, blockApi, moderationApi, friendsApi, pagesApi, hiddenPostsApi } from '../api'
 import { trackInteraction } from '../utils/interactions'
+import { isShareable, sharePost } from '../utils/share'
 import { handle, timeAgo } from '../utils/handle'
 import { useAuthStore } from '../store/auth'
 import { useBlockStore } from '../store/blocks'
@@ -193,7 +194,7 @@ const pw = StyleSheet.create({
 })
 
 export default function PostCard({ post, queryKey }: { post: any; queryKey: any[] }) {
-  const { user } = useAuthStore()
+  const { user, instanceUrl } = useAuthStore()
   const { addBlock } = useBlockStore()
   const showToast = useToastStore(s => s.show)
   const qc = useQueryClient()
@@ -320,9 +321,9 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
     }),
     onSuccess: () => {
       closeShareModal(); trackInteraction('repost', post.id); invalidate()
-      showToast('Shared!')
+      showToast('Reposted!')
     },
-    onError: (e: any) => showToast(e.response?.data?.error || 'Could not share post', 'error'),
+    onError: (e: any) => showToast(e.response?.data?.error || 'Could not repost', 'error'),
   })
 
   const closeShareModal = () => {
@@ -798,11 +799,20 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
 
           <TouchableOpacity
             style={s.actionBtn}
-            onPress={() => post.visibility === 'public' ? setShowShare(true) : Alert.alert('Cannot share', 'Friends-only posts cannot be shared.')}
+            accessibilityLabel="Repost"
+            onPress={() => post.visibility === 'public' ? setShowShare(true) : Alert.alert('Cannot repost', 'Friends-only posts cannot be reposted.')}
           >
             <Ionicons name="repeat" size={17} color={post.reposted ? c.primary : post.visibility !== 'public' ? c.border : c.textMuted} />
             {post.repost_count > 0 && <Text style={[s.actionCount, { color: post.reposted ? c.primary : c.textMuted }]}>{post.repost_count}</Text>}
           </TouchableOpacity>
+
+          {/* AMOBILE-229: send the post's link somewhere else through the
+              system share sheet, as distinct from Repost beside it. */}
+          {isShareable(post) && (
+            <TouchableOpacity style={s.actionBtn} accessibilityLabel="Share" onPress={() => sharePost(post, instanceUrl)}>
+              <Ionicons name="share-outline" size={17} color={c.textMuted} />
+            </TouchableOpacity>
+          )}
 
         </View>
 
@@ -1034,20 +1044,20 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         </View>
       </Modal>
 
-      {/* ── Share modal ───────────────────────────────────────────── */}
+      {/* ── Repost modal ──────────────────────────────────────────── */}
       <Modal visible={showShare} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeShareModal}>
         <View style={[s.editModal, { backgroundColor: c.card }]}>
           <View style={[s.editHeader, { borderBottomColor: c.border }]}>
             <TouchableOpacity onPress={closeShareModal}>
               <Text style={{ fontSize: 18, color: c.textMuted }}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[s.editTitle, { color: c.text }]}>Share post</Text>
+            <Text style={[s.editTitle, { color: c.text }]}>Repost</Text>
             <TouchableOpacity
               onPress={() => repost.mutate()}
               disabled={repost.isPending || (shareVisibility === 'group' && !shareFriendListId) || (showShareCW && !shareCW.trim())}
               style={[s.editSaveBtn, (repost.isPending || (shareVisibility === 'group' && !shareFriendListId) || (showShareCW && !shareCW.trim())) && { backgroundColor: c.primaryLt }]}
             >
-              <Text style={s.editSaveBtnText}>{repost.isPending ? '…' : 'Share'}</Text>
+              <Text style={s.editSaveBtnText}>{repost.isPending ? '…' : 'Repost'}</Text>
             </TouchableOpacity>
           </View>
 
