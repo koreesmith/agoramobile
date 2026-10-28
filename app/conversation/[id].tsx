@@ -30,6 +30,10 @@ export default function ConversationScreen() {
   const [uploading, setUploading] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [reactionTarget, setReactionTarget] = useState<string | null>(null)
+  // AMOBILE-218: the message being edited, if any. While set, the composer
+  // edits it in place instead of sending a new one, the same way web does.
+  const [editing, setEditing] = useState<{ id: string } | null>(null)
+  const [editText, setEditText] = useState('')
   const flatListRef = useRef<FlatList>(null)
 
   const { data: convData } = useQuery({ queryKey: ['conversation', id], queryFn: () => dmApi.getConversation(id!).then(r => r.data) })
@@ -47,6 +51,12 @@ export default function ConversationScreen() {
     mutationFn: () => dmApi.sendMessage(id!, text, imageUrl || undefined),
     onSuccess: () => { setText(''); setImageUrl(''); refetch(); qc.invalidateQueries({ queryKey: ['conversations'] }) },
   })
+  const edit     = useMutation({
+    mutationFn: () => dmApi.editMessage(editing!.id, editText.trim()),
+    onSuccess: () => { setEditing(null); setEditText(''); refetch() },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not edit message'),
+  })
+  const cancelEdit = () => { setEditing(null); setEditText('') }
   const del      = useMutation({ mutationFn: (msgId: string) => dmApi.deleteMessage(msgId), onSuccess: refetch })
   // AMOBILE-170: sends the reaction type, not the glyph. The endpoint used to
   // store whatever string it was handed and now validates against the canonical
@@ -142,8 +152,10 @@ export default function ConversationScreen() {
                       if (isOwn) {
                         Alert.alert('Message', undefined, [
                           { text: 'React', onPress: () => setReactionTarget(msg.id) },
-                          { text: 'Delete', style: 'destructive', onPress: () => del.mutate(msg.id) },
-                          { text: 'Cancel', style: 'cancel' },
+                          // An image-only message has no text to edit.
+                          ...(msg.content ? [{ text: 'Edit', onPress: () => { setEditing({ id: msg.id }); setEditText(msg.content) } }] : []),
+                          { text: 'Delete', style: 'destructive' as const, onPress: () => del.mutate(msg.id) },
+                          { text: 'Cancel', style: 'cancel' as const },
                         ])
                       } else {
                         setReactionTarget(msg.id)
@@ -154,7 +166,7 @@ export default function ConversationScreen() {
                     {msg.content ? <LinkedText text={msg.content} style={[s.bubbleText, isOwn && { color: 'white' }]} linkStyle={isOwn ? { color: 'rgba(255,255,255,0.9)' } : undefined} /> : null}
                     {msg.image_url ? <Image source={{ uri: msg.image_url }} style={s.bubbleImage} resizeMode="cover" /> : null}
                     <Text style={[s.bubbleTime, isOwn && { color: 'rgba(255,255,255,0.7)' }]}>
-                      {timeAgo(msg.created_at)}
+                      {timeAgo(msg.created_at)}{msg.edited_at ? ' · edited' : ''}
                     </Text>
                   </TouchableOpacity>
                   {myReaction && (
@@ -193,16 +205,40 @@ export default function ConversationScreen() {
           </View>
         </Modal>
 
+        {editing && (
+          <View style={[s.editBanner, { backgroundColor: c.primaryBg, borderTopColor: c.border }]}>
+            <Ionicons name="create-outline" size={15} color={c.textMuted} />
+            <Text style={[s.editBannerText, { color: c.textMuted }]}>Editing message</Text>
+            <TouchableOpacity onPress={cancelEdit} accessibilityLabel="Cancel editing" hitSlop={8}>
+              <Ionicons name="close" size={18} color={c.textMuted} />
+            </TouchableOpacity>
+          </View>
+        )}
         {(conv?.is_accepted !== false) && (
           <View style={[s.composer, { backgroundColor: c.card, borderTopColor: c.border, paddingBottom: Math.max(insets.bottom, 10) }]}>
-            <TouchableOpacity onPress={pickImage} disabled={uploading}>
-              {uploading ? <ActivityIndicator size="small" color={c.primary} /> : <Ionicons name="image-outline" size={22} color={c.primary} />}
-            </TouchableOpacity>
-            <TextInput style={s.input} placeholder="Message…" placeholderTextColor={c.textLight}
-              value={text} onChangeText={setText} multiline maxLength={2000} />
-            <TouchableOpacity onPress={() => (text.trim() || imageUrl) && send.mutate()} disabled={(!text.trim() && !imageUrl) || send.isPending}>
-              <Ionicons name="send" size={20} color={(text.trim() || imageUrl) ? c.primary : c.textLight} />
-            </TouchableOpacity>
+            {!editing && (
+              <TouchableOpacity onPress={pickImage} disabled={uploading}>
+                {uploading ? <ActivityIndicator size="small" color={c.primary} /> : <Ionicons name="image-outline" size={22} color={c.primary} />}
+              </TouchableOpacity>
+            )}
+            {editing ? (
+              <>
+                <TextInput style={s.input} placeholder="Edit message…" placeholderTextColor={c.textLight}
+                  value={editText} onChangeText={setEditText} multiline maxLength={2000} autoFocus />
+                <TouchableOpacity onPress={() => editText.trim() && edit.mutate()} disabled={!editText.trim() || edit.isPending}
+                  accessibilityLabel="Save edit">
+                  <Ionicons name="checkmark" size={22} color={editText.trim() ? c.primary : c.textLight} />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TextInput style={s.input} placeholder="Message…" placeholderTextColor={c.textLight}
+                  value={text} onChangeText={setText} multiline maxLength={2000} />
+                <TouchableOpacity onPress={() => (text.trim() || imageUrl) && send.mutate()} disabled={(!text.trim() && !imageUrl) || send.isPending}>
+                  <Ionicons name="send" size={20} color={(text.trim() || imageUrl) ? c.primary : c.textLight} />
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         )}
       </KeyboardAvoidingView>
@@ -233,6 +269,8 @@ const s = StyleSheet.create({
   bubbleTime: { fontSize: 11, color: C.textLight, marginTop: 3 },
   bubbleImage: { width: 180, height: 140, borderRadius: 8, marginTop: 4 },
   deleted: { fontSize: 13, color: C.textLight, fontStyle: 'italic', paddingHorizontal: 12, paddingVertical: 6 },
+  editBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6, borderTopWidth: StyleSheet.hairlineWidth },
+  editBannerText: { flex: 1, fontSize: 13 },
   removeImg: { position: 'absolute', top: 6, right: -2, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.card },
   input: { flex: 1, backgroundColor: C.bg, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 16, color: C.text, maxHeight: 100 },
