@@ -1456,8 +1456,20 @@ export default function AdminScreen() {
                       <Text style={{ fontSize: 16, fontWeight: '600', color: c.text }}>
                         {entry.action?.replace(/_/g, ' ') || 'Unknown action'}
                       </Text>
-                      {entry.admin_username && <Text style={{ fontSize: 13, color: c.textMuted }}>By @{entry.admin_username}</Text>}
-                      {entry.target_username && <Text style={{ fontSize: 13, color: c.textMuted }}>Target: @{entry.target_username}</Text>}
+                      {/* AMOBILE-222: the server sends actor_username; this
+                          read admin_username, which never existed, so who
+                          acted was never shown. target_username arrives with
+                          AGORA-397; anything else falls back to target_id,
+                          as on web. */}
+                      <Text style={{ fontSize: 13, color: c.textMuted }}>
+                        {entry.actor_username ? `By @${entry.actor_username}` : 'By a deleted account'}
+                      </Text>
+                      {(entry.target_username || entry.target_id) ? (
+                        <Text style={{ fontSize: 13, color: c.textMuted }}>
+                          Target: {entry.target_username ? `@${entry.target_username}`
+                            : entry.target_type === 'user' ? 'a deleted account' : entry.target_id}
+                        </Text>
+                      ) : null}
                       {entry.details && <Text style={{ fontSize: 13, color: c.textMd, marginTop: 3 }}>{entry.details}</Text>}
                     </View>
                     {entry.created_at && (
