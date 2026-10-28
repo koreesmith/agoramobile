@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, StyleSheet, Switch, ActivityIndicator, Share } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, StyleSheet, Switch, ActivityIndicator, Share, Image } from 'react-native'
 import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
+import * as ImagePicker from 'expo-image-picker'
+import { normalizeImageOrientation } from '../utils/image'
 import { Screen, Header, Spinner } from '../components/ui'
 import RemoteMediaCacheCard from '../components/RemoteMediaCacheCard'
-import { moderationApi, adminApi, waitlistApi, pagesApi, adminPagesApi } from '../api'
+import { moderationApi, adminApi, waitlistApi, pagesApi, adminPagesApi, feedApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
 
@@ -278,6 +280,22 @@ export default function AdminScreen() {
     },
     onError: () => Alert.alert('Error', 'Could not save settings'),
   })
+
+  // AMOBILE-221, parity with web's Settings tab: the instance logo, uploaded
+  // to the same 'instance' media category web uses and saved straight away,
+  // the way every other setting on this tab is.
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const pickLogo = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8, allowsEditing: true, aspect: [1, 1] })
+    if (result.canceled) return
+    setUploadingLogo(true)
+    try {
+      const uri = await normalizeImageOrientation(result.assets[0].uri)
+      const res = await feedApi.uploadMedia({ uri, type: 'image/jpeg', name: 'logo.jpg' } as any, 'instance')
+      updateSettings.mutate({ logo_url: res.data.url })
+    } catch { Alert.alert('Upload failed') }
+    finally { setUploadingLogo(false) }
+  }
 
   const createRule = useMutation({
     mutationFn: () => adminApi.createRule({ title: newRuleForm.title.trim(), description: newRuleForm.description.trim() || undefined }),
@@ -1388,7 +1406,35 @@ export default function AdminScreen() {
           {settingsLoading ? <Spinner /> : (
             <View style={{ gap: 12 }}>
               <Text style={[s.sectionTitle, { color: c.textMuted }]}>Instance Settings</Text>
-              {Object.entries(settings).filter(([key]) => key !== 'activitypub_enabled').map(([key, value]: [string, any]) => (
+              <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 8 }]}>Instance logo</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                  <View style={[s.logoPreview, { backgroundColor: c.bg, borderColor: c.border }]}>
+                    {settings.logo_url
+                      ? <Image source={{ uri: settings.logo_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      : <Text style={{ fontSize: 22, fontWeight: '700', color: c.textLight }}>{String(settings.instance_name || 'A')[0].toUpperCase()}</Text>}
+                  </View>
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <TouchableOpacity onPress={pickLogo} disabled={uploadingLogo || updateSettings.isPending}
+                      style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg, alignSelf: 'flex-start' }]}>
+                      {uploadingLogo
+                        ? <ActivityIndicator size="small" color={c.primary} />
+                        : <Text style={{ fontSize: 15, color: c.text }}>Upload logo</Text>}
+                    </TouchableOpacity>
+                    {!!settings.logo_url && (
+                      <TouchableOpacity onPress={() => Alert.alert('Remove logo?', undefined, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Remove', style: 'destructive', onPress: () => updateSettings.mutate({ logo_url: '' }) },
+                      ])}>
+                        <Text style={{ fontSize: 13, color: c.red }}>Remove logo</Text>
+                      </TouchableOpacity>
+                    )}
+                    <Text style={{ fontSize: 12, color: c.textMuted }}>Shown in the web sidebar. Square images work best.</Text>
+                  </View>
+                </View>
+              </View>
+              {/* logo_url has its own card above rather than a bare URL field. */}
+              {Object.entries(settings).filter(([key]) => key !== 'activitypub_enabled' && key !== 'logo_url').map(([key, value]: [string, any]) => (
                 <View key={key} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
                   <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>{key.replace(/_/g, ' ')}</Text>
                   {ENUM_SETTINGS[key] ? (
@@ -1723,6 +1769,7 @@ const s = StyleSheet.create({
   miniInput:        { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 15 },
   sectionTitle:     { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
   smallBtn:         { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  logoPreview:      { width: 56, height: 56, borderRadius: 12, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   statsGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   statCard:         { flexBasis: '47%', flexGrow: 1, borderWidth: 1, borderRadius: 12, padding: 14 },
   statValue:        { fontSize: 27, fontWeight: '700' },
