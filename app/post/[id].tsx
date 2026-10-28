@@ -110,7 +110,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
               <Modal visible={showCommentLightbox} transparent animationType="fade" onRequestClose={() => setShowCommentLightbox(false)}>
                 <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' }}>
                   <ZoomableImage
-                    uri={imgUrl(comment.image_url)}
+                    uri={imgUrl(comment.image_url) ?? ''}
                     width={screenWidth}
                     height={screenHeight * 0.8}
                     onClose={() => setShowCommentLightbox(false)}

@@ -304,7 +304,10 @@ export default function AdminScreen() {
   })
 
   const updateRule = useMutation({
-    mutationFn: () => editingRule ? adminApi.updateRule(editingRule.id, { title: editingRule.title, description: editingRule.description }) : Promise.resolve(),
+    mutationFn: async () => {
+      if (!editingRule) return
+      await adminApi.updateRule(editingRule.id, { title: editingRule.title, description: editingRule.description })
+    },
     onSuccess: () => { setEditingRule(null); qc.invalidateQueries({ queryKey: ['admin-rules'] }) },
     onError: () => Alert.alert('Error', 'Could not update rule'),
   })
@@ -1347,7 +1350,7 @@ export default function AdminScreen() {
             <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>No rules yet.</Text>
           ) : rules.map((rule: any, idx: number) => (
             <View key={rule.id} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
-              {editingRule?.id === rule.id ? (
+              {editingRule && editingRule.id === rule.id ? (
                 <View style={{ gap: 8 }}>
                   <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
                     value={editingRule.title} onChangeText={t => setEditingRule(e => e ? { ...e, title: t } : null)} />

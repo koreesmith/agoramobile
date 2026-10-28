@@ -3,7 +3,9 @@ import { View, Text, TouchableOpacity, ScrollView, TextInput, Switch, Alert, Key
 import { router, Stack } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import * as FileSystem from 'expo-file-system'
+// AMOBILE-223: the legacy API. Since SDK 54, cacheDirectory and downloadAsync
+// imported from 'expo-file-system' itself throw, which broke Export your data.
+import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
 import Constants from 'expo-constants'
 import * as WebBrowser from 'expo-web-browser'

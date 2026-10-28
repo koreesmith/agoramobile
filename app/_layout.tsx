@@ -77,8 +77,8 @@ function AppContent() {
   // AMOBILE-209: the in-app Theme, not the phone's appearance, or the status
   // bar is drawn dark on dark (or light on light) whenever the two differ.
   const isDark = useIsDark()
-  const notifListener = useRef<any>()
-  const responseListener = useRef<any>()
+  const notifListener = useRef<any>(null)
+  const responseListener = useRef<any>(null)
   const lastSeenAccountRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -152,8 +152,11 @@ function AppContent() {
           // Suppress the raw push for types where the backend sends placeholder text;
           // a properly-labelled local notification is fired by notifListener instead.
           const suppressRaw = data?.type === 'waitlist_signup'
+          // shouldShowAlert is deprecated; banner and list together are what it
+          // used to mean.
           return {
-            shouldShowAlert: !suppressRaw,
+            shouldShowBanner: !suppressRaw,
+            shouldShowList: !suppressRaw,
             shouldPlaySound: true,
             shouldSetBadge: true,
           }

@@ -57,7 +57,7 @@ export default function ConversationScreen() {
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not edit message'),
   })
   const cancelEdit = () => { setEditing(null); setEditText('') }
-  const del      = useMutation({ mutationFn: (msgId: string) => dmApi.deleteMessage(msgId), onSuccess: refetch })
+  const del      = useMutation({ mutationFn: (msgId: string) => dmApi.deleteMessage(msgId), onSuccess: () => { refetch() } })
   // AMOBILE-170: sends the reaction type, not the glyph. The endpoint used to
   // store whatever string it was handed and now validates against the canonical
   // set, so a glyph here is a 400.
@@ -66,7 +66,7 @@ export default function ConversationScreen() {
     onSuccess: () => { setReactionTarget(null); refetch() },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not react to message'),
   })
-  const unreact  = useMutation({ mutationFn: (msgId: string) => dmApi.unreactMessage(msgId), onSuccess: refetch })
+  const unreact  = useMutation({ mutationFn: (msgId: string) => dmApi.unreactMessage(msgId), onSuccess: () => { refetch() } })
   const accept = useMutation({ mutationFn: () => dmApi.acceptRequest(id!), onSuccess: () => qc.invalidateQueries({ queryKey: ['conversation', id] }) })
 
   const pickImage = async () => {

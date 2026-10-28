@@ -7,7 +7,9 @@ import AutoGrowInput from './AutoGrowInput'
 import PollVotersModal from './PollVotersModal'
 import { router } from 'expo-router'
 import * as MediaLibrary from 'expo-media-library'
-import * as FileSystem from 'expo-file-system'
+// AMOBILE-223: the legacy API. Since SDK 54, cacheDirectory and downloadAsync
+// imported from 'expo-file-system' itself throw, which broke Save image.
+import * as FileSystem from 'expo-file-system/legacy'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { feedApi, imgUrl, blockApi, moderationApi, friendsApi, pagesApi, hiddenPostsApi } from '../api'

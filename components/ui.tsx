@@ -163,17 +163,22 @@ export function Screen({ children }: { children: React.ReactNode }) {
   return <View style={[lay.screen, { backgroundColor: c.bg }]}>{children}</View>
 }
 
-export function Header({ title, right, back }: { title: string; right?: React.ReactNode; back?: boolean }) {
+// AMOBILE-223: `left` is a custom leading control, for a screen whose back
+// button needs its own handler (Create Page confirms before discarding). The
+// Pages screens passed one before Header accepted it, so it was dropped and
+// they had no back button at all.
+export function Header({ title, right, back, left }: { title: string; right?: React.ReactNode; back?: boolean; left?: React.ReactNode }) {
   const c = useC()
   const router = useRouter()
+  const lead = left ?? (back
+    ? <TouchableOpacity onPress={() => router.back()} style={lay.headerBack}>
+        <Ionicons name="chevron-back" size={24} color={c.primary} />
+      </TouchableOpacity>
+    : null)
   return (
     <View style={[lay.header, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-      {back
-        ? <TouchableOpacity onPress={() => router.back()} style={lay.headerBack}>
-            <Ionicons name="chevron-back" size={24} color={c.primary} />
-          </TouchableOpacity>
-        : null}
-      <Text style={[lay.headerTitle, { color: c.text, flex: back ? 1 : undefined }]}>{title}</Text>
+      {lead}
+      <Text style={[lay.headerTitle, { color: c.text, flex: lead ? 1 : undefined }]}>{title}</Text>
       {right && <View>{right}</View>}
     </View>
   )

@@ -148,7 +148,7 @@ export default function NotificationsScreen() {
       qc.setQueryData(['unread-count'], { count: 0 })
       return { prevNotifs, prevUnread }
     },
-    onError: (_err: any, _vars: any, ctx: any) => {
+    onError: (_err: any, _vars: void, ctx: any) => {
       if (ctx?.prevNotifs) qc.setQueryData(['notifications'], ctx.prevNotifs)
       if (ctx?.prevUnread) qc.setQueryData(['unread-count'], ctx.prevUnread)
     },
