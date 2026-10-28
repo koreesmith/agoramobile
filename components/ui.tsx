@@ -107,7 +107,7 @@ export function LinkedText({ text, style, linkStyle, emojis, numberOfLines, ment
               onPress={() => router.push(`/profile/${part.slice(1)}` as any)}
               accessibilityLabel={domain ? `${part}, verified as ${domain}` : undefined}>
               {part}
-              {domain ? <Text>{' '}<Ionicons name="checkmark-circle" size={13} color={badgeColor} /></Text> : null}
+              {domain ? <Text>{'\u00A0'}<Ionicons name="checkmark-circle" size={13} color={badgeColor} /></Text> : null}
             </Text>
           )
         }
