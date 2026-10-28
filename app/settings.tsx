@@ -13,6 +13,7 @@ import { Screen } from '../components/ui'
 import { usersApi, authApi, instanceApi, interactionsApi } from '../api'
 import { resetWhatsNew } from '../components/WhatsNewModal'
 import { useAuthStore } from '../store/auth'
+import { meQueryKey, useMe } from '../components/welcome/useMe'
 import { promptSignOut } from '../utils/signOut'
 import { useWhatsNewStore } from '../store/whatsNew'
 import { useToastStore } from '../store/toast'
@@ -33,7 +34,14 @@ export default function SettingsScreen() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [section, setSection] = useState<'main' | 'password' | 'email'>('main')
-  const [deletionScheduledAt, setDeletionScheduledAt] = useState<string | null>(null)
+  // AMOBILE-226: a pending deletion comes from /auth/me, so the cancel row
+  // shows up whenever one is scheduled, not only right after scheduling it
+  // in this screen. Servers without the field just never show it.
+  const { data: me } = useMe({ staleTime: 0 })
+  const activeAccountId = useAuthStore((s) => s.activeAccountId)
+  const deletionScheduledAt: string | null = me?.deletion_scheduled_at ?? null
+  const setDeletionScheduledAt = (at: string | null) =>
+    qc.setQueryData(meQueryKey(activeAccountId), (old: any) => old && { ...old, deletion_scheduled_at: at })
   const [exportLoading, setExportLoading] = useState(false)
 
   const togglePrivacy = useMutation({
@@ -148,8 +156,10 @@ export default function SettingsScreen() {
   const requestDeletion = useMutation({
     mutationFn: () => usersApi.requestDeletion(),
     onSuccess: (res) => {
-      setDeletionScheduledAt(res.data.deletion_scheduled_at)
-      const date = new Date(res.data.deletion_scheduled_at).toLocaleDateString()
+      // Servers before AGORA-405 only send scheduled_at.
+      const at = res.data.deletion_scheduled_at ?? res.data.scheduled_at
+      setDeletionScheduledAt(at)
+      const date = new Date(at).toLocaleDateString()
       Alert.alert('Account deletion scheduled', `Your account will be permanently deleted on ${date}. You can cancel this before then.`)
     },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not schedule deletion'),
