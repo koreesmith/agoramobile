@@ -190,7 +190,9 @@ export default function NotificationsScreen() {
     } else if (n.type === 'federation_request') {
       router.push({ pathname: '/admin', params: { tab: 'federation' } } as any)
     } else if (n.type.startsWith('custom_domain_')) {
-      router.push({ pathname: '/settings', params: { tab: 'bluesky' } } as any)
+      // AMOBILE-161: was /settings?tab=bluesky, a web route; mobile Settings
+      // has no tabs and the claim lives on its own screen.
+      router.push('/custom-domain' as any)
     } else if (n.type === 'wall_post_pending') {
       // AMOBILE-186: this fires on the wall owner's own account, so the
       // queue to review is always the recipient's own wall, regardless of

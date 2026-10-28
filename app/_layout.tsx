@@ -45,6 +45,14 @@ function getRouteForNotification(data: Record<string, string>): string | null {
       return '/(tabs)/messages'
     case 'waitlist_signup':
       return '/admin?tab=waitlist'
+    // AMOBILE-161: a custom-domain status change is about the claim, so it
+    // opens the screen that shows the claim's status and what to fix.
+    case 'custom_domain_live':
+    case 'custom_domain_verified':
+    case 'custom_domain_failed':
+    case 'custom_domain_lost':
+    case 'custom_domain_rejected':
+      return '/custom-domain'
     default:
       return '/(tabs)/notifications'
   }
