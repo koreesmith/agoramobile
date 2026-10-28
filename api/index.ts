@@ -61,6 +61,8 @@ export const authApi = {
     axios.post(`${instanceUrl}/api/auth/login`, { username_or_email: username, password }),
   register:          (data: any)              => api.post('/auth/register', data),
   registerWithUrl:   (url: string, data: any) => axios.post(`${url}/api/auth/register`, data),
+  // AMOBILE-227: the proof-of-work puzzle the register POST should carry.
+  signupChallengeWithUrl: (url: string) => axios.get(`${url}/api/auth/signup-challenge`, { timeout: 15000 }),
   me:         ()                 => api.get('/auth/me'),
   meWithUrl:  (instanceUrl: string, token: string) =>
     axios.get(`${instanceUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } }),

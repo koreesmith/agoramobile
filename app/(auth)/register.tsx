@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, StyleSheet } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { authApi } from '../../api'
 import { useC } from '../../constants/ColorContext'
+import { solveSignupChallenge, SignupSolution } from '../../utils/signupChallenge'
 
 export default function RegisterScreen() {
   const c = useC()
@@ -16,6 +17,20 @@ export default function RegisterScreen() {
   const [loading, setLoading]         = useState(false)
   const [done, setDone]               = useState<'verify' | 'waitlist' | null>(null)
 
+  // AMOBILE-227: solve the instance's proof-of-work puzzle while the form
+  // is being filled in. Without a solution the signup still goes through,
+  // but onto the waitlist.
+  const solution = useRef<Promise<SignupSolution | null> | null>(null)
+  const unmounted = useRef(false)
+  const startSolve = () => {
+    solution.current = instanceUrl ? solveSignupChallenge(instanceUrl, () => unmounted.current) : Promise.resolve(null)
+  }
+  useEffect(() => {
+    unmounted.current = false
+    startSolve()
+    return () => { unmounted.current = true }
+  }, [instanceUrl])
+
   const submit = async () => {
     if (!username.trim() || !email.trim() || !password.trim()) {
       Alert.alert('Missing fields', 'Please fill in all required fields.'); return
@@ -28,11 +43,13 @@ export default function RegisterScreen() {
     }
     setLoading(true)
     try {
+      const signupChallenge = await solution.current
       const res = await authApi.registerWithUrl(instanceUrl, {
         username: username.trim(),
         email: email.trim().toLowerCase(),
         password,
         display_name: displayName.trim() || username.trim(),
+        ...(signupChallenge && { signup_challenge: signupChallenge }),
       })
       if (res.data?.message === 'waitlist') {
         setDone('waitlist')
@@ -42,6 +59,8 @@ export default function RegisterScreen() {
     } catch (err: any) {
       const msg = err?.response?.data?.error || 'Registration failed. Please try again.'
       Alert.alert('Registration failed', msg)
+      // Each solution works once, so the next attempt needs a fresh one.
+      startSolve()
     } finally { setLoading(false) }
   }
 
