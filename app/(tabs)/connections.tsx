@@ -495,7 +495,7 @@ export default function ConnectionsScreen() {
               <Text style={[s.cardTitle, { color: c.text }]}>Your follows</Text>
               {following.length > 0 && (
                 <Text style={[s.cardSubtitle, { color: c.textMuted, marginTop: 2 }]}>
-                  Add to a friend list, show in your main feed (off by default), or get notified on new posts.
+                  Add to a friend list, show in your main feed (on by default), or get notified on new posts.
                 </Text>
               )}
               {following.length === 0 ? (
