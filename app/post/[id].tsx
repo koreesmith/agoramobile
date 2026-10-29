@@ -15,14 +15,11 @@ import { feedApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { C } from '../../constants/colors'
 import { useC } from '../../constants/ColorContext'
+import { REACTIONS, reactionDisplay, pickerMetrics } from '../../utils/reactions'
 
-const REACTIONS = [
-  { type: 'like', emoji: '❤️' }, { type: 'love', emoji: '😍' },
-  { type: 'laugh', emoji: '😂' }, { type: 'wow', emoji: '😮' },
-  { type: 'angry', emoji: '😡' }, { type: 'care', emoji: '🤗' },
-  { type: 'pride', emoji: '🏳️‍🌈' }, { type: 'thankful', emoji: '🙏' },
-  { type: 'vomit', emoji: '🤮' },
-]
+// AMOBILE-170: the comment picker carries the same ten reactions as the post one
+// and needs the same width-driven sizing. See pickerMetrics.
+const PICKER = pickerMetrics(Dimensions.get('window').width)
 
 // Depth controls indentation and avatar size
 const DEPTH_INDENT = 20
@@ -69,7 +66,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
 
   const reactionCounts: Record<string, number> = comment.reaction_counts || {}
   const totalReactions = Object.values(reactionCounts).reduce((a: any, b: any) => a + b, 0) as number
-  const myEmoji = REACTIONS.find(r => r.type === comment.my_reaction)?.emoji
+  const myEmoji = comment.my_reaction ? reactionDisplay(comment.my_reaction).emoji : undefined
   const avatarSize = DEPTH_AVATAR[Math.min(depth, 2)]
   const indent = depth * DEPTH_INDENT
 
@@ -95,7 +92,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
                 <TouchableOpacity onPress={() => edit.mutate()} disabled={!editContent.trim() || edit.isPending}
                   style={[s.actionBtn, { backgroundColor: c.primary, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6 }]}>
-                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>{edit.isPending ? 'Saving…' : 'Save'}</Text>
+                  <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>{edit.isPending ? 'Saving…' : 'Save'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => { setIsEditing(false); setEditContent(comment.content) }} style={[s.actionBtn, { paddingHorizontal: 12, paddingVertical: 5 }]}>
                   <Text style={{ color: c.textMuted, fontSize: 15 }}>Cancel</Text>
@@ -103,7 +100,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
               </View>
             </View>
           ) : (
-            <Text style={[s.commentText, { color: c.textMd }]}><LinkedText text={comment.content} emojis={comment.content_emojis} />{comment.edited_at ? <Text style={{ color: c.textLight, fontSize: 12 }}> (edited)</Text> : null}</Text>
+            <Text style={[s.commentText, { color: c.textMd }]}><LinkedText text={comment.content} emojis={comment.content_emojis} mentionDomains={comment.mention_domains} />{comment.edited_at ? <Text style={{ color: c.textLight, fontSize: 12 }}> (edited)</Text> : null}</Text>
           )}
           {comment.image_url ? (
             <>
@@ -113,7 +110,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
               <Modal visible={showCommentLightbox} transparent animationType="fade" onRequestClose={() => setShowCommentLightbox(false)}>
                 <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' }}>
                   <ZoomableImage
-                    uri={imgUrl(comment.image_url)}
+                    uri={imgUrl(comment.image_url) ?? ''}
                     width={screenWidth}
                     height={screenHeight * 0.8}
                     onClose={() => setShowCommentLightbox(false)}
@@ -128,7 +125,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
           {totalReactions > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
               {Object.entries(reactionCounts).filter(([, v]) => (v as number) > 0).map(([type, count]) => {
-                const emoji = REACTIONS.find(r => r.type === type)?.emoji ?? '❤️'
+                const emoji = reactionDisplay(type).emoji
                 const isActive = comment.my_reaction === type
                 return (
                   <TouchableOpacity key={type} onPress={() => { setReactorsTab(type); setShowReactors(true) }}
@@ -154,13 +151,21 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
                 onLongPress={() => {
                   wrapperRef.current?.measure((_x, _y, _w, h, pageX, pageY) => {
                     const sh = Dimensions.get('window').height
-                    setPickerPosition({ bottom: sh - pageY - h + 40, left: pageX })
+                    const sw = Dimensions.get('window').width
+                    // AMOBILE-170: clamp so the ten-item row can't run off the
+                    // right edge, which matters more here than on a post card
+                    // since a nested comment's anchor is already indented.
+                    const left = Math.max(PICKER.margin, Math.min(pageX, sw - PICKER.width - PICKER.margin))
+                    setPickerPosition({ bottom: sh - pageY - h + 40, left })
                     setShowPicker(true)
                   })
                 }}
                 delayLongPress={400}
               >
-                <Text style={{ fontSize: 16 }}>{myEmoji ?? '🤍'}</Text>
+                {/* Unreacted is an outline thumb now that Like is a thumbs-up (AMOBILE-170). */}
+                {myEmoji
+                  ? <Text style={{ fontSize: 16 }}>{myEmoji}</Text>
+                  : <Ionicons name="thumbs-up-outline" size={15} color={c.textMuted} />}
                 <Text style={[s.actionBtnText, { color: c.textLight }]}>React</Text>
               </TouchableOpacity>
             </View>
@@ -179,7 +184,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
                           comment.my_reaction === r.type && { backgroundColor: c.primaryBg },
                         ]}
                       >
-                        <Text style={{ fontSize: 27 }}>{r.emoji}</Text>
+                        <Text style={{ fontSize: PICKER.emoji, textAlign: 'center' }}>{r.emoji}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -411,8 +416,8 @@ const s = StyleSheet.create({
   reactionChip:    { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, borderWidth: 1 },
   actionBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionBtnText:   { fontSize: 13 },
-  pickerModal:     { position: 'absolute', borderWidth: 1, borderRadius: 24, padding: 8, flexDirection: 'row', gap: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10 },
-  pickerItem:      { borderRadius: 8, padding: 3 },
+  pickerModal:     { position: 'absolute', width: PICKER.width, borderWidth: 1, borderRadius: 24, paddingVertical: 8, flexDirection: 'row', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10 },
+  pickerItem:      { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 8, paddingVertical: 3 },
   composerWrap:    { borderTopWidth: 1 },
   replyBanner:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1 },
   replyBannerText: { fontSize: 15 },

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, StyleSheet } from 'react-native'
-import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Avatar, renderName } from './ui'
 import { friendsApi } from '../api'
@@ -19,15 +19,73 @@ interface PickerFriend {
 // Friend Lists screen with no idea which account it was tapped for, so
 // there was no way to actually add that specific account to a list from
 // there. This is a per-account add/remove picker instead, mirroring web's
-// shape (and its useQueries-based membership fetch, AGORA-261 — a
-// hand-rolled effect+Promise.all here would be just as prone to the same
-// "hangs on Loading forever" race if a background refetch of
-// ['friend-groups'] lands mid-fetch).
+// shape.
 export default function FriendListPickerModal({ friend, visible, onClose }: {
   friend: PickerFriend | null
   visible: boolean
   onClose: () => void
 }) {
+  // AMOBILE-216: mounted fresh for each opening, so the selection and the
+  // membership fetch always start clean instead of carrying over from the
+  // last time, or the last account, it was opened for.
+  if (!visible || !friend) return null
+  return <Picker key={friend.id} friend={friend} onClose={onClose} />
+}
+
+// AMOBILE-216: the picker used to learn membership by fetching every list's
+// full member list, one request per list, all at once, and to save with one
+// add or remove per changed list, also all at once. When some of those were
+// refused (a burst over the API rate limit was enough), a list that failed to
+// load just looked unticked, Save diffed against that guess, and whichever
+// writes got through were applied while the rest were silently lost.
+//
+// The server now answers both in a single request (AGORA-395), and the save is
+// all or nothing. This app can be signed in to an Agora server older than that,
+// which answers 404, so both fall back to the per-list endpoints, one request
+// at a time so a long set of lists is not one burst.
+
+type Membership = { ids: string[], perList: boolean }
+
+async function loadMembership(friendID: string, lists: any[]): Promise<Membership> {
+  try {
+    const r = await friendsApi.getFriendListMemberships(friendID)
+    return { ids: r.data.group_ids, perList: false }
+  } catch (e: any) {
+    if (e?.response?.status !== 404) throw e
+  }
+  // Any list failing fails the whole load, rather than leaving that list
+  // looking unticked.
+  const ids: string[] = []
+  for (const list of lists) {
+    const r = await friendsApi.getFriendListMembers(list.id)
+    if ((r.data?.members || []).some((m: any) => m.id === friendID)) ids.push(list.id)
+  }
+  return { ids, perList: true }
+}
+
+// Returns the IDs of lists whose change failed, which only the per-list
+// fallback can leave behind. A refusal of the all-or-nothing request throws,
+// with nothing applied.
+async function saveMembership(friendID: string, add: string[], remove: string[], perList: boolean): Promise<string[]> {
+  if (!perList) {
+    try {
+      await friendsApi.setFriendListMemberships(friendID, { add, remove })
+      return []
+    } catch (e: any) {
+      if (e?.response?.status !== 404) throw e
+    }
+  }
+  const failed: string[] = []
+  for (const id of add) {
+    try { await friendsApi.addFriendToList(id, friendID) } catch { failed.push(id) }
+  }
+  for (const id of remove) {
+    try { await friendsApi.removeFriendFromList(id, friendID) } catch { failed.push(id) }
+  }
+  return failed
+}
+
+function Picker({ friend, onClose }: { friend: PickerFriend, onClose: () => void }) {
   const c = useC()
   const qc = useQueryClient()
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -39,41 +97,38 @@ export default function FriendListPickerModal({ friend, visible, onClose }: {
   const [newListName, setNewListName] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const { data: listsData } = useQuery({
+  const listsQuery = useQuery({
     queryKey: ['friend-groups'],
     queryFn: () => friendsApi.listFriendLists().then(r => r.data),
-    enabled: visible,
   })
-  const lists: any[] = listsData?.groups || []
+  const lists: any[] = listsQuery.data?.groups || []
 
-  const membershipQueries = useQueries({
-    queries: lists.map(list => ({
-      queryKey: ['list-members', list.id],
-      queryFn: () => friendsApi.getFriendListMembers(list.id).then(r => r.data),
-      enabled: visible,
-    })),
+  // gcTime 0 so each opening fetches fresh instead of reusing an earlier
+  // opening's answer. Waits for the lists, which the per-list fallback needs.
+  const membershipQuery = useQuery({
+    queryKey: ['friend-list-memberships', friend.id],
+    queryFn: () => loadMembership(friend.id, lists),
+    enabled: !!listsQuery.data,
+    gcTime: 0,
+    retry: 2,
   })
-  const membershipLoaded = lists.length === 0 || membershipQueries.every(q => q.isSuccess || q.isError)
 
-  // Reset the one-time seed whenever the modal closes/reopens for a
-  // (possibly different) account, then seed selected/initialSelected once
-  // membership has resolved.
-  useEffect(() => {
-    if (!visible) { setSeeded(false); return }
-  }, [visible, friend?.id])
+  // Lists that loaded earlier are good enough even if a background refetch of
+  // them has since failed; membership is matched by list ID, not position.
+  const loadFailed = !seeded && ((listsQuery.isError && !listsQuery.data) || membershipQuery.isError)
+  const retrying = listsQuery.isFetching || membershipQuery.isFetching
+  const retryLoad = () => {
+    if (listsQuery.isError) listsQuery.refetch()
+    if (membershipQuery.isError) membershipQuery.refetch()
+  }
 
   useEffect(() => {
-    if (!visible || seeded || !membershipLoaded || !friend) return
-    const memberOf = new Set<string>()
-    lists.forEach((list, i) => {
-      const members: any[] = membershipQueries[i]?.data?.members || []
-      if (members.some((m: any) => m.id === friend.id)) memberOf.add(list.id)
-    })
+    if (seeded || !listsQuery.data || !membershipQuery.isSuccess) return
+    const memberOf = new Set<string>(membershipQuery.data.ids)
     setSelected(memberOf)
     setInitialSelected(memberOf)
     setSeeded(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, seeded, membershipLoaded, friend?.id])
+  }, [seeded, listsQuery.data, membershipQuery.isSuccess, membershipQuery.data])
 
   const createList = useMutation({
     mutationFn: (name: string) => friendsApi.createFriendList(name),
@@ -99,31 +154,55 @@ export default function FriendListPickerModal({ friend, visible, onClose }: {
   const hasChanges = toAdd.length > 0 || toRemove.length > 0
 
   const handleSave = async () => {
-    if (!friend) return
+    if (!seeded || !membershipQuery.data) return
     if (!hasChanges) { onClose(); return }
     setSaving(true)
     try {
-      await Promise.all([
-        ...toAdd.map(listID => friendsApi.addFriendToList(listID, friend.id)),
-        ...toRemove.map(listID => friendsApi.removeFriendFromList(listID, friend.id)),
-      ])
+      const failed = await saveMembership(friend.id, toAdd, toRemove, membershipQuery.data.perList)
       qc.invalidateQueries({ queryKey: ['friend-groups'] })
       for (const listID of [...toAdd, ...toRemove]) {
         qc.invalidateQueries({ queryKey: ['list-members', listID] })
       }
-      onClose()
+      if (failed.length === 0) { onClose(); return }
+      // Per-list fallback only. What went through becomes the new baseline,
+      // so Save again resends just the changes that failed.
+      setInitialSelected(prev => {
+        const next = new Set(prev)
+        for (const id of toAdd) if (!failed.includes(id)) next.add(id)
+        for (const id of toRemove) if (!failed.includes(id)) next.delete(id)
+        return next
+      })
+      const names = failed.map(id => lists.find((l: any) => l.id === id)?.name || 'a deleted list')
+      Alert.alert("Some changes weren't saved", `Couldn't update ${names.join(', ')}. Your other changes were saved. Tap Save to try again.`)
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || 'Could not update lists — please try again.')
+      // The selection is kept so Save can simply be tapped again: adding to a
+      // list the account is already on, or removing from one it isn't, is a
+      // no-op, so a retry is safe whatever happened to this attempt.
+      const msg: string | undefined = err.response?.data?.error
+      if (err.response?.status === 409) {
+        // A list was deleted elsewhere while this was open. Drop it from the
+        // selection so tapping Save again sends only lists that still exist.
+        await qc.refetchQueries({ queryKey: ['friend-groups'] })
+        const current = new Set<string>((qc.getQueryData<any>(['friend-groups'])?.groups || []).map((l: any) => l.id))
+        setSelected(s => new Set([...s].filter(id => current.has(id))))
+        setInitialSelected(s => new Set([...s].filter(id => current.has(id))))
+        Alert.alert('Nothing was saved', 'One of those lists was just deleted, so none of your changes were saved. Tap Save again to apply the rest.')
+      } else if (msg) {
+        Alert.alert('Nothing was saved', `${msg[0].toUpperCase()}${msg.slice(1)}. None of your changes were saved.`)
+      } else if (err.response?.status === 429) {
+        Alert.alert('Nothing was saved', 'Too many requests right now. None of your changes were saved, so try again in a moment.')
+      } else {
+        Alert.alert('Error', "Couldn't save your changes. Try again.")
+      }
     } finally {
       setSaving(false)
     }
   }
 
-  if (!friend) return null
   const displayName = friend.display_name || friend.username
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[s.container, { backgroundColor: c.card }]}>
         <View style={[s.header, { borderBottomColor: c.border }]}>
           <Text style={[s.title, { color: c.text }]}>Add to friend lists</Text>
@@ -141,10 +220,21 @@ export default function FriendListPickerModal({ friend, visible, onClose }: {
         </View>
 
         <ScrollView style={{ flex: 1 }}>
-          {lists.length === 0 ? (
-            <Text style={[s.emptyText, { color: c.textMuted }]}>No lists yet — create one below</Text>
-          ) : !membershipLoaded ? (
+          {loadFailed ? (
+            <View style={s.loadError}>
+              <Text style={[s.loadErrorText, { color: c.red }]}>Couldn't load this account's current lists.</Text>
+              <TouchableOpacity
+                onPress={retryLoad}
+                disabled={retrying}
+                style={[s.retryBtn, { borderColor: c.border }, retrying && { opacity: 0.5 }]}
+              >
+                <Text style={[s.retryText, { color: c.text }]}>{retrying ? 'Trying again…' : 'Try again'}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : !seeded ? (
             <ActivityIndicator style={{ marginTop: 24 }} color={c.primary} />
+          ) : lists.length === 0 ? (
+            <Text style={[s.emptyText, { color: c.textMuted }]}>No lists yet. Create one below.</Text>
           ) : (
             lists.map((list: any) => {
               const isSelected = selected.has(list.id)
@@ -155,7 +245,7 @@ export default function FriendListPickerModal({ friend, visible, onClose }: {
                   style={[s.listRow, { backgroundColor: isSelected ? c.primaryBg : 'transparent', borderBottomColor: c.border }]}
                 >
                   <View style={[s.checkbox, { borderColor: isSelected ? c.primary : c.border, backgroundColor: isSelected ? c.primary : 'transparent' }]}>
-                    {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
+                    {isSelected && <Ionicons name="checkmark" size={12} color={c.onPrimary} />}
                   </View>
                   <Text style={[s.listName, { color: c.text }]}>{list.name}</Text>
                   <Text style={[s.listMeta, { color: c.textMuted }]}>
@@ -175,14 +265,15 @@ export default function FriendListPickerModal({ friend, visible, onClose }: {
             value={newListName}
             onChangeText={setNewListName}
             returnKeyType="done"
-            onSubmitEditing={() => { const n = newListName.trim(); if (n) createList.mutate(n) }}
+            onSubmitEditing={() => { const n = newListName.trim(); if (n && seeded) createList.mutate(n) }}
+            editable={seeded}
           />
           <TouchableOpacity
             onPress={() => { const n = newListName.trim(); if (n) createList.mutate(n) }}
-            disabled={!newListName.trim() || createList.isPending}
-            style={[s.addBtn, { backgroundColor: c.primary }, (!newListName.trim() || createList.isPending) && { opacity: 0.5 }]}
+            disabled={!seeded || !newListName.trim() || createList.isPending}
+            style={[s.addBtn, { backgroundColor: c.primary }, (!seeded || !newListName.trim() || createList.isPending) && { opacity: 0.5 }]}
           >
-            <Ionicons name="add" size={18} color="#fff" />
+            <Ionicons name="add" size={18} color={c.onPrimary} />
           </TouchableOpacity>
         </View>
 
@@ -192,10 +283,10 @@ export default function FriendListPickerModal({ friend, visible, onClose }: {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleSave}
-            disabled={saving || !membershipLoaded}
-            style={[s.saveBtn, { backgroundColor: c.primary }, (saving || !membershipLoaded) && { opacity: 0.5 }]}
+            disabled={saving || !seeded}
+            style={[s.saveBtn, { backgroundColor: c.primary }, (saving || !seeded) && { opacity: 0.5 }]}
           >
-            <Text style={s.saveText}>{saving ? 'Saving…' : hasChanges ? 'Save changes' : 'Done'}</Text>
+            <Text style={[s.saveText, { color: c.onPrimary }]}>{saving ? 'Saving…' : hasChanges ? 'Save changes' : 'Done'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -212,6 +303,10 @@ const s = StyleSheet.create({
   friendName:     { fontSize: 16, fontWeight: '600' },
   friendUsername: { fontSize: 13, marginTop: 1 },
   emptyText:      { fontSize: 16, textAlign: 'center', paddingVertical: 24 },
+  loadError:      { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 16, gap: 12 },
+  loadErrorText:  { fontSize: 16, textAlign: 'center' },
+  retryBtn:       { borderWidth: 1, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 },
+  retryText:      { fontSize: 15, fontWeight: '600' },
   listRow:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   checkbox:       { width: 18, height: 18, borderRadius: 4, borderWidth: 2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   listName:       { flex: 1, fontSize: 16, fontWeight: '500' },

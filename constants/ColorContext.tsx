@@ -24,3 +24,9 @@ export function ColorProvider({ children }: { children: React.ReactNode }) {
 export function useC() {
   return useContext(ColorContext)
 }
+
+// Whether the app is drawing in its dark palette: the in-app Theme setting,
+// or the phone's own appearance while that's set to System.
+export function useIsDark() {
+  return useContext(ColorContext) === dark
+}

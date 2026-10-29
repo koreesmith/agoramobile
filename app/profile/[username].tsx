@@ -9,6 +9,7 @@ import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
 import { useC } from '../../constants/ColorContext'
 import { handle } from '../../utils/handle'
+import CustomHandle from '../../components/CustomHandle'
 
 export default function ProfileViewScreen() {
   const c = useC()
@@ -48,21 +49,48 @@ export default function ProfileViewScreen() {
     qc.invalidateQueries({ queryKey: ['friends'] })
     qc.invalidateQueries({ queryKey: ['requests'] })
   }
+  // AMOBILE-220, mirroring web: re-fetch a remote account now, for when its
+  // name, avatar or cover look out of date.
+  const refreshRemote = useMutation({
+    mutationFn: () => usersApi.refreshRemoteProfile(username!),
+    onSuccess: inv,
+    onError: () => Alert.alert("Couldn't refresh", "Couldn't reach their server. Try again later."),
+  })
   const sendReq  = useMutation({
     mutationFn: () => friendsApi.sendRequest(profile!.id),
     onSuccess: inv,
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not send friend request'),
   })
   const accept   = useMutation({ mutationFn: () => friendsApi.acceptRequest(profile!.id), onSuccess: inv })
+  const cancelReq = useMutation({
+    mutationFn: () => friendsApi.cancelRequest(profile!.id),
+    onSuccess: inv,
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not cancel the request'),
+  })
   const unfriend = useMutation({ mutationFn: () => friendsApi.unfriend(profile!.id), onSuccess: inv })
   const startDM  = useMutation({
     mutationFn: () => dmApi.startConversation(username!),
     onSuccess: (res) => router.push(`/conversation/${res.data.id}`)
   })
 
-  // AGORA-167: fediverse accounts have no friending concept — follow/notify
+  // AGORA-167: fediverse accounts have no friending concept, so follow/notify
   // (ap_following) is the equivalent, surfaced here instead of Add friend.
-  const isFediverse = !!(profile as any)?.ap_actor_url
+  //
+  // AMOBILE-172: an actor URL no longer identifies one. This read
+  // `!!ap_actor_url`, which was right while only Mastodon-style accounts had
+  // one; since AGORA-329 moved friend requests onto ActivityPub and AGORA-330
+  // removed the legacy transport, every remote Agora user has one too. So a
+  // friend on another Agora instance was being classified as a fediverse
+  // account and offered Follow, with no way to friend them at all, and a follow
+  // is not a substitute: friendship is what carries friends-only posts, list
+  // audiences and direct messages.
+  //
+  // can_friend (AGORA-334) is the backend answering the question directly,
+  // because the client genuinely cannot derive it. A remote Agora account then
+  // falls through to the same branch a local one takes, which is the point:
+  // they are a friend on another instance, not a different kind of thing.
+  const canFriend = !!(profile as any)?.can_friend
+  const isFediverse = !!(profile as any)?.ap_actor_url && !canFriend
   const followFed = useMutation({
     mutationFn: () => federationApi.followFediverseAccount((profile as any).ap_actor_url),
     onSuccess: inv,
@@ -96,6 +124,16 @@ export default function ProfileViewScreen() {
     mutationFn: () => atprotoApi.toggleFollowNotify((profile as any).follow_id, !(profile as any)?.follow_notify),
     onSuccess: inv,
   })
+
+  // AMOBILE-171: this account gates follows behind manual approval and the
+  // viewer isn't through that gate yet. Fediverse only, since AT Proto has no
+  // follow-approval mechanism. `following` means accepted rather than merely
+  // requested, and a mutual follow clears the lock just as an Accept does:
+  // either way no gate is left standing between the two accounts.
+  const followPending = !!(profile as any)?.follow_pending
+  const showLock = isFediverse && !isSelf
+    && !!(profile as any)?.manually_approves_followers
+    && !(profile as any)?.following && !(profile as any)?.follows_back
 
   const notifying = !!(profile as any)?.post_notifications_enabled
   const followNotif = useMutation({
@@ -166,31 +204,42 @@ export default function ProfileViewScreen() {
         <View style={[s.profileCard, { backgroundColor: c.card }]}>
           <View style={s.avatarRow}>
             <View style={[s.avatarBorder, { borderColor: c.card }]}>
-              <Avatar url={profile.avatar_url} name={profile.display_name || profile.username} size={72} />
+              <Avatar url={profile.avatar_url} name={profile.display_name || profile.username} size={72} locked={showLock} />
             </View>
             {!isSelf && (
               <View style={s.actions}>
                 {isFediverse ? (
                   <>
+                    {/* AMOBILE-171: three states, not two. A follow of a locked
+                        account sits un-Accepted for as long as its owner takes
+                        to approve it, and collapsing that into "not following"
+                        left the button showing Follow again on tap, as though
+                        nothing had been sent. Tapping through withdraws the
+                        request, which is the same unfollow call. */}
                     <TouchableOpacity
-                      onPress={() => (profile as any).following
-                        ? Alert.alert('Unfollow?', `Unfollow ${profile.display_name}?`, [
-                            { text: 'Cancel', style: 'cancel' },
-                            { text: 'Unfollow', style: 'destructive', onPress: () => unfollowFed.mutate() },
-                          ])
+                      onPress={() => (profile as any).following || followPending
+                        ? Alert.alert(
+                            followPending ? 'Withdraw request?' : 'Unfollow?',
+                            followPending
+                              ? `Withdraw your follow request to ${profile.display_name}?`
+                              : `Unfollow ${profile.display_name}?`,
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              { text: followPending ? 'Withdraw' : 'Unfollow', style: 'destructive', onPress: () => unfollowFed.mutate() },
+                            ])
                         : followFed.mutate()}
                       disabled={followFed.isPending || unfollowFed.isPending}
-                      style={[s.actionBtn, (profile as any).following
+                      style={[s.actionBtn, (profile as any).following || followPending
                         ? { borderColor: c.border }
                         : { borderColor: c.primary, backgroundColor: c.primary }]}
                     >
                       <Ionicons
-                        name={(profile as any).following ? 'checkmark' : 'person-add-outline'}
+                        name={(profile as any).following ? 'checkmark' : followPending ? 'time-outline' : 'person-add-outline'}
                         size={15}
-                        color={(profile as any).following ? c.textMd : 'white'}
+                        color={(profile as any).following || followPending ? c.textMd : c.onPrimary}
                       />
-                      <Text style={[s.actionBtnText, { color: (profile as any).following ? c.textMd : 'white' }]}>
-                        {(profile as any).following ? 'Following' : 'Follow'}
+                      <Text style={[s.actionBtnText, { color: (profile as any).following || followPending ? c.textMd : 'white' }]}>
+                        {(profile as any).following ? 'Following' : followPending ? 'Requested' : 'Follow'}
                       </Text>
                     </TouchableOpacity>
                     {(profile as any).following && (
@@ -227,7 +276,7 @@ export default function ProfileViewScreen() {
                       <Ionicons
                         name={(profile as any).following ? 'checkmark' : 'person-add-outline'}
                         size={15}
-                        color={(profile as any).following ? c.textMd : 'white'}
+                        color={(profile as any).following ? c.textMd : c.onPrimary}
                       />
                       <Text style={[s.actionBtnText, { color: (profile as any).following ? c.textMd : 'white' }]}>
                         {(profile as any).following ? 'Following' : 'Follow'}
@@ -269,18 +318,35 @@ export default function ProfileViewScreen() {
                     {!status && (
                       <TouchableOpacity onPress={() => sendReq.mutate()} disabled={sendReq.isPending}
                         style={[s.primaryBtn, { backgroundColor: c.primary }]}>
-                        <Text style={s.primaryBtnText}>Add friend</Text>
+                        <Text style={[s.primaryBtnText, { color: c.onPrimary }]}>Add friend</Text>
                       </TouchableOpacity>
                     )}
                     {status === 'pending' && (
-                      <View style={[s.actionBtn, { borderColor: c.border }]}>
-                        <Text style={{ fontSize: 15, color: c.textMuted }}>Pending</Text>
-                      </View>
+                      // AMOBILE-174: a sent request had no way back from here
+                      // either. Confirms first, since the button sits where
+                      // "Pending" used to and a stray tap should not silently
+                      // withdraw something the other person may be about to
+                      // accept.
+                      <TouchableOpacity
+                        onPress={() => Alert.alert(
+                          'Cancel request?',
+                          `Withdraw your friend request to ${profile.display_name || profile.username}?`,
+                          [
+                            { text: 'Keep waiting', style: 'cancel' },
+                            { text: 'Cancel request', style: 'destructive', onPress: () => cancelReq.mutate() },
+                          ],
+                        )}
+                        disabled={cancelReq.isPending}
+                        style={[s.actionBtn, { borderColor: c.border }]}
+                      >
+                        <Ionicons name="close-circle-outline" size={15} color={c.textMuted} />
+                        <Text style={[s.actionBtnText, { color: c.textMuted }]}>Pending</Text>
+                      </TouchableOpacity>
                     )}
                     {status === 'pending_incoming' && (
                       <TouchableOpacity onPress={() => accept.mutate()}
                         style={[s.primaryBtn, { backgroundColor: c.primary }]}>
-                        <Text style={s.primaryBtnText}>Accept</Text>
+                        <Text style={[s.primaryBtnText, { color: c.onPrimary }]}>Accept</Text>
                       </TouchableOpacity>
                     )}
                     {status === 'accepted' && (
@@ -329,6 +395,20 @@ export default function ProfileViewScreen() {
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <Text style={[s.username, { color: c.textMuted }]}>{handle(profile.username, (profile as any).is_remote, (profile as any).remote_instance)}</Text>
+            {/* AMOBILE-220: same rule as web, a remote account that isn't on
+                Bluesky (the refresh re-fetches an ActivityPub actor). */}
+            {me && !isSelf && (profile as any).is_remote && !isBluesky && (
+              <TouchableOpacity
+                onPress={() => refreshRemote.mutate()}
+                disabled={refreshRemote.isPending}
+                accessibilityLabel="Refresh this profile from its server"
+                hitSlop={8}
+              >
+                <Ionicons name="refresh" size={15} color={c.textMuted} style={refreshRemote.isPending ? { opacity: 0.4 } : undefined} />
+              </TouchableOpacity>
+            )}
+            {/* AMOBILE-160: full size here, where identity lives, as on web. */}
+            <CustomHandle domain={(profile as any).custom_domain} size="md" />
             {/* AGORA-249: fediverse/Bluesky mutual-follow indicator — meaningful
                 regardless of whether the viewer follows them back. */}
             {(isFediverse || isBluesky) && (profile as any).follows_back && (
@@ -381,6 +461,17 @@ export default function ProfileViewScreen() {
               <Text style={[s.albumsText, { color: c.primary }]}>
                 Albums{albumCount > 0 ? ` (${albumCount})` : ''}
               </Text>
+              <Ionicons name="chevron-forward" size={16} color={c.textLight} style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+          )}
+          {/* AMOBILE-186: Wall requires auth, same gate web uses. */}
+          {!!me && (
+            <TouchableOpacity
+              onPress={() => router.push(`/wall/${username}`)}
+              style={[s.albumsRow, { borderTopColor: c.border, borderTopWidth: showAlbums ? 0 : StyleSheet.hairlineWidth }]}
+            >
+              <Ionicons name="create-outline" size={16} color={c.primary} />
+              <Text style={[s.albumsText, { color: c.primary }]}>Wall</Text>
               <Ionicons name="chevron-forward" size={16} color={c.textLight} style={{ marginLeft: 'auto' }} />
             </TouchableOpacity>
           )}

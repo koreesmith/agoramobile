@@ -6,7 +6,9 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Spinner, Avatar, UploadingModal } from '../../components/ui'
+import { PostingAsLine } from '../../components/ActiveAccount'
 import PostCard from '../../components/PostCard'
+import { AltTextModal, AltEditButton } from '../../components/AltText'
 import { groupsApi, feedApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { C } from '../../constants/colors'
@@ -19,11 +21,14 @@ export default function GroupScreen() {
   const qc = useQueryClient()
   const [content, setContent] = useState('')
   const [imageUrls, setImageUrls] = useState<string[]>([])
+  // AMOBILE-224: each photo's description, keyed by its uploaded URL
+  const [altByUrl, setAltByUrl] = useState<Record<string, string>>({})
+  const [altEditing, setAltEditing] = useState<string | null>(null)
   const [showCW, setShowCW] = useState(false)
   const [cwLabel, setCwLabel] = useState('')
   const MAX_IMAGES = 10
 
-  const resetCompose = () => { setContent(''); setImageUrls([]); setShowCW(false); setCwLabel(''); setShowCompose(false) }
+  const resetCompose = () => { setContent(''); setImageUrls([]); setAltByUrl({}); setShowCW(false); setCwLabel(''); setShowCompose(false) }
   const [uploading, setUploading] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showCompose, setShowCompose] = useState(false)
@@ -49,6 +54,7 @@ export default function GroupScreen() {
       content,
       image_url: imageUrls[0] || '',
       image_urls: imageUrls,
+      image_alts: imageUrls.map(u => altByUrl[u] || ''), // AMOBILE-224; older servers ignore it
       content_warning: showCW && cwLabel.trim() ? cwLabel.trim() : '',
     }),
     onSuccess: () => { resetCompose(); qc.invalidateQueries({ queryKey: ['group-feed', slug] }) },
@@ -143,7 +149,7 @@ export default function GroupScreen() {
                 </View>
                 {!group.is_member && (
                   <TouchableOpacity onPress={() => join.mutate()} disabled={join.isPending} style={[s.joinBtn, { backgroundColor: c.primary }]}>
-                    <Text style={s.joinBtnText}>Join</Text>
+                    <Text style={[s.joinBtnText, { color: c.onPrimary }]}>Join</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -156,6 +162,7 @@ export default function GroupScreen() {
               <View style={[s.composer, { backgroundColor: c.card }]}>
                 {showCompose ? (
                   <>
+                    <PostingAsLine style={{ marginBottom: 8 }} />
                     {showCW && (
                       <View style={{ borderWidth: 1, borderColor: '#fcd34d', backgroundColor: '#fffbeb', borderRadius: 8, padding: 8, marginBottom: 8 }}>
                         <Text style={{ fontSize: 11, fontWeight: '600', color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>⚠️ Trigger warning</Text>
@@ -178,6 +185,7 @@ export default function GroupScreen() {
                               source={{ uri: url }}
                               style={[{ height: 100, borderRadius: 8 }, imageUrls.length > 1 ? { width: Dimensions.get('window').width * 0.45 } : { width: '100%' }]}
                               resizeMode="cover"
+                              accessibilityLabel={altByUrl[url] || undefined}
                             />
                             <TouchableOpacity
                               onPress={() => setImageUrls(prev => prev.filter((_, j) => j !== i))}
@@ -185,10 +193,18 @@ export default function GroupScreen() {
                             >
                               <Ionicons name="close" size={12} color="white" />
                             </TouchableOpacity>
+                            <AltEditButton hasAlt={!!altByUrl[url]} onPress={() => setAltEditing(url)} />
                           </View>
                         ))}
                       </ScrollView>
                     ) : null}
+                    <AltTextModal
+                      visible={!!altEditing}
+                      imageUri={altEditing ? imgUrl(altEditing) ?? undefined : undefined}
+                      initial={altEditing ? altByUrl[altEditing] || '' : ''}
+                      onSave={alt => { const url = altEditing; if (url) setAltByUrl(prev => ({ ...prev, [url]: alt })) }}
+                      onClose={() => setAltEditing(null)}
+                    />
                     <View style={[s.composeActions, { borderTopColor: c.border }]}>
                       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                         <TouchableOpacity onPress={pickImage} disabled={uploading || imageUrls.length >= MAX_IMAGES}>
@@ -209,7 +225,7 @@ export default function GroupScreen() {
                           <Text style={[s.cancelBtnText, { color: c.textMd }]}>Cancel</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => createPost.mutate()} disabled={(!content.trim() && imageUrls.length === 0) || createPost.isPending} style={[s.postBtn, { backgroundColor: c.primary }, (!content.trim() && imageUrls.length === 0) && { backgroundColor: c.primaryLt }]}>
-                          <Text style={s.postBtnText}>{createPost.isPending ? '…' : 'Post'}</Text>
+                          <Text style={[s.postBtnText, { color: c.onPrimary }]}>{createPost.isPending ? '…' : 'Post'}</Text>
                         </TouchableOpacity>
                       </View>
                     </View>

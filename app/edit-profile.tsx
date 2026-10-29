@@ -176,8 +176,8 @@ export default function EditProfileScreen() {
                 <Avatar url={avatarUrl} name={user?.display_name || user?.username} size={80} />
                 <View style={[f.editBadge, { backgroundColor: c.primary }]}>
                   {uploadingAvatar
-                    ? <ActivityIndicator size="small" color="white" />
-                    : <Text style={{ color: 'white', fontSize: 16 }}>✏️</Text>}
+                    ? <ActivityIndicator size="small" color={c.onPrimary} />
+                    : <Text style={{ color: c.onPrimary, fontSize: 16 }}>✏️</Text>}
                 </View>
               </View>
             </TouchableOpacity>
@@ -239,7 +239,7 @@ export default function EditProfileScreen() {
             disabled={save.isPending}
             style={[f.saveBtn, { backgroundColor: save.isPending ? c.primaryLt : c.primary }]}
           >
-            <Text style={f.saveBtnText}>{save.isPending ? 'Saving…' : 'Save changes'}</Text>
+            <Text style={[f.saveBtnText, { color: c.onPrimary }]}>{save.isPending ? 'Saving…' : 'Save changes'}</Text>
           </TouchableOpacity>
 
         </ScrollView>

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/auth'
+import { useToastStore } from '../store/toast'
 
 // Create a dynamic axios instance that reads instanceUrl from store at call time
 const api = axios.create()
@@ -15,7 +16,28 @@ api.interceptors.response.use(
   r => r,
   err => {
     if (err.response?.status === 401) {
-      useAuthStore.getState().logout()
+      // AMOBILE-196: a 401 expires one account's session, not the app.
+      // Drop only the account the request went out as (match on its token,
+      // then its instance), promote another if that one was active, and
+      // fall back to a full logout only if nothing matched.
+      const store = useAuthStore.getState()
+      const auth = err.config?.headers?.Authorization as string | undefined
+      const bearer = auth?.replace(/^Bearer\s+/i, '')
+      const baseURL = err.config?.baseURL as string | undefined
+      const hit =
+        store.accounts.find(a => a.token === bearer) ||
+        store.accounts.find(a => baseURL && baseURL.startsWith(a.instanceUrl)) ||
+        store.accounts.find(a => a.id === store.activeAccountId)
+      if (hit) {
+        const wasActive = hit.id === store.activeAccountId
+        const hadOthers = store.accounts.length > 1
+        store.removeAccount(hit.id)
+        if (wasActive && hadOthers) {
+          useToastStore.getState().show(`Signed out of @${hit.user.username} — the session expired`, 'error')
+        }
+      } else {
+        store.logout()
+      }
     }
     return Promise.reject(err)
   }
@@ -39,12 +61,23 @@ export const authApi = {
     axios.post(`${instanceUrl}/api/auth/login`, { username_or_email: username, password }),
   register:          (data: any)              => api.post('/auth/register', data),
   registerWithUrl:   (url: string, data: any) => axios.post(`${url}/api/auth/register`, data),
+  // AMOBILE-227: the proof-of-work puzzle the register POST should carry.
+  signupChallengeWithUrl: (url: string) => axios.get(`${url}/api/auth/signup-challenge`, { timeout: 15000 }),
   me:         ()                 => api.get('/auth/me'),
   meWithUrl:  (instanceUrl: string, token: string) =>
     axios.get(`${instanceUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } }),
   instance:   (baseUrl: string)  => axios.get(`${baseUrl}/api/instance`),
   changePassword: (data: any)    => api.post('/auth/change-password', data),
-  changeEmail:    (data: any)    => api.post('/auth/change-email', data),
+  // AMOBILE-184: this used to hit /auth/change-email, which the backend
+  // never registered. The actual endpoint is the two-step request+verify
+  // flow: this kicks it off, and the user completes it via the emailed link.
+  changeEmail:    (data: any)    => api.post('/auth/request-email-change', data),
+  // Pre-auth: instanceUrl isn't in the store yet, so these hit the instance
+  // directly like login()/registerWithUrl() do.
+  forgotPasswordWithUrl: (instanceUrl: string, email: string) =>
+    axios.post(`${instanceUrl}/api/auth/forgot-password`, { email }),
+  resetPasswordWithUrl:  (instanceUrl: string, token: string, newPassword: string) =>
+    axios.post(`${instanceUrl}/api/auth/reset-password`, { token, new_password: newPassword }),
 }
 
 // ── Feed ──────────────────────────────────────────────────────────────────────
@@ -54,6 +87,8 @@ export const feedsApi = {
   get:    (id: string)            => api.get(`/feeds/${id}`),
   update: (id: string, data: any) => api.put(`/feeds/${id}`, data),
   delete: (id: string)            => api.delete(`/feeds/${id}`),
+  setPinned:   (id: string, pinned: boolean) => api.put(`/feeds/${id}/pin`, { pinned }),
+  reorderPins: (feed_ids: string[])          => api.put('/feeds/pins/order', { feed_ids }),
 }
 
 export const feedApi = {
@@ -79,6 +114,12 @@ export const feedApi = {
   deleteComment:(postId: string, commentId: string) => api.delete(`/posts/${postId}/comments/${commentId}`),
   editComment:  (postId: string, commentId: string, content: string) => api.patch(`/posts/${postId}/comments/${commentId}`, { content }),
   getUserPosts: (username: string)   => api.get(`/users/${username}/posts`),
+  // AMOBILE-186: the active half of the wall feature (approve_wall_posts is
+  // already wired up in settings.tsx, but posting/reviewing had no path).
+  getWall:      (username: string)   => api.get(`/users/${username}/wall`),
+  getWallQueue: ()                   => api.get('/users/me/wall-queue'),
+  wallApprove:  (id: string)         => api.post(`/posts/${id}/wall-approve`),
+  wallReject:   (id: string)         => api.post(`/posts/${id}/wall-reject`),
   uploadMedia:  (file: any, category = 'posts') => {
     const form = new FormData()
     form.append('file', file)
@@ -86,6 +127,11 @@ export const feedApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
+  // AMOBILE-180: a 'videos' upload doesn't return a url synchronously the
+  // way an image upload does — it kicks off a background transcode and
+  // returns { job_id, status: 'processing' } immediately. Poll this until
+  // status is 'done' (url/thumb_url) or 'failed' (error).
+  getVideoJob:  (jobId: string)      => api.get(`/media/jobs/${jobId}`),
   previewUrl:   (url: string)        => api.get('/preview', { params: { url } }),
   // Guest-reachable — unauthenticated, so it bypasses the `api` instance
   // (which always attaches whatever token/instanceUrl auth store currently
@@ -97,6 +143,9 @@ export const feedApi = {
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const usersApi = {
   getProfile:      (username: string) => api.get(`/users/${username}`),
+  // AMOBILE-220 (server side AGORA-381): fetch a Fediverse account's profile,
+  // avatar and cover again now instead of waiting for the hourly sync.
+  refreshRemoteProfile: (username: string) => api.post(`/users/${username}/refresh`),
   updateProfile:   (data: any)        => api.patch('/users/me', data),
   uploadAvatar:    (file: any)        => {
     const form = new FormData()
@@ -124,6 +173,9 @@ export const friendsApi = {
   sendRequest:    (id: string)     => api.post(`/friends/request/${id}`),
   acceptRequest:  (id: string)     => api.post(`/friends/accept/${id}`),
   declineRequest: (id: string)     => api.post(`/friends/decline/${id}`),
+  // AMOBILE-174: withdraw a request you sent. For a remote addressee the
+  // backend also sends the Undo(Follow) that clears it on their side.
+  cancelRequest:  (id: string)     => api.delete(`/friends/request/${id}`),
   unfriend:       (id: string)     => api.delete(`/friends/${id}`),
   listFriendLists:    ()                                => api.get('/friend-groups'),
   createFriendList:   (name: string)                    => api.post('/friend-groups', { name }),
@@ -131,6 +183,11 @@ export const friendsApi = {
   getFriendListMembers: (groupId: string)               => api.get(`/friend-groups/${groupId}/members`),
   addFriendToList:    (groupId: string, friendId: string) => api.post(`/friend-groups/${groupId}/members/${friendId}`),
   removeFriendFromList: (groupId: string, friendId: string) => api.delete(`/friend-groups/${groupId}/members/${friendId}`),
+  // AMOBILE-216 (server side AGORA-395): one account's lists in one request,
+  // and an all-or-nothing change to them. Both answer { group_ids }. Servers
+  // older than that answer 404; FriendListPickerModal falls back.
+  getFriendListMemberships: (friendId: string)          => api.get(`/friend-groups/memberships/${friendId}`),
+  setFriendListMemberships: (friendId: string, changes: { add: string[], remove: string[] }) => api.put(`/friend-groups/memberships/${friendId}`, changes),
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────
@@ -164,6 +221,7 @@ export const groupsApi = {
   getInvites:     (slug: string)                     => api.get(`/groups/${slug}/invites`),
   createInvite:   (slug: string)                     => api.post(`/groups/${slug}/invites`),
   deleteInvite:   (slug: string, token: string)      => api.delete(`/groups/${slug}/invites/${token}`),
+  joinByInvite:   (token: string)                    => api.get(`/groups/join-by-invite/${token}`),
   requestJoin:    (slug: string)                     => api.post(`/groups/${slug}/request`),
   getRequests:    (slug: string)                     => api.get(`/groups/${slug}/requests`),
   approveRequest: (slug: string, requestId: string)  => api.post(`/groups/${slug}/requests/${requestId}/approve`),
@@ -196,6 +254,14 @@ export const searchApi = {
 // ── Invites ───────────────────────────────────────────────────────────────────
 export const inviteApi = {
   send: (email: string) => api.post('/invites/send', { email }),
+}
+
+// ── Getting started wizard (AMOBILE-202) ─────────────────────────────────────
+// Server side is AGORA-387. Finishing or skipping on either web or here
+// counts for both, since the state lives on the account.
+export const onboardingApi = {
+  complete:    () => api.post('/onboarding/complete'),
+  suggestions: () => api.get('/onboarding/suggestions'),
 }
 
 // ── Instance ──────────────────────────────────────────────────────────────────
@@ -235,6 +301,8 @@ export const federationApi = {
   followFediverseAccount:   (actorUrl: string) => api.post('/federation/follow', { actor_url: actorUrl }),
   unfollowFediverseAccount: (id: string)       => api.delete(`/federation/follow/${id}`),
   listFollowing:            ()                 => api.get('/federation/following'),
+  // AGORA-348: the caller's own inbound followers, self-scoped only.
+  listFollowers:            ()                 => api.get('/federation/followers'),
   toggleFollowNotify:       (id: string, notify: boolean) => api.put(`/federation/follow/${id}/notify`, { notify }),
   toggleShowInFeed:         (id: string, showInFeed: boolean) => api.put(`/federation/follow/${id}/show-in-feed`, { show_in_feed: showInFeed }),
 }
@@ -245,6 +313,8 @@ export const atprotoApi = {
   followBlueskyAccount:   (actor: string)  => api.post('/atproto/follow', { actor }),
   unfollowBlueskyAccount: (id: string)     => api.delete(`/atproto/follow/${id}`),
   listBlueskyFollowing:   ()               => api.get('/atproto/following'),
+  // AGORA-348: the caller's own inbound followers, self-scoped only.
+  listBlueskyFollowers:   ()               => api.get('/atproto/followers'),
   toggleFollowNotify:     (id: string, notify: boolean) => api.put(`/atproto/follow/${id}/notify`, { notify }),
   // AGORA-236: per-follow main-feed opt-in, mirroring federationApi's own toggleShowInFeed.
   toggleShowInFeed:       (id: string, showInFeed: boolean) => api.put(`/atproto/follow/${id}/show-in-feed`, { show_in_feed: showInFeed }),
@@ -255,12 +325,32 @@ export const atprotoApi = {
   searchBlueskyPosts:  (q: string) => api.get('/atproto/search/posts', { params: { q } }),
 }
 
+// ── Custom domain handles (AGORA-278) ────────────────────────────────────────
+// One claim per account: the endpoints are singular and take no id.
+export const customDomainApi = {
+  get:     ()               => api.get('/custom-domain'),
+  claim:   (domain: string) => api.post('/custom-domain', { domain }),
+  verify:  ()               => api.post('/custom-domain/verify'),
+  release: ()               => api.delete('/custom-domain'),
+  // AMOBILE-219 (server side AGORA-361): only offered when the server says
+  // single_user_domain_available, so older servers never see the call.
+  useInstanceDomain: ()     => api.post('/custom-domain/use-instance-domain'),
+}
+
 // ── Instance rules ────────────────────────────────────────────────────────────
 export const rulesApi = {
   list: () => api.get('/instance/rules'),
 }
 
 // ── Blocking ──────────────────────────────────────────────────────────────────
+// AGORA-309: per-user, per-post timeline hiding. A client of one: it changes
+// nothing for anybody else and notifies no one.
+export const hiddenPostsApi = {
+  list:   ()               => api.get('/hidden-posts'),
+  hide:   (postId: string) => api.post(`/posts/${postId}/hide`),
+  unhide: (postId: string) => api.delete(`/posts/${postId}/hide`),
+}
+
 export const blockApi = {
   blockUser:   (username: string) => api.post(`/blocks/${username}`),
   unblockUser: (username: string) => api.delete(`/blocks/${username}`),
@@ -272,6 +362,8 @@ export const adminApi = {
   getStats:       ()                             => api.get('/admin/stats'),
   listUsers:      (q?: string)                   => api.get('/admin/users', { params: { q } }),
   setRole:        (userID: string, role: string) => api.patch(`/admin/users/${userID}/role`, { role }),
+  deleteUser:         (userID: string)           => api.delete(`/admin/users/${userID}`),
+  resendVerification: (userID: string)           => api.post(`/admin/users/${userID}/resend-verification`),
   // Settings
   getSettings:    ()                             => api.get('/admin/settings'),
   updateSettings: (data: any)                    => api.patch('/admin/settings', data),
@@ -281,6 +373,10 @@ export const adminApi = {
   updateRule:     (id: string, data: any)        => api.patch(`/admin/rules/${id}`, data),
   deleteRule:     (id: string)                   => api.delete(`/admin/rules/${id}`),
   moveRule:       (id: string, direction: 'up' | 'down') => api.patch(`/admin/rules/${id}/move`, { direction }),
+  // Custom domain handles (AGORA-286)
+  listCustomDomains:   (status?: string)            => api.get('/admin/custom-domains', { params: { status } }),
+  approveCustomDomain: (id: string)                 => api.post(`/admin/custom-domains/${id}/approve`),
+  rejectCustomDomain:  (id: string, reason: string) => api.post(`/admin/custom-domains/${id}/reject`, { reason }),
   // Invites
   listInvites:    ()                             => api.get('/admin/invites'),
   createInvite:   ()                             => api.post('/admin/invites'),
@@ -292,9 +388,19 @@ export const adminApi = {
   addInstance:     (domain: string)              => api.post('/admin/federation/instances', { domain }),
   blockInstance:   (id: string)                  => api.post(`/admin/federation/instances/${id}/block`),
   unblockInstance: (id: string)                  => api.post(`/admin/federation/instances/${id}/unblock`),
+  // AMOBILE-176: removing a peer without blocking it (AGORA-320), and the
+  // per-peer timeline exchange (AGORA-322).
+  disconnectInstance:  (id: string)              => api.delete(`/admin/federation/instances/${id}`),
+  setInstanceTimeline: (id: string, enabled: boolean) => api.put(`/admin/federation/instances/${id}/timeline`, { enabled }),
   // Storage / orphaned media
   scanOrphans:    ()                             => api.get('/admin/media/orphans'),
   deleteOrphans:  ()                             => api.delete('/admin/media/orphans'),
+  // Remote media cache (AMOBILE-213, from web's AGORA-380/381)
+  getRemoteMediaCache:    ()          => api.get('/admin/media/remote-cache'),
+  updateRemoteMediaCache: (data: any) => api.put('/admin/media/remote-cache', data),
+  pruneRemoteMediaCache:  ()          => api.post('/admin/media/remote-cache/prune'),
+  clearRemoteMediaCache:  ()          => api.delete('/admin/media/remote-cache'),
+  refreshRemoteProfiles:  ()          => api.post('/admin/federation/refresh-profiles'),
   // Fediverse relays (AMOBILE-134)
   listRelays:   ()                 => api.get('/admin/relays'),
   addRelay:     (inboxUrl: string) => api.post('/admin/relays', { inbox_url: inboxUrl }),
@@ -351,7 +457,10 @@ export const pollApi = {
 export const waitlistApi = {
   list:    ()            => api.get('/admin/waitlist'),
   approve: (id: string)  => api.post(`/admin/waitlist/${id}/approve`),
-  reject:  (id: string)  => api.post(`/admin/waitlist/${id}/reject`),
+  // AMOBILE-181: rejection is a DELETE on the waitlist entry itself, not a
+  // POST to a /reject sub-path (which the backend never registered) — matches
+  // the web client and the actual backend route (internal/admin/admin.go).
+  reject:  (id: string)  => api.delete(`/admin/waitlist/${id}`),
 }
 
 // ── Albums ────────────────────────────────────────────────────────────────────

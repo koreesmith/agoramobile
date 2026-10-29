@@ -5,14 +5,17 @@ import {
   KeyboardAvoidingView, Platform, Dimensions,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import * as SecureStore from 'expo-secure-store'
 import { Image } from 'expo-image'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import { router } from 'expo-router'
+import { router, useIsFocused, useNavigation } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Header, Spinner, EmptyState, UploadingModal, Avatar } from '../../components/ui'
+import { useActiveAccount } from '../../components/ActiveAccount'
 import AutoGrowInput from '../../components/AutoGrowInput'
+import { AltTextModal, AltEditButton } from '../../components/AltText'
 import PostCard from '../../components/PostCard'
 import { feedApi, feedsApi, friendsApi, instanceApi, usersApi, pagesApi, groupMentionApi, atprotoApi, federationApi, imgUrl } from '../../api'
 import { trackInteraction } from '../../utils/interactions'
@@ -20,9 +23,27 @@ import WhatsNewModal, { shouldShowWhatsNew } from '../../components/WhatsNewModa
 import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
 import { useWhatsNewStore } from '../../store/whatsNew'
+import { useMe } from '../../components/welcome/useMe'
+import { useWelcomeStore } from '../../store/welcome'
 
 import { C } from '../../constants/colors'
 import { useC } from '../../constants/ColorContext'
+import { findFirstUrl } from '../../utils/linkify'
+
+// AMOBILE-167: the feed the user was last reading, so relaunching the app does
+// not silently drop them back to Home. Mirrors the /feed?f=<id> URL state the
+// web client gained in AGORA-303.
+const ACTIVE_FEED_KEY = 'agora_active_feed_id'
+
+// AMOBILE-180: persists the in-flight video transcode job id, mirroring
+// web's own PENDING_VIDEO_KEY (AGORA-137), so backgrounding or relaunching
+// the app while a video is still processing resumes the poll instead of
+// losing track of the job.
+const PENDING_VIDEO_KEY = 'agora_pending_video_job'
+
+// Past this many feeds the sheet stops being scannable and earns a search
+// field. Below it, search is a control nobody needs. Matches web.
+const FEED_SEARCH_THRESHOLD = 8
 
 function isGifUrl(url: string): boolean {
   if (!url) return false
@@ -40,12 +61,14 @@ function isGifUrl(url: string): boolean {
   return false
 }
 
-const URL_RE = /https?:\/\/[^\s]+/g
+// Max gap between two Feed tab presses to count as a double tap.
+const DOUBLE_TAP_MS = 300
 
 export default function FeedScreen() {
   const c = useC()
   const insets = useSafeAreaInsets()
   const { user } = useAuthStore()
+  const { multi: multiAccount, handle: accountHandle } = useActiveAccount()
   const { blockedIds } = useBlockStore()
   const { data: instanceData } = useQuery({
     queryKey: ['instance-info'],
@@ -57,8 +80,16 @@ export default function FeedScreen() {
   const [showCompose, setShowCompose] = useState(false)
   const [content, setContent] = useState('')
   const [imageUrls, setImageUrls] = useState<string[]>([])
+  // AMOBILE-224: each photo's description, keyed by its uploaded URL so
+  // removing a photo can't shift another's description onto the wrong one.
+  const [altByUrl, setAltByUrl] = useState<Record<string, string>>({})
+  const [altEditing, setAltEditing] = useState<string | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [videoThumbUrl, setVideoThumbUrl] = useState<string | null>(null)
+  // AMOBILE-180: a video upload returns a job id and transcodes in the
+  // background, unlike an image upload which returns its url immediately —
+  // see startVideoPolling below.
+  const [videoProcessing, setVideoProcessing] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showCW, setShowCW] = useState(false)
@@ -70,14 +101,32 @@ export default function FeedScreen() {
   const [pollExpiresHours, setPollExpiresHours] = useState(24)
   const [visibility, setVisibility] = useState<'public'|'friends'|'group'>('friends')
   const [friendListId, setFriendListId] = useState('')
+  // AMOBILE-198: per-post network targeting, only meaningful for Public.
+  // All three default on — the untouched state that sends the same payload
+  // (no federate_activitypub/federate_atproto/external_only at all) as
+  // before this control existed.
+  const [agoraEnabled, setAgoraEnabled] = useState(true)
+  const [federateAP, setFederateAP] = useState(true)
+  const [federateATProto, setFederateATProto] = useState(true)
   const [showVisibilitySheet, setShowVisibilitySheet] = useState(false)
   const [showListSheet, setShowListSheet] = useState(false)
   const [linkPreview, setLinkPreview] = useState<{url:string,title:string,description:string,image:string,domain:string}|null>(null)
   const [linkFetching, setLinkFetching] = useState(false)
-  const [activeFeedId, setActiveFeedId] = useState<string | null>(null)
+  // AMOBILE-167: seeded synchronously from storage so the first render already
+  // shows the feed the user was last reading, rather than flashing Home first.
+  const [activeFeedId, setActiveFeedId] = useState<string | null>(() => SecureStore.getItem(ACTIVE_FEED_KEY) || null)
+  const [showFeedSheet, setShowFeedSheet] = useState(false)
+  const [feedQuery, setFeedQuery] = useState('')
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [postAsPageSlug, setPostAsPageSlug] = useState<string | null>(null)
   const [showWhatsNew, setShowWhatsNew] = useState(false)
+
+  const selectFeed = useCallback((id: string | null) => {
+    setActiveFeedId(id)
+    setShowFeedSheet(false)
+    if (id) SecureStore.setItemAsync(ACTIVE_FEED_KEY, id)
+    else SecureStore.deleteItemAsync(ACTIVE_FEED_KEY)
+  }, [])
 
   const { data: customFeedsData } = useQuery({
     queryKey: ['custom-feeds'],
@@ -85,6 +134,26 @@ export default function FeedScreen() {
     staleTime: 0,
   })
   const customFeeds: any[] = customFeedsData || []
+
+  // The server returns pinned feeds first, already in the user's order.
+  const pinnedFeeds:   any[] = customFeeds.filter(f => f.pinned)
+  const unpinnedFeeds: any[] = customFeeds.filter(f => !f.pinned)
+
+  // An unpinned feed picked from the sheet joins the pill row while it stays
+  // selected, so the row always shows which feed is being read.
+  const promotedFeed = activeFeedId ? unpinnedFeeds.find(f => f.id === activeFeedId) : undefined
+  const pillFeeds    = promotedFeed ? [...pinnedFeeds, promotedFeed] : pinnedFeeds
+  const sheetFeeds   = promotedFeed ? unpinnedFeeds.filter(f => f.id !== promotedFeed.id) : unpinnedFeeds
+  const feedMatches  = feedQuery.trim()
+    ? sheetFeeds.filter(f => f.name.toLowerCase().includes(feedQuery.trim().toLowerCase()))
+    : sheetFeeds
+
+  // A feed deleted on another device would otherwise leave the picker stuck on
+  // an id the server no longer knows, with no pill to show for it.
+  useEffect(() => {
+    if (!activeFeedId || !customFeedsData) return
+    if (!customFeedsData.some((f: any) => f.id === activeFeedId)) selectFeed(null)
+  }, [activeFeedId, customFeedsData, selectFeed])
 
   const { data: groupsData } = useQuery({
     queryKey: ['friend-lists'],
@@ -113,11 +182,18 @@ export default function FeedScreen() {
   const selectedFriendList = friendLists.find((g: any) => g.id === friendListId)
 
   const resetCompose = () => {
-    setContent(''); setImageUrls([]); setVideoUrl(null); setVideoThumbUrl(null)
+    // AMOBILE-180: a post can only submit once a pending video finishes (the
+    // submit button stays disabled while videoProcessing), so there's never
+    // a job actually in flight here — stopping regardless is just defensive.
+    stopVideoPolling()
+    SecureStore.deleteItemAsync(PENDING_VIDEO_KEY)
+    setVideoProcessing(false)
+    setContent(''); setImageUrls([]); setAltByUrl({}); setVideoUrl(null); setVideoThumbUrl(null)
     setShowCW(false); setCwLabel('')
     setShowPoll(false); setPollOptions(['', '']); setPollMultiple(false)
     setPollAllowsNew(false); setPollExpiresHours(24)
     setVisibility('friends'); setFriendListId('')
+    setAgoraEnabled(true); setFederateAP(true); setFederateATProto(true)
     setLinkPreview(null); setLinkFetching(false)
     setPostAsPageSlug(null)
     setMentionQuery(null); setBlueskyQuery(null); setFediverseQuery(null)
@@ -126,9 +202,37 @@ export default function FeedScreen() {
 
   const MAX_IMAGES = 10
 
+  // AMOBILE-202: What's New waits while the getting started wizard is
+  // pending for this account, so it can't open on top of it. Finishing the
+  // wizard decides which way it goes (a returning member still gets it). A
+  // failed fetch doesn't hold it back for good. AMOBILE-205: it also waits
+  // for the composer, which the wizard's "Write a post" opens on the way
+  // out, since two sheets can't be up at once.
+  //
+  // Both sheets open only once the feed is in focus and a moment has passed
+  // for the wizard to finish animating away: iOS won't present a sheet from
+  // a screen that's covered or mid-transition, and Modal doesn't retry, so
+  // it would sit "visible" and never appear.
+  const { data: me, isError: meFailed } = useMe()
+  const onboardingSettled = (!!me && me.onboarding_completed !== false) || meFailed
+  const composeRequested = useWelcomeStore(s => s.composeRequested)
+  const isFocused = useIsFocused()
   useEffect(() => {
-    shouldShowWhatsNew().then(should => { if (should) setShowWhatsNew(true) })
-  }, [])
+    if (!onboardingSettled || showCompose || composeRequested || !isFocused) return
+    const t = setTimeout(() => {
+      shouldShowWhatsNew().then(should => { if (should) setShowWhatsNew(true) })
+    }, 500)
+    return () => clearTimeout(t)
+  }, [onboardingSettled, showCompose, composeRequested, isFocused])
+
+  useEffect(() => {
+    if (!composeRequested || !isFocused) return
+    const t = setTimeout(() => {
+      useWelcomeStore.getState().consumeCompose()
+      setShowCompose(true)
+    }, 500)
+    return () => clearTimeout(t)
+  }, [composeRequested, isFocused])
 
   const forceShowWhatsNew = useWhatsNewStore(s => s.forceShow)
   const consumeWhatsNew = useWhatsNewStore(s => s.consume)
@@ -142,9 +246,10 @@ export default function FeedScreen() {
   // Auto-detect URLs pasted into content: GIFs become inline images, others become link preview cards
   useEffect(() => {
     if (imageUrls.length > 0) return
-    const match = content.match(URL_RE)
-    if (!match) return
-    const url = match[0].replace(/[.,!?)]+$/, '')
+    // First URL, scheme-less ones like bit.ly/... included (AMOBILE-200).
+    const found = findFirstUrl(content)
+    if (!found) return
+    const url = found.href
 
     if (isGifUrl(url)) {
       // Call preview API to resolve share URLs (tenor.com/xPpM.gif) to direct media URLs
@@ -152,10 +257,10 @@ export default function FeedScreen() {
         const preview = res.data
         const resolvedUrl = preview?.image || url
         setImageUrls([resolvedUrl])
-        setContent(c => c.replace(url, '').trim())
+        setContent(c => c.replace(found.text, '').trim())
       }).catch(() => {
         setImageUrls([url])
-        setContent(c => c.replace(url, '').trim())
+        setContent(c => c.replace(found.text, '').trim())
       })
       return
     }
@@ -292,10 +397,30 @@ export default function FeedScreen() {
   const posts = (data?.pages.flatMap(p => p?.posts ?? []) ?? [])
     .filter((p: any) => p && !blockedIds.includes(p.author_id))
 
+  // AMOBILE-198: same source app/settings.tsx already reads these two off
+  // of, rather than a fresh fetch — matches this file's own existing
+  // (user as any)?.atproto_enabled use for the poll/Bluesky hint below.
+  const apEnabled = (user as any)?.activitypub_enabled
+  const atprotoEnabled = (user as any)?.atproto_enabled
+  // At least one of Agora/Fediverse/Bluesky must stay on — turning all of
+  // them off would post nowhere at all. Irrelevant outside Public, where the
+  // targeting control isn't shown and the three flags stay at their default
+  // "on".
+  const validTargeting = visibility !== 'public' || agoraEnabled || federateAP || federateATProto
+  // Omit the targeting fields entirely when the author left the control at
+  // its default (everything on, or posting as a page, which never shows the
+  // control at all) — the payload for anyone who never touches it is
+  // exactly what it was before this control existed.
+  const usingDefaultTargeting = agoraEnabled && federateAP && federateATProto
+  const targeting = !postAsPageSlug && visibility === 'public' && !usingDefaultTargeting
+    ? { federate_activitypub: federateAP, federate_atproto: federateATProto, external_only: !agoraEnabled }
+    : {}
+
   const postData = {
     content,
     image_url: imageUrls[0] || '',
     image_urls: imageUrls,
+    image_alts: imageUrls.map(u => altByUrl[u] || ''), // AMOBILE-224; older servers ignore it
     video_url: videoUrl ?? '',
     video_thumb_url: videoThumbUrl ?? '',
     visibility: postAsPageSlug ? 'public' : visibility,
@@ -310,6 +435,7 @@ export default function FeedScreen() {
     link_description: linkPreview?.description ?? '',
     link_image: linkPreview?.image ?? '',
     link_domain: linkPreview?.domain ?? '',
+    ...targeting,
   }
 
   const createPost = useMutation({
@@ -345,15 +471,80 @@ export default function FeedScreen() {
     finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploading(false) }
   }
 
+  // AMOBILE-180: transcoding runs in the background on the server. Poll the
+  // job until it's done, then attach the resulting video — mirrors web's
+  // startVideoPolling (AGORA-137) exactly, including resuming a pending job
+  // across a relaunch via PENDING_VIDEO_KEY.
+  const videoPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const stopVideoPolling = () => {
+    if (videoPollRef.current) {
+      clearInterval(videoPollRef.current)
+      videoPollRef.current = null
+    }
+  }
+
+  const startVideoPolling = (jobId: string) => {
+    stopVideoPolling()
+    SecureStore.setItemAsync(PENDING_VIDEO_KEY, jobId)
+    setVideoProcessing(true)
+    videoPollRef.current = setInterval(async () => {
+      try {
+        const { data } = await feedApi.getVideoJob(jobId)
+        if (data.status === 'done') {
+          stopVideoPolling()
+          SecureStore.deleteItemAsync(PENDING_VIDEO_KEY)
+          setVideoProcessing(false)
+          setImageUrls([]) // video and photos are mutually exclusive
+          setVideoUrl(data.url)
+          setVideoThumbUrl(data.thumb_url || null)
+        } else if (data.status === 'failed') {
+          stopVideoPolling()
+          SecureStore.deleteItemAsync(PENDING_VIDEO_KEY)
+          setVideoProcessing(false)
+          Alert.alert('Video processing failed', data.error || 'Please try a different file.')
+        }
+        // status 'processing' → keep polling
+      } catch (err: any) {
+        // A 404 means the job no longer exists — stop polling. Transient
+        // network errors are ignored so a brief blip doesn't abort a valid job.
+        if (err?.response?.status === 404) {
+          stopVideoPolling()
+          SecureStore.deleteItemAsync(PENDING_VIDEO_KEY)
+          setVideoProcessing(false)
+        }
+      }
+    }, 3000)
+  }
+
+  const removeVideo = () => {
+    stopVideoPolling()
+    SecureStore.deleteItemAsync(PENDING_VIDEO_KEY)
+    setVideoUrl(null)
+    setVideoThumbUrl(null)
+    setVideoProcessing(false)
+  }
+
+  // Resume a pending transcode after the app is relaunched; clean up on unmount.
+  useEffect(() => {
+    const pending = SecureStore.getItem(PENDING_VIDEO_KEY)
+    if (pending) startVideoPolling(pending)
+    return () => stopVideoPolling()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const pickVideo = async () => {
-    if (videoUrl) return
+    if (videoUrl || videoProcessing) return
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      mediaTypes: ['videos'],
       allowsEditing: false,
     })
     if (result.canceled) return
     const asset = result.assets[0]
-    if (asset.duration && asset.duration > 120) {
+    // AMOBILE-187: asset.duration is milliseconds, not seconds. This was
+    // comparing it straight against 120 and rejecting every video with any
+    // real length at all.
+    if (asset.duration && asset.duration > 120_000) {
       Alert.alert('Video too long', 'Please select a video that is 2 minutes or less.')
       return
     }
@@ -362,8 +553,10 @@ export default function FeedScreen() {
     try {
       const file = { uri: asset.uri, type: 'video/mp4', name: 'video.mp4' } as any
       const res = await feedApi.uploadMedia(file, 'videos')
-      setVideoUrl(res.data.url)
-      setVideoThumbUrl(res.data.thumb_url || null)
+      const jobId = res.data.job_id
+      if (!jobId) throw new Error('missing job id')
+      setImageUrls([]) // video and photos are mutually exclusive
+      startVideoPolling(jobId)
     } catch { Alert.alert('Upload failed', 'Could not upload video') }
     finally { clearTimeout(slowTimer); setShowUploadModal(false); setUploading(false) }
   }
@@ -375,49 +568,143 @@ export default function FeedScreen() {
     }
   }, [])
 
+  // Double-tapping the Feed tab scrolls back to the top of the list.
+  const listRef = useRef<FlatList<any>>(null)
+  const lastTabPress = useRef(0)
+  const navigation = useNavigation()
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress' as any, () => {
+      const now = Date.now()
+      if (now - lastTabPress.current < DOUBLE_TAP_MS) {
+        lastTabPress.current = 0
+        listRef.current?.scrollToOffset({ offset: 0, animated: true })
+      } else {
+        lastTabPress.current = now
+      }
+    })
+    return unsubscribe
+  }, [navigation])
+
   return (
     <Screen>
       <Header title="Feed" right={
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <TouchableOpacity onPress={() => router.push('/search')} style={s.searchBtn}>
-            <Ionicons name="search-outline" size={22} color={c.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowCompose(true)} style={s.postBtn}>
-            <Text style={s.postBtnText}>Post</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity onPress={() => setShowCompose(true)} style={s.postBtn}>
+          <Text style={s.postBtnText}>Post</Text>
+        </TouchableOpacity>
       } />
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[s.switcher, { borderBottomColor: c.border }]}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: 'center' }}
+      {/* AMOBILE-169: a field rather than an icon, so search reads as search.
+          It is a button and not a TextInput on purpose: app/search.tsx already
+          autofocuses its own input and renders live results as you type, so
+          typing in place would mean duplicating that whole stack into the feed
+          to save a tap that the autofocus already gives back. */}
+      <TouchableOpacity
+        onPress={() => router.push('/search')}
+        accessibilityRole="button"
+        accessibilityLabel="Search people and posts"
+        style={[s.searchField, { backgroundColor: c.bg, borderColor: c.border }]}
       >
-        <TouchableOpacity
-          onPress={() => setActiveFeedId(null)}
-          style={[s.feedTab, { borderColor: c.border }, activeFeedId === null && { backgroundColor: c.primary, borderColor: c.primary }]}
+        <Ionicons name="search-outline" size={17} color={c.textMuted} />
+        <Text style={[s.searchFieldText, { color: c.textMuted }]}>Search people and posts</Text>
+      </TouchableOpacity>
+
+      {/* Pinned feeds get pills; everything else lives behind the trailing
+          button, which stays outside the ScrollView so it can never scroll out
+          of reach the way the old Manage pill did (AMOBILE-167). */}
+      <View style={[s.switcherRow, { borderBottomColor: c.border }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={s.switcher}
+          contentContainerStyle={{ paddingLeft: 12, paddingRight: 4, paddingVertical: 8, gap: 8, alignItems: 'center' }}
         >
-          <Text style={[s.feedTabText, { color: activeFeedId === null ? 'white' : c.textMuted }]}>Home</Text>
-        </TouchableOpacity>
-        {customFeeds.map((feed: any) => (
           <TouchableOpacity
-            key={feed.id}
-            onPress={() => setActiveFeedId(feed.id)}
-            style={[s.feedTab, { borderColor: c.border }, activeFeedId === feed.id && { backgroundColor: c.primary, borderColor: c.primary }]}
+            onPress={() => selectFeed(null)}
+            style={[s.feedTab, { borderColor: c.border }, activeFeedId === null && { backgroundColor: c.primary, borderColor: c.primary }]}
           >
-            <Text style={[s.feedTabText, { color: activeFeedId === feed.id ? 'white' : c.textMuted }]}>{feed.name}</Text>
+            <Text style={[s.feedTabText, { color: activeFeedId === null ? c.onPrimary : c.textMuted }]}>Home</Text>
           </TouchableOpacity>
-        ))}
-        <TouchableOpacity onPress={() => router.push('/manage-feeds')} style={[s.feedTab, { borderColor: c.border }]}>
-          <Ionicons name="options-outline" size={14} color={c.textMuted} />
-          <Text style={[s.feedTabText, { color: c.textMuted }]}>Manage</Text>
+          {pillFeeds.map((feed: any) => (
+            <TouchableOpacity
+              key={feed.id}
+              onPress={() => selectFeed(feed.id)}
+              style={[s.feedTab, { borderColor: c.border }, activeFeedId === feed.id && { backgroundColor: c.primary, borderColor: c.primary }]}
+            >
+              <Text style={[s.feedTabText, { color: activeFeedId === feed.id ? c.onPrimary : c.textMuted }]}>{feed.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <TouchableOpacity
+          onPress={() => { setFeedQuery(''); setShowFeedSheet(true) }}
+          style={[s.feedTab, s.feedOverflowTab, { borderColor: c.border, backgroundColor: c.bg }]}
+        >
+          <Text style={[s.feedTabText, { color: c.textMuted }]}>
+            {sheetFeeds.length > 0 ? `${sheetFeeds.length} more` : 'Feeds'}
+          </Text>
+          <Ionicons name="chevron-down" size={13} color={c.textMuted} />
         </TouchableOpacity>
-      </ScrollView>
+      </View>
+
+      {/* Overflow sheet: the native analogue of web's dropdown. */}
+      <Modal visible={showFeedSheet} transparent animationType="slide" onRequestClose={() => setShowFeedSheet(false)}>
+        <TouchableOpacity style={s.sheetBackdrop} activeOpacity={1} onPress={() => setShowFeedSheet(false)}>
+          <TouchableOpacity activeOpacity={1} style={[s.sheet, { backgroundColor: c.card, paddingBottom: insets.bottom + 12 }]}>
+            <View style={[s.sheetGrabber, { backgroundColor: c.border }]} />
+
+            {customFeeds.length > FEED_SEARCH_THRESHOLD && (
+              <View style={[s.sheetSearch, { borderColor: c.border }]}>
+                <Ionicons name="search-outline" size={15} color={c.textMuted} />
+                <TextInput
+                  value={feedQuery}
+                  onChangeText={setFeedQuery}
+                  placeholder="Find a feed"
+                  placeholderTextColor={c.textMuted}
+                  style={[s.sheetSearchInput, { color: c.text }]}
+                  autoCorrect={false}
+                />
+              </View>
+            )}
+
+            <ScrollView style={{ maxHeight: 320 }}>
+              {feedMatches.map((feed: any) => (
+                <TouchableOpacity
+                  key={feed.id}
+                  onPress={() => selectFeed(feed.id)}
+                  style={[s.sheetRow, { borderBottomColor: c.border }]}
+                >
+                  <Ionicons name="radio-outline" size={18} color={c.textMuted} />
+                  <Text style={[s.sheetRowText, { color: c.text }]} numberOfLines={1}>{feed.name}</Text>
+                  {activeFeedId === feed.id && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
+                </TouchableOpacity>
+              ))}
+
+              {feedMatches.length === 0 && (
+                <Text style={[s.sheetEmpty, { color: c.textMuted }]}>
+                  {feedQuery.trim()
+                    ? 'No feeds match'
+                    : customFeeds.length === 0
+                      ? 'No custom feeds yet'
+                      : 'Every feed is pinned'}
+                </Text>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => { setShowFeedSheet(false); router.push('/manage-feeds') }}
+              style={[s.sheetFooter, { borderTopColor: c.border }]}
+            >
+              <Ionicons name="options-outline" size={18} color={c.textMuted} />
+              <Text style={[s.sheetRowText, { color: c.textMuted }]}>Manage feeds</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       <View style={{ flex: 1 }}>
         {isLoading ? <Spinner /> : (
           <FlatList
+            ref={listRef}
             data={posts}
             keyExtractor={p => p.id}
             renderItem={({ item }) => <PostCard post={item} queryKey={['feed', activeFeedId]} />}
@@ -438,8 +725,8 @@ export default function FeedScreen() {
             style={[s.fab, { backgroundColor: c.primary }]}
             activeOpacity={0.85}
           >
-            <Ionicons name="mail" size={20} color="white" />
-            <Text style={s.fabText}>Invite a Friend</Text>
+            <Ionicons name="mail" size={20} color={c.onPrimary} />
+            <Text style={[s.fabText, { color: c.onPrimary }]}>Invite a Friend</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -469,32 +756,37 @@ export default function FeedScreen() {
                 style={[s.cwBtn, showPoll && { backgroundColor: c.primaryBg, borderColor: c.primaryLt }]}>
                 <Ionicons name="bar-chart-outline" size={16} color={showPoll ? c.primary : c.textMuted} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={pickImage} disabled={uploading || showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl}>
+              <TouchableOpacity onPress={pickImage} disabled={uploading || showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl || videoProcessing}>
                 {uploading
                   ? <ActivityIndicator size="small" color={c.primary} />
                   : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                      <Ionicons name="image-outline" size={22} color={(showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl) ? c.border : c.primary} />
+                      <Ionicons name="image-outline" size={22} color={(showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl || videoProcessing) ? c.border : c.primary} />
                       {imageUrls.length > 0 && !showPoll && (
                         <Text style={{ fontSize: 12, color: c.primary, fontWeight: '600' }}>{imageUrls.length}/{MAX_IMAGES}</Text>
                       )}
                     </View>}
               </TouchableOpacity>
-              <TouchableOpacity onPress={pickVideo} disabled={uploading || showPoll || imageUrls.length > 0 || !!videoUrl}>
-                <Ionicons name="videocam-outline" size={22} color={(showPoll || imageUrls.length > 0 || !!videoUrl) ? c.border : c.primary} />
+              <TouchableOpacity onPress={pickVideo} disabled={uploading || showPoll || imageUrls.length > 0 || !!videoUrl || videoProcessing}>
+                {videoProcessing
+                  ? <ActivityIndicator size="small" color={c.primary} />
+                  : <Ionicons name="videocam-outline" size={22} color={(showPoll || imageUrls.length > 0 || !!videoUrl) ? c.border : c.primary} />}
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => createPost.mutate()}
-                disabled={(!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || createPost.isPending}
-                style={[s.submitBtn, (!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) && s.submitBtnDisabled]}
+                disabled={(!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || !validTargeting || createPost.isPending || videoProcessing}
+                style={[s.submitBtn, ((!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || !validTargeting || videoProcessing) && s.submitBtnDisabled]}
               >
                 <Text style={s.submitBtnText}>{createPost.isPending ? '…' : 'Post'}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Identity switcher */}
-          {myPages.length > 0 && (
+          {/* Identity switcher. AMOBILE-212: also shown, as a plain label,
+              whenever more than one account is signed in, naming the account
+              the post goes out from. */}
+          {(myPages.length > 0 || multiAccount) && (
             <TouchableOpacity
+              disabled={myPages.length === 0}
               onPress={() => {
                 const options = [
                   { label: `${user?.display_name || user?.username} (personal)`, value: null },
@@ -514,13 +806,22 @@ export default function FeedScreen() {
               }}
               style={[s.identityRow, { borderBottomColor: c.border, backgroundColor: c.card }]}
             >
-              <Ionicons name="person-circle-outline" size={16} color={c.primary} />
-              <Text style={[s.identityLabel, { color: c.text }]}>
-                Posting as: <Text style={{ color: c.primary, fontWeight: '700' }}>
-                  {postAsPageSlug ? (myPages.find((p: any) => p.slug === postAsPageSlug)?.display_name ?? postAsPageSlug) : (user?.display_name || user?.username)}
+              {multiAccount && !postAsPageSlug
+                ? <Avatar url={user?.avatar_url} name={user?.display_name || user?.username} size={24} />
+                : <Ionicons name="person-circle-outline" size={16} color={c.primary} />}
+              <View style={{ flex: 1 }}>
+                <Text style={[s.identityLabel, { color: c.text }]} numberOfLines={1}>
+                  Posting as: <Text style={{ color: c.primary, fontWeight: '700' }}>
+                    {postAsPageSlug ? (myPages.find((p: any) => p.slug === postAsPageSlug)?.display_name ?? postAsPageSlug) : (user?.display_name || user?.username)}
+                  </Text>
                 </Text>
-              </Text>
-              <Ionicons name="chevron-down" size={13} color={c.textMuted} style={{ marginLeft: 'auto' }} />
+                {multiAccount && (
+                  <Text style={[s.identityAccount, { color: c.textMuted }]} numberOfLines={1}>
+                    {postAsPageSlug ? `via ${accountHandle}` : accountHandle}
+                  </Text>
+                )}
+              </View>
+              {myPages.length > 0 && <Ionicons name="chevron-down" size={13} color={c.textMuted} />}
             </TouchableOpacity>
           )}
 
@@ -555,6 +856,11 @@ export default function FeedScreen() {
                       onPress={() => {
                         setVisibility(opt.value as any)
                         if (opt.value !== 'group') setFriendListId('')
+                        // AMOBILE-198: the targeting control only ever applies
+                        // to Public — reset it going into or out of that
+                        // visibility so a choice made earlier can't linger
+                        // and silently apply to a later post.
+                        if (opt.value !== 'public') { setAgoraEnabled(true); setFederateAP(true); setFederateATProto(true) }
                         setShowVisibilitySheet(false)
                         if (opt.value === 'group') setShowListSheet(true)
                       }}
@@ -600,6 +906,43 @@ export default function FeedScreen() {
                     ))
                   )}
                 </View>
+              )}
+
+              {/* AMOBILE-175: quiet unless lossy. Nothing is shown for the
+                  ordinary case, because a limited post to a list of Agora
+                  people works exactly as the author expects and a standing
+                  warning on every one of them trains people to ignore it,
+                  which costs the warning its value on the post that needs it. */}
+              <AudienceReach list={visibility === 'group' ? selectedFriendList : null} />
+
+              {/* AMOBILE-198: per-post network targeting, offered only for
+                  Public — Friends/Friend List posts can't reach an external
+                  network at all, so the control stays hidden there rather
+                  than offering choices that would do nothing. Hidden
+                  entirely when the account has neither network enabled:
+                  there is nothing to choose between, only Agora. */}
+              {visibility === 'public' && (apEnabled || atprotoEnabled) && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8 }}>
+                  <Text style={{ fontSize: 13, color: c.textMuted }}>Post to:</Text>
+                  <NetworkChip label="Agora" active={agoraEnabled} onPress={() => setAgoraEnabled(v => !v)} c={c} />
+                  {apEnabled && (
+                    <NetworkChip label="Fediverse" active={federateAP} onPress={() => setFederateAP(v => !v)} c={c} />
+                  )}
+                  {atprotoEnabled && (
+                    <NetworkChip label="Bluesky" active={federateATProto} onPress={() => setFederateATProto(v => !v)} c={c} />
+                  )}
+                </View>
+              )}
+              {visibility === 'public' && !agoraEnabled && (
+                <Text style={{ fontSize: 13, color: validTargeting ? c.textMuted : c.red, paddingHorizontal: 16, paddingBottom: 8 }}>
+                  {!validTargeting
+                    ? 'Pick at least one place for this post to go.'
+                    : federateAP && federateATProto
+                    ? 'This post will only appear on the Fediverse and Bluesky, not on Agora.'
+                    : federateAP
+                    ? 'This post will only appear on the Fediverse, not on Agora.'
+                    : 'This post will only appear on Bluesky, not on Agora.'}
+                </Text>
               )}
             </>
           )}
@@ -758,6 +1101,7 @@ export default function FeedScreen() {
                       source={{ uri: imgUrl(url) }}
                       style={[s.imagePreview, { width: imageUrls.length > 1 ? Dimensions.get('window').width * 0.6 : Dimensions.get('window').width - 32 }]}
                       contentFit="cover"
+                      accessibilityLabel={altByUrl[url] || undefined}
                     />
                     <TouchableOpacity
                       onPress={() => setImageUrls(prev => prev.filter((_, j) => j !== i))}
@@ -765,10 +1109,18 @@ export default function FeedScreen() {
                     >
                       <Ionicons name="close" size={14} color="white" />
                     </TouchableOpacity>
+                    <AltEditButton hasAlt={!!altByUrl[url]} onPress={() => setAltEditing(url)} />
                   </View>
                 ))}
               </ScrollView>
             ) : null}
+            <AltTextModal
+              visible={!!altEditing}
+              imageUri={altEditing ? imgUrl(altEditing) ?? undefined : undefined}
+              initial={altEditing ? altByUrl[altEditing] || '' : ''}
+              onSave={alt => { const url = altEditing; if (url) setAltByUrl(prev => ({ ...prev, [url]: alt })) }}
+              onClose={() => setAltEditing(null)}
+            />
 
             {!showPoll && videoUrl ? (
               <View style={{ marginTop: 12, position: 'relative' }}>
@@ -782,10 +1134,23 @@ export default function FeedScreen() {
                   </View>
                 </View>
                 <TouchableOpacity
-                  onPress={() => { setVideoUrl(null); setVideoThumbUrl(null) }}
+                  onPress={removeVideo}
                   style={s.removeImage}
                 >
                   <Ionicons name="close" size={14} color="white" />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {/* AMOBILE-180: video processing indicator, mirroring web's (AGORA-137) */}
+            {!showPoll && videoProcessing && !videoUrl ? (
+              <View style={[s.linkPreviewCard, { borderColor: c.border, backgroundColor: c.bg, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+                <ActivityIndicator size="small" color={c.primary} />
+                <Text style={{ flex: 1, fontSize: 13, color: c.textMuted }}>
+                  Processing video… this can take a minute. You can keep typing or come back later.
+                </Text>
+                <TouchableOpacity onPress={removeVideo}>
+                  <Ionicons name="close" size={16} color={c.textMuted} />
                 </TouchableOpacity>
               </View>
             ) : null}
@@ -820,11 +1185,103 @@ export default function FeedScreen() {
   )
 }
 
+// NetworkChip is one toggle in AMOBILE-198's network-targeting control.
+function NetworkChip({ label, active, onPress, c }: { label: string; active: boolean; onPress: () => void; c: any }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={{
+        paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1,
+        borderColor: active ? c.primary : c.border,
+        backgroundColor: active ? c.primaryBg : 'transparent',
+      }}
+    >
+      <Text style={{ fontSize: 13, fontWeight: '500', color: active ? c.primary : c.textMuted }}>{label}</Text>
+    </TouchableOpacity>
+  )
+}
+
+// AudienceReach says what will happen to the members of a limited audience
+// whose servers cannot honour the limit, and says nothing otherwise
+// (AMOBILE-175).
+//
+// Two levels, because the cases genuinely differ. A Bluesky account is not
+// delivered to at all, which is the closest thing to a defect from the author's
+// point of view. A fediverse account does receive it and their server does keep
+// it unlisted, but there is no Close Friends concept there and it will not
+// carry replies back to the rest of the list.
+//
+// Named rather than counted: "Dave will get this and their server will keep it
+// unlisted" is something an author can act on, where "1 member has reduced
+// functionality" is not. The reach data rides on the friend-lists response the
+// picker above already fetched, so this costs no extra request and cannot lag
+// behind the selection.
+function AudienceReach({ list }: { list: any }) {
+  const c = useC()
+  if (!list) return null
+
+  const bsky = (list.bluesky_count ?? 0) > 0
+  const fedi = (list.fediverse_count ?? 0) > 0
+  if (!bsky && !fedi) return null
+
+  const names = (shown: string[] = [], total = 0) => {
+    if (total > shown.length) {
+      const others = total - shown.length
+      return `${shown.join(', ')} and ${others} other${others === 1 ? '' : 's'}`
+    }
+    if (shown.length > 1) return `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]}`
+    return shown[0] || ''
+  }
+
+  return (
+    <View style={[s.reachNotice, { borderBottomColor: c.border, backgroundColor: c.card }]}>
+      <Ionicons name="information-circle-outline" size={14} color={c.textMuted} style={{ marginTop: 1 }} />
+      <View style={{ flex: 1, gap: 3 }}>
+        {bsky && (
+          <Text style={[s.reachText, { color: c.textMuted }]}>
+            <Text style={{ fontWeight: '600' }}>{names(list.bluesky_names, list.bluesky_count)}</Text>
+            {(list.bluesky_count === 1 ? ' is' : ' are')} on Bluesky, which has no way to receive a post
+            limited to a list, so they will not get this one.
+          </Text>
+        )}
+        {fedi && (
+          <Text style={[s.reachText, { color: c.textMuted }]}>
+            <Text style={{ fontWeight: '600' }}>{names(list.fediverse_names, list.fediverse_count)}</Text>
+            {' will get this and their server will keep it unlisted, but it has no concept of this list, '}
+            so replies there will not reach the rest of it.
+          </Text>
+        )}
+      </View>
+    </View>
+  )
+}
+
 const s = StyleSheet.create({
-  switcher: { flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth },
+  // Deliberately quieter than the trigger-warning box: this is a delivery
+  // estimate, not a security warning, and styling it as an alert would make an
+  // ordinary limited post look broken.
+  reachNotice: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
+  reachText: { fontSize: 12, lineHeight: 17 },
+  // switcherRow holds the scrolling pills and the fixed overflow button side by
+  // side, so the border sits under both and only the pills scroll.
+  switcherRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
+  switcher: { flexGrow: 0, flexShrink: 1 },
   feedTab: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  feedOverflowTab: { marginRight: 12, marginLeft: 4, flexShrink: 0 },
   feedTabText: { fontSize: 15, fontWeight: '500' },
-  searchBtn: { padding: 4 },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 8 },
+  sheetGrabber: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
+  sheetSearch: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 10, marginHorizontal: 16, marginBottom: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  sheetSearchInput: { flex: 1, fontSize: 15, padding: 0 },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  sheetRowText: { flex: 1, fontSize: 16 },
+  sheetEmpty: { textAlign: 'center', fontSize: 15, paddingVertical: 24 },
+  sheetFooter: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth },
+  // Same 20pt radius and 12pt inset as feedTab, so the field and the pills
+  // directly beneath it read as one block rather than two stacked controls.
+  searchField: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8, marginHorizontal: 12, marginTop: 8 },
+  searchFieldText: { fontSize: 15 },
   postBtn: { backgroundColor: '#486581', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
   postBtnText: { color: 'white', fontWeight: '600', fontSize: 16 },
   fab: {
@@ -882,5 +1339,6 @@ const s = StyleSheet.create({
   videoPreviewOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' },
   identityRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 1 },
   identityLabel: { fontSize: 15 },
+  identityAccount: { fontSize: 13, marginTop: 1 },
 })
 

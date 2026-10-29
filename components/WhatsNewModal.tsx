@@ -5,33 +5,90 @@ import * as SecureStore from 'expo-secure-store'
 import { Ionicons } from '@expo/vector-icons'
 import { useC } from '../constants/ColorContext'
 
-const WHATS_NEW_VERSION = '3.0.0'
+// AMOBILE-217: the list grew after 4.0.0 first reached people, so the stored
+// marker moved on once to show the fuller list to anyone who had already
+// dismissed the original.
+const WHATS_NEW_VERSION = '4.0.0-2'
 const STORAGE_KEY = 'last_seen_whats_new'
 
 const FEATURES: { icon: string; title: string; desc: string; link?: string; linkText?: string }[] = [
   {
-    icon: 'cloud',
-    title: 'Native Bluesky account',
-    desc: 'Every Agora account is now also a real Bluesky account — no bridge, no separate signup required. Your public posts sync both ways, and you can follow any Bluesky account natively.',
-    link: '/connections?tab=bluesky',
-    linkText: 'Explore Bluesky →',
+    icon: 'send-outline',
+    title: 'Choose where each post goes',
+    desc: 'Pick Agora, the Fediverse, Bluesky, or any mix of them for each post. You can even post to the Fediverse or Bluesky without posting on Agora.',
+    link: '/',
+    linkText: 'Try it in the composer →',
   },
   {
-    icon: 'list',
-    title: 'Unified Connections & Friend Lists',
-    desc: 'Friends, Fediverse follows, and Bluesky follows now live together on one Connections screen — Friend Lists can include accounts from either network, not just Agora friends.',
+    icon: 'git-network-outline',
+    title: 'Friends across Agora instances',
+    desc: "Friend requests, friends-only posts, and their replies and reactions now reach your friends even when they're on a different Agora instance, not just your own.",
     link: '/connections',
-    linkText: 'See your lists →',
+    linkText: 'See your friends →',
   },
-  { icon: 'chatbubbles', title: 'Quote posts', desc: 'Mastodon and other fediverse apps can now quote your Agora posts, not just boost them.' },
   {
-    icon: 'search',
-    title: 'Unified search',
-    desc: 'Search now covers Agora, the Fediverse, and Bluesky in one place — accounts, posts, and hashtags.',
+    icon: 'mail-outline',
+    title: 'Direct messages across instances',
+    desc: 'Send and receive DMs with friends on other Agora instances, not just your own.',
+    link: '/messages',
+    linkText: 'Open Messages →',
+  },
+  {
+    icon: 'people-circle-outline',
+    title: 'More than one account',
+    desc: 'Sign in to several accounts, on one server or many, and switch between them by pressing and holding the Profile tab.',
+    link: '/manage-accounts',
+    linkText: 'Manage accounts →',
+  },
+  {
+    icon: 'compass-outline',
+    title: 'Find people on other Agora instances',
+    desc: 'Find Friends now suggests people from Agora instances this one connects with, and you can find a private profile by its exact handle to send a friend request.',
+    link: '/connections?tab=discover',
+    linkText: 'Find friends →',
+  },
+  {
+    icon: 'search-outline',
+    title: 'Search from anywhere',
+    desc: 'Search now sits above your feed pills, one tap away from every tab.',
     link: '/search',
+    linkText: 'Try a search →',
+  },
+  {
+    icon: 'globe-outline',
+    title: 'Bring your own domain',
+    desc: "Use your own domain as your Bluesky handle. Once it's verified, it's your handle everywhere on Bluesky.",
+    link: '/custom-domain',
+    linkText: 'Set it up →',
+  },
+  {
+    icon: 'create-outline',
+    title: 'Wall posts',
+    desc: "Write on a friend's wall from their profile, and choose in Settings whether posts on your own wall wait for your approval.",
+  },
+  {
+    icon: 'pin-outline',
+    title: 'Pinned feed pills',
+    desc: 'Pin your favorite feeds to the top of your feed bar, with an overflow sheet for the rest.',
+    link: '/',
     linkText: 'Try it →',
   },
-  { icon: 'warning', title: 'Trigger warnings on shares', desc: "Add your own content warning when sharing someone else's post, independent of the original post's own visibility." },
+  { icon: 'happy-outline', title: 'Refreshed reactions', desc: 'A realigned reaction set, shared consistently between posts and Messages.' },
+  {
+    icon: 'eye-outline',
+    title: 'See your followers',
+    desc: "View your Fediverse and Bluesky follower and following lists, now with a dedicated Followers segment in each tab. You'll also get a notification when someone new follows you.",
+    link: '/connections?tab=fediverse&sub=followers',
+    linkText: 'Check your followers →',
+  },
+  { icon: 'eye-off-outline', title: 'Hide a post', desc: 'Remove a post from your own timeline without deleting it.' },
+  {
+    icon: 'map-outline',
+    title: 'Getting started tour',
+    desc: 'A short tour for setting up your profile, privacy, and networks. Take it again anytime from Settings, under Help.',
+    link: '/welcome',
+    linkText: 'Take the tour →',
+  },
 ]
 
 export async function shouldShowWhatsNew(): Promise<boolean> {
@@ -74,7 +131,7 @@ export default function WhatsNewModal({ visible, onDismiss }: { visible: boolean
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleDismiss}>
       <View style={[s.container, { backgroundColor: c.card }]}>
         <View style={[s.header, { borderBottomColor: c.border }]}>
-          <Text style={[s.title, { color: c.text }]}>What's New in 3.0</Text>
+          <Text style={[s.title, { color: c.text }]}>What's New in 4.0</Text>
           <TouchableOpacity onPress={handleDismiss} style={s.closeBtn}>
             <Ionicons name="close" size={22} color={c.textMuted} />
           </TouchableOpacity>
@@ -101,7 +158,7 @@ export default function WhatsNewModal({ visible, onDismiss }: { visible: boolean
         </ScrollView>
         <View style={[s.footer, { borderTopColor: c.border }]}>
           <TouchableOpacity style={[s.gotItBtn, { backgroundColor: c.primary }]} onPress={handleDismiss}>
-            <Text style={s.gotItText}>Got it!</Text>
+            <Text style={[s.gotItText, { color: c.onPrimary }]}>Got it!</Text>
           </TouchableOpacity>
         </View>
       </View>

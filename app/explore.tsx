@@ -102,7 +102,7 @@ export default function ExploreScreen() {
 
       <View style={[s.footer, { backgroundColor: c.card, borderTopColor: c.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={[s.signInBtn, { backgroundColor: c.primary }]}>
-          <Text style={s.signInText}>Sign in to interact</Text>
+          <Text style={[s.signInText, { color: c.onPrimary }]}>Sign in to interact</Text>
         </TouchableOpacity>
       </View>
     </Screen>

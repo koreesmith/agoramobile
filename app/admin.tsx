@@ -1,14 +1,21 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, StyleSheet, Switch, ActivityIndicator, Share } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, StyleSheet, Switch, ActivityIndicator, Share, Image } from 'react-native'
 import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
+import * as ImagePicker from 'expo-image-picker'
+import { normalizeImageOrientation } from '../utils/image'
 import { Screen, Header, Spinner } from '../components/ui'
-import { moderationApi, adminApi, waitlistApi, pagesApi, adminPagesApi } from '../api'
+import RemoteMediaCacheCard from '../components/RemoteMediaCacheCard'
+import { moderationApi, adminApi, waitlistApi, pagesApi, adminPagesApi, feedApi, imgUrl } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useC } from '../constants/ColorContext'
 
-type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'federation' | 'relays' | 'invites' | 'rules' | 'settings' | 'audit' | 'pages' | 'media'
+type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediverse' | 'bluesky' | 'federation' | 'domains' | 'invites' | 'rules' | 'settings' | 'audit' | 'pages' | 'media'
+
+// Tabs whose label isn't just the id capitalized. 'media' keeps its id (as on
+// web) but is called Storage there, and now here too (AMOBILE-213).
+const TAB_LABELS: Partial<Record<Tab, string>> = { media: 'Storage' }
 
 // GetSettings (internal/admin/admin.go) serializes every instance_settings
 // value as a string ("true"/"false", not a JSON boolean), so `typeof value
@@ -19,6 +26,24 @@ type Tab = 'overview' | 'reports' | 'moderation' | 'users' | 'waitlist' | 'fediv
 // tab instead, alongside instance bans (parity with the web admin panel's
 // AGORA-178 consolidation).
 const BOOLEAN_SETTING_KEYS = new Set(['federation_enabled', 'smtp_enabled', 'user_invites_enabled'])
+
+// AMOBILE-176: settings that are neither a boolean nor free text. Without this
+// they fall through to the text input below, where an admin has to know and
+// correctly type a magic value, and a typo silently sets nothing useful.
+//
+// friend_requests_from (AGORA-329) gives an admin receiving sprayed friend
+// requests a lever short of blocking each source by hand.
+const ENUM_SETTINGS: Record<string, { value: string; label: string; desc: string }[]> = {
+  friend_requests_from: [
+    { value: 'everyone',    label: 'Anyone',      desc: 'Any instance may send your users friend requests' },
+    { value: 'peered_only', label: 'Peers only',  desc: 'Only instances in your Federation tab' },
+  ],
+  // AMOBILE-183, mirroring web's toggle on the Domains tab (AGORA-286).
+  custom_domain_approval: [
+    { value: 'auto',   label: 'Approve automatically', desc: 'A domain goes live as soon as it verifies' },
+    { value: 'manual', label: 'Review manually',       desc: 'Every verified domain waits in the Domains tab for a decision' },
+  ],
+}
 
 export default function AdminScreen() {
   const c = useC()
@@ -45,6 +70,9 @@ export default function AdminScreen() {
   const [relayInboxUrl, setRelayInboxUrl] = useState('')
   const [orphanScan, setOrphanScan] = useState<{ count: number; total_bytes: number; orphans: { path: string; size: number; mod_time: string }[] } | null>(null)
   const [orphanScanning, setOrphanScanning] = useState(false)
+  const [domainFilter, setDomainFilter] = useState<'pending' | 'all'>('pending')
+  const [domainRejectReasons, setDomainRejectReasons] = useState<Record<string, string>>({})
+  const [rejectingDomain, setRejectingDomain] = useState<string | null>(null)
 
   if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
     return (
@@ -115,7 +143,13 @@ export default function AdminScreen() {
   const { data: relaysData, isLoading: relaysLoading } = useQuery({
     queryKey: ['admin-relays'],
     queryFn: () => adminApi.listRelays().then(r => r.data),
-    enabled: tab === 'relays',
+    enabled: tab === 'fediverse',
+  })
+
+  const { data: domainsData, isLoading: domainsLoading } = useQuery({
+    queryKey: ['admin-custom-domains', domainFilter],
+    queryFn: () => adminApi.listCustomDomains(domainFilter).then(r => r.data),
+    enabled: tab === 'domains',
   })
 
   const { data: adminPagesData, isLoading: adminPagesLoading } = useQuery({
@@ -181,6 +215,17 @@ export default function AdminScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
   })
 
+  const deleteUser = useMutation({
+    mutationFn: (id: string) => adminApi.deleteUser(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
+  })
+
+  const resendVerification = useMutation({
+    mutationFn: (id: string) => adminApi.resendVerification(id),
+    onSuccess: () => Alert.alert('Sent', 'Verification email resent.'),
+    onError: () => Alert.alert('Error', 'Failed to resend verification email.'),
+  })
+
   const approveWaitlist = useMutation({
     mutationFn: (id: string) => waitlistApi.approve(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-waitlist'] }),
@@ -227,9 +272,30 @@ export default function AdminScreen() {
 
   const updateSettings = useMutation({
     mutationFn: (data: any) => adminApi.updateSettings(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-settings'] }); Alert.alert('Saved') },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-settings'] })
+      // custom_domain_approval also drives the Domains tab's own header text.
+      qc.invalidateQueries({ queryKey: ['admin-custom-domains'] })
+      Alert.alert('Saved')
+    },
     onError: () => Alert.alert('Error', 'Could not save settings'),
   })
+
+  // AMOBILE-221, parity with web's Settings tab: the instance logo, uploaded
+  // to the same 'instance' media category web uses and saved straight away,
+  // the way every other setting on this tab is.
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const pickLogo = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8, allowsEditing: true, aspect: [1, 1] })
+    if (result.canceled) return
+    setUploadingLogo(true)
+    try {
+      const uri = await normalizeImageOrientation(result.assets[0].uri)
+      const res = await feedApi.uploadMedia({ uri, type: 'image/jpeg', name: 'logo.jpg' } as any, 'instance')
+      updateSettings.mutate({ logo_url: res.data.url })
+    } catch { Alert.alert('Upload failed') }
+    finally { setUploadingLogo(false) }
+  }
 
   const createRule = useMutation({
     mutationFn: () => adminApi.createRule({ title: newRuleForm.title.trim(), description: newRuleForm.description.trim() || undefined }),
@@ -238,7 +304,10 @@ export default function AdminScreen() {
   })
 
   const updateRule = useMutation({
-    mutationFn: () => editingRule ? adminApi.updateRule(editingRule.id, { title: editingRule.title, description: editingRule.description }) : Promise.resolve(),
+    mutationFn: async () => {
+      if (!editingRule) return
+      await adminApi.updateRule(editingRule.id, { title: editingRule.title, description: editingRule.description })
+    },
     onSuccess: () => { setEditingRule(null); qc.invalidateQueries({ queryKey: ['admin-rules'] }) },
     onError: () => Alert.alert('Error', 'Could not update rule'),
   })
@@ -263,6 +332,39 @@ export default function AdminScreen() {
   const unblockInstance = useMutation({
     mutationFn: (id: string) => adminApi.unblockInstance(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-fed'] }),
+  })
+
+  // AMOBILE-176: disconnecting removes a peer without refusing its traffic
+  // (AGORA-320). Blocking was the only way to get rid of one, which is the
+  // wrong instrument: blocking says "refuse this instance", disconnecting says
+  // "we are not peered any more".
+  const disconnectInstance = useMutation({
+    mutationFn: (id: string) => adminApi.disconnectInstance(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-fed'] }),
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not disconnect instance'),
+  })
+
+  // AGORA-322. Our subscription to their timeline only; whether they carry ours
+  // is their decision, and is reported rather than toggled.
+  const setInstanceTimeline = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) => adminApi.setInstanceTimeline(id, enabled),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-fed'] }),
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not change timeline exchange'),
+  })
+
+  const approveCustomDomain = useMutation({
+    mutationFn: (id: string) => adminApi.approveCustomDomain(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-custom-domains'] }),
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not approve domain'),
+  })
+
+  const rejectCustomDomain = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => adminApi.rejectCustomDomain(id, reason),
+    onSuccess: () => {
+      setRejectingDomain(null)
+      qc.invalidateQueries({ queryKey: ['admin-custom-domains'] })
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not reject domain'),
   })
 
   const addRelay = useMutation({
@@ -380,8 +482,26 @@ export default function AdminScreen() {
   const settings: any = settingsData || {}
   const stats: any = statsData || {}
   const fedInstances: any[] = fedData?.instances || []
+  const fedInbound = fedInstances.filter((i: any) => i.direction === 'inbound')
+  const fedOthers  = fedInstances.filter((i: any) => i.direction !== 'inbound')
+
+  // Confirms before acting, because the button alone does not convey that
+  // disconnecting is not the same thing as blocking, and says what it actually
+  // does rather than asking "are you sure".
+  const confirmDisconnect = (inst: any) => Alert.alert(
+    `Disconnect ${inst.domain}?`,
+    'This removes it from your peer list and stops delivering to it. Accounts and posts already received are '
+      + 'kept, so any friendships your users have there keep working. It is not blocked, so if it contacts this '
+      + 'instance again it will reappear.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Disconnect', style: 'destructive', onPress: () => disconnectInstance.mutate(inst.id) },
+    ],
+  )
   const relays: any[] = relaysData?.relays || []
   const adminPages: any[] = adminPagesData?.pages || []
+  const customDomains: any[] = domainsData?.domains || []
+  const domainApprovalMode: string = domainsData?.approval_mode || 'manual'
 
   return (
     <Screen>
@@ -392,11 +512,11 @@ export default function AdminScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={[s.tabBar, { backgroundColor: c.card, borderBottomColor: c.border }]}
         contentContainerStyle={{ flexDirection: 'row' }}>
-        {(['overview', 'reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'federation', 'relays', 'invites', 'rules', 'settings', 'audit', 'pages', 'media'] as Tab[]).map(t => (
+        {(['overview', 'reports', 'moderation', 'users', 'waitlist', 'fediverse', 'bluesky', 'federation', 'domains', 'invites', 'rules', 'settings', 'audit', 'pages', 'media'] as Tab[]).map(t => (
           <TouchableOpacity key={t} onPress={() => setTab(t)}
             style={[s.tabItem, tab === t && { borderBottomColor: c.primary }]}>
             <Text style={[s.tabText, { color: tab === t ? c.primary : c.textMuted }]}>
-              {t.charAt(0).toUpperCase() + t.slice(1)}
+              {TAB_LABELS[t] ?? t.charAt(0).toUpperCase() + t.slice(1)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -475,7 +595,7 @@ export default function AdminScreen() {
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                           <TouchableOpacity onPress={() => reviewRep.mutate({ id: r.id, action: 'actioned' })}
                             style={[s.actionBtn, { backgroundColor: c.primary, flex: 1 }]}>
-                            <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>Mark actioned</Text>
+                            <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>Mark actioned</Text>
                           </TouchableOpacity>
                           <TouchableOpacity onPress={() => reviewRep.mutate({ id: r.id, action: 'dismissed' })}
                             style={[s.actionBtn, { backgroundColor: c.bg, borderWidth: 1, borderColor: c.border, flex: 1 }]}>
@@ -501,7 +621,7 @@ export default function AdminScreen() {
                             <TouchableOpacity
                               disabled={!sf.reason || suspendUser.isPending}
                               onPress={() => suspendUser.mutate({ id: r.reported_user_id, data: { reason: sf.reason, notes: sf.notes, days: parseInt(sf.days) || 0 } })}
-                              style={[s.actionBtn, { backgroundColor: '#f59e0b', opacity: !sf.reason ? 0.5 : 1 }]}>
+                              style={[s.actionBtn, { backgroundColor: '#b45309', opacity: !sf.reason ? 0.5 : 1 }]}>
                               <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>
                                 ⏸ Suspend {sf.days && sf.days !== '0' ? `for ${sf.days}d` : 'indefinitely'}
                               </Text>
@@ -626,6 +746,27 @@ export default function AdminScreen() {
                       <Text style={{ color: c.textMd, fontSize: 15, fontWeight: '600' }}>Change role</Text>
                     </TouchableOpacity>
 
+                    {/* Resend verification */}
+                    {!u.email_verified && (
+                      <TouchableOpacity
+                        disabled={resendVerification.isPending}
+                        onPress={() => resendVerification.mutate(u.id)}
+                        style={[s.actionBtn, { backgroundColor: c.bg, borderWidth: 1, borderColor: c.border }]}>
+                        <Text style={{ color: c.textMd, fontSize: 15, fontWeight: '600' }}>Resend verification email</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Delete user */}
+                    <TouchableOpacity
+                      disabled={deleteUser.isPending}
+                      onPress={() => Alert.alert('Delete user?', `This will permanently delete @${u.username}.`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: () => deleteUser.mutate(u.id) },
+                      ])}
+                      style={[s.actionBtn, { backgroundColor: '#ef4444' }]}>
+                      <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>Delete user</Text>
+                    </TouchableOpacity>
+
                     {/* Unsuspend / Unban quick actions */}
                     {u.is_suspended && !u.banned_at && (
                       <TouchableOpacity onPress={() => unsuspendDirect.mutate(u.id)}
@@ -658,7 +799,7 @@ export default function AdminScreen() {
                         <TouchableOpacity
                           disabled={!sf.reason || suspendUserDirect.isPending}
                           onPress={() => suspendUserDirect.mutate({ id: u.id, data: { reason: sf.reason, notes: sf.notes, days: parseInt(sf.days) || 0 } })}
-                          style={[s.actionBtn, { backgroundColor: '#f59e0b', opacity: !sf.reason ? 0.5 : 1 }]}>
+                          style={[s.actionBtn, { backgroundColor: '#b45309', opacity: !sf.reason ? 0.5 : 1 }]}>
                           <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>
                             Suspend {sf.days && sf.days !== '0' ? `for ${sf.days}d` : 'indefinitely'}
                           </Text>
@@ -748,7 +889,7 @@ export default function AdminScreen() {
               <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>Fediverse (ActivityPub)</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ color: c.textMd, fontSize: 13, flex: 1, marginRight: 8 }}>
-                  Let Mastodon and other fediverse apps discover, follow, and interact with users on this instance.
+                  Let Mastodon and other Fediverse apps discover, follow, and interact with users on this instance.
                   Separate from Agora-to-Agora federation in Settings; users can also opt out individually in their own Settings.
                 </Text>
                 <Switch
@@ -759,6 +900,81 @@ export default function AdminScreen() {
               </View>
             </View>
           )}
+
+          {/* AMOBILE-166: relays are an ActivityPub concept, not a
+              protocol-neutral one, so they live inside this tab rather than
+              claiming one of their own in a bar that already carried 15.
+              Placement matches the web panel from AGORA-302: below the
+              ActivityPub toggle, above instance bans. */}
+          <View style={[s.actionSection, { borderColor: c.border, marginBottom: 16 }]}>
+            <Text style={[s.actionSectionTitle, { color: c.textMuted }]}>Add new relay</Text>
+            <Text style={{ color: c.textMd, fontSize: 13 }}>
+              A federation relay is an intermediary server that exchanges large volumes of public posts between
+              servers that subscribe and publish to it. It can help small and medium servers discover content
+              from the Fediverse, which would otherwise require local users manually following other people on
+              remote servers.
+            </Text>
+            <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
+              placeholder="https://relay.example.com/inbox" placeholderTextColor={c.textLight}
+              autoCapitalize="none" keyboardType="url"
+              value={relayInboxUrl} onChangeText={setRelayInboxUrl} />
+            <TouchableOpacity
+              disabled={!relayInboxUrl.trim() || addRelay.isPending}
+              onPress={() => addRelay.mutate(relayInboxUrl.trim())}
+              style={[s.actionBtn, { backgroundColor: c.primary, opacity: !relayInboxUrl.trim() ? 0.5 : 1 }]}>
+              <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>
+                {addRelay.isPending ? 'Requesting…' : 'Add new relay'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[s.sectionTitle, { color: c.textMuted }]}>Relays</Text>
+          {relaysLoading ? <Spinner /> : relays.length === 0 ? (
+            <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>No relays yet.</Text>
+          ) : relays.map((relay: any) => {
+            const statusLabel: Record<string, string> = {
+              enabled: '✓ Enabled', pending: '⏳ Pending', disabled: 'Disabled', rejected: 'Rejected',
+            }
+            const statusColor: Record<string, string> = {
+              enabled: '#15803d', pending: '#a16207', disabled: c.textMuted, rejected: '#dc2626',
+            }
+            const statusBg: Record<string, string> = {
+              enabled: '#dcfce7', pending: '#fef9c3', disabled: c.bg, rejected: '#fee2e2',
+            }
+            return (
+              <View key={relay.id} style={[s.card, { backgroundColor: c.card, borderColor: c.border, opacity: relay.status === 'enabled' ? 1 : 0.7 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontFamily: 'monospace', color: c.text }} numberOfLines={1}>{relay.inbox_url}</Text>
+                    <View style={[s.violationBadge, { backgroundColor: statusBg[relay.status] || c.bg, marginTop: 4 }]}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: statusColor[relay.status] || c.textMuted }}>
+                        {statusLabel[relay.status] || relay.status}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                  {relay.status === 'enabled'
+                    ? <TouchableOpacity onPress={() => disableRelay.mutate(relay.id)}
+                        style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
+                        <Text style={{ fontSize: 13, color: c.textMd }}>Disable</Text>
+                      </TouchableOpacity>
+                    : <TouchableOpacity onPress={() => enableRelay.mutate(relay.id)}
+                        style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
+                        <Text style={{ fontSize: 13, color: '#15803d' }}>Enable</Text>
+                      </TouchableOpacity>}
+                  <TouchableOpacity
+                    onPress={() => Alert.alert('Remove relay?', relay.inbox_url, [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Delete', style: 'destructive', onPress: () => deleteRelay.mutate(relay.id) },
+                    ])}
+                    style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
+                    <Text style={{ fontSize: 13, color: c.red }}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )
+          })}
 
           {/* Ban new instance form */}
           <View style={[s.actionSection, { borderColor: c.border, marginBottom: 16 }]}>
@@ -892,8 +1108,16 @@ export default function AdminScreen() {
             <Text style={[s.actionSectionTitle, { color: c.textMuted }]}>Add Federated Instance</Text>
             <Text style={{ color: c.textMd, fontSize: 13 }}>
               Enter the domain of another Agora instance to federate with. Both instances must have federation
-              enabled. This is specifically for the Agora-to-Agora protocol — to block a Mastodon or other standard
-              fediverse instance, use the Fediverse tab's Instance Bans instead.
+              enabled. This is specifically for Agora-to-Agora peering; to block a Mastodon or other standard
+              Fediverse instance, use the Fediverse tab's Instance Bans instead.
+            </Text>
+            {/* AMOBILE-176 (AGORA-322): peering can carry a timeline now, but
+                only when an admin turns it on for that peer. Saying so is what
+                keeps the per-peer toggle meaningful. */}
+            <Text style={{ color: c.textLight, fontSize: 12 }}>
+              Connecting lets your users find and friend accounts there, and posts flow between accounts once a
+              friend request is accepted. It does not by itself pull in that instance's public timeline; each peer
+              has its own toggle for that, off by default.
             </Text>
             <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
               placeholder="social.example.com" placeholderTextColor={c.textLight}
@@ -903,116 +1127,150 @@ export default function AdminScreen() {
               disabled={!fedDomain.trim() || addInstance.isPending}
               onPress={() => addInstance.mutate(fedDomain.trim())}
               style={[s.actionBtn, { backgroundColor: c.primary, opacity: !fedDomain.trim() ? 0.5 : 1 }]}>
-              <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>
+              <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>
                 {addInstance.isPending ? 'Connecting…' : 'Add Instance'}
               </Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={[s.sectionTitle, { color: c.textMuted }]}>Federated Instances</Text>
           {fedLoading ? <Spinner /> : fedInstances.length === 0 ? (
             <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>No federated instances yet.</Text>
-          ) : fedInstances.map((inst: any) => (
-            <View key={inst.id} style={[s.card, { backgroundColor: c.card, borderColor: c.border, opacity: inst.status === 'blocked' ? 0.6 : 1 }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: c.text }}>{inst.name || inst.domain}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                    <Text style={{ fontSize: 13, color: c.textMuted }}>{inst.domain}</Text>
-                    <View style={[s.violationBadge, { backgroundColor: inst.status === 'active' ? '#dcfce7' : '#fee2e2' }]}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: inst.status === 'active' ? '#15803d' : '#dc2626' }}>
-                        {inst.status}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                {inst.status === 'active'
-                  ? <TouchableOpacity onPress={() => blockInstance.mutate(inst.id)}
-                      style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
-                      <Text style={{ fontSize: 13, color: c.red }}>Block</Text>
-                    </TouchableOpacity>
-                  : <TouchableOpacity onPress={() => unblockInstance.mutate(inst.id)}
-                      style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
-                      <Text style={{ fontSize: 13, color: c.textMd }}>Unblock</Text>
-                    </TouchableOpacity>}
-              </View>
-            </View>
-          ))}
+          ) : null}
+
+          {/* AMOBILE-176 (AGORA-321): grouped rather than one flat list. An
+              admin reviewing servers that arrived on their own wants them
+              together, not interleaved with the ones they added. */}
+          {fedInbound.length > 0 && (
+            <>
+              <Text style={[s.sectionTitle, { color: c.textMuted }]}>Connected to you</Text>
+              <Text style={{ fontSize: 12, color: c.textLight, marginBottom: 8 }}>
+                These servers started federating with this instance on their own. Federation is open by design.
+                Disconnect one to forget it, or block it to refuse its traffic outright.
+              </Text>
+              {fedInbound.map((inst: any) => (
+                <InstanceRow key={inst.id} inst={inst} c={c}
+                  onBlock={() => blockInstance.mutate(inst.id)}
+                  onUnblock={() => unblockInstance.mutate(inst.id)}
+                  onDisconnect={() => confirmDisconnect(inst)}
+                  onToggleTimeline={() => setInstanceTimeline.mutate({ id: inst.id, enabled: !inst.timeline_exchange })} />
+              ))}
+            </>
+          )}
+          {fedOthers.length > 0 && (
+            <>
+              {fedInbound.length > 0 && (
+                <Text style={[s.sectionTitle, { color: c.textMuted, marginTop: 16 }]}>Instances you added</Text>
+              )}
+              {fedOthers.map((inst: any) => (
+                <InstanceRow key={inst.id} inst={inst} c={c}
+                  onBlock={() => blockInstance.mutate(inst.id)}
+                  onUnblock={() => unblockInstance.mutate(inst.id)}
+                  onDisconnect={() => confirmDisconnect(inst)}
+                  onToggleTimeline={() => setInstanceTimeline.mutate({ id: inst.id, enabled: !inst.timeline_exchange })} />
+              ))}
+            </>
+          )}
         </ScrollView>
       )}
 
-      {/* Relays tab (AMOBILE-134): mirrors Mastodon's own admin Relays
-          screen and web's parallel implementation (AGORA-223) — a relay is
-          entered by its inbox URL directly, matching the AGORA-220 backend
-          design (no client-side actor resolution). */}
-      {tab === 'relays' && (
+      {/* Custom domain handles approval queue (AGORA-286) */}
+      {tab === 'domains' && (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
-          <View style={[s.actionSection, { borderColor: c.border, marginBottom: 16 }]}>
-            <Text style={[s.actionSectionTitle, { color: c.textMuted }]}>Add new relay</Text>
-            <Text style={{ color: c.textMd, fontSize: 13 }}>
-              A federation relay is an intermediary server that exchanges large volumes of public posts between
-              servers that subscribe and publish to it. It can help small and medium servers discover content
-              from the fediverse, which would otherwise require local users manually following other people on
-              remote servers.
+          <View style={[s.card, { backgroundColor: c.card, borderColor: c.border, marginBottom: 12 }]}>
+            <Text style={[s.sectionTitle, { color: c.textMuted, marginBottom: 4 }]}>Custom domain handles</Text>
+            <Text style={{ fontSize: 13, color: c.textMuted, lineHeight: 18 }}>
+              Users can point a domain they own at their account so it becomes their handle on Bluesky and the
+              wider AT Protocol network. Ownership is proven by a DNS record or a file on the domain before a
+              request reaches this queue, approving is a decision about whether this instance wants to publish
+              that handle, not a second ownership check. The auto/manual approval switch lives in the Settings tab.
             </Text>
-            <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
-              placeholder="https://relay.example.com/inbox" placeholderTextColor={c.textLight}
-              autoCapitalize="none" keyboardType="url"
-              value={relayInboxUrl} onChangeText={setRelayInboxUrl} />
-            <TouchableOpacity
-              disabled={!relayInboxUrl.trim() || addRelay.isPending}
-              onPress={() => addRelay.mutate(relayInboxUrl.trim())}
-              style={[s.actionBtn, { backgroundColor: c.primary, opacity: !relayInboxUrl.trim() ? 0.5 : 1 }]}>
-              <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>
-                {addRelay.isPending ? 'Requesting…' : 'Add new relay'}
-              </Text>
-            </TouchableOpacity>
+            <Text style={{ fontSize: 12, color: c.textLight, marginTop: 8 }}>
+              Currently {domainApprovalMode === 'auto' ? 'approving verified domains automatically' : 'reviewing every verified domain by hand'}.
+            </Text>
           </View>
 
-          <Text style={[s.sectionTitle, { color: c.textMuted }]}>Relays</Text>
-          {relaysLoading ? <Spinner /> : relays.length === 0 ? (
-            <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>No relays yet.</Text>
-          ) : relays.map((relay: any) => {
-            const statusLabel: Record<string, string> = {
-              enabled: '✓ Enabled', pending: '⏳ Pending', disabled: 'Disabled', rejected: 'Rejected',
-            }
-            const statusColor: Record<string, string> = {
-              enabled: '#15803d', pending: '#a16207', disabled: c.textMuted, rejected: '#dc2626',
-            }
-            const statusBg: Record<string, string> = {
-              enabled: '#dcfce7', pending: '#fef9c3', disabled: c.bg, rejected: '#fee2e2',
-            }
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+            {(['pending', 'all'] as const).map(f => (
+              <TouchableOpacity key={f} onPress={() => setDomainFilter(f)}
+                style={[s.smallBtn, { backgroundColor: domainFilter === f ? c.primary : c.bg, borderColor: domainFilter === f ? c.primary : c.border }]}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: domainFilter === f ? c.onPrimary : c.textMd }}>
+                  {f === 'pending' ? 'Awaiting review' : 'All requests'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {domainsLoading ? <Spinner /> : customDomains.length === 0 ? (
+            <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>
+              {domainFilter === 'pending' ? 'Nothing waiting for review.' : 'No custom domain requests yet.'}
+            </Text>
+          ) : customDomains.map((d: any) => {
+            const statusLabel = d.live ? '✓ Live'
+              : d.approval_status === 'rejected' ? 'Rejected'
+              : d.verification_status === 'verified' ? '⏳ Awaiting review'
+              : d.verification_status === 'failed' ? 'Not verifying'
+              : 'Unverified'
+            const statusColor = d.live ? '#15803d'
+              : d.approval_status === 'rejected' || d.verification_status === 'failed' ? '#dc2626'
+              : d.verification_status === 'verified' ? '#b45309'
+              : c.textMuted
             return (
-              <View key={relay.id} style={[s.card, { backgroundColor: c.card, borderColor: c.border, opacity: relay.status === 'enabled' ? 1 : 0.7 }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+              <View key={d.id} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 15, fontFamily: 'monospace', color: c.text }} numberOfLines={1}>{relay.inbox_url}</Text>
-                    <View style={[s.violationBadge, { backgroundColor: statusBg[relay.status] || c.bg, marginTop: 4 }]}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: statusColor[relay.status] || c.textMuted }}>
-                        {statusLabel[relay.status] || relay.status}
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: c.text }}>{d.domain}</Text>
+                    <Text style={{ fontSize: 13, color: c.textMuted, marginTop: 2 }}>
+                      Requested by {d.display_name || d.username} · @{d.username}
+                    </Text>
+                    {!!d.verified_at && (
+                      <Text style={{ fontSize: 12, color: c.textLight, marginTop: 2 }}>
+                        Verified via {d.verification_method} on {new Date(d.verified_at).toLocaleDateString()}
                       </Text>
-                    </View>
+                    )}
+                    {!!d.last_error && d.verification_status === 'failed' && (
+                      <Text style={{ fontSize: 12, color: '#dc2626', marginTop: 2 }}>{d.last_error}</Text>
+                    )}
+                    {!!d.rejection_reason && (
+                      <Text style={{ fontSize: 12, color: c.textMuted, fontStyle: 'italic', marginTop: 2 }}>
+                        Reason: {d.rejection_reason}
+                      </Text>
+                    )}
                   </View>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: statusColor }}>{statusLabel}</Text>
                 </View>
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                  {relay.status === 'enabled'
-                    ? <TouchableOpacity onPress={() => disableRelay.mutate(relay.id)}
-                        style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
-                        <Text style={{ fontSize: 13, color: c.textMd }}>Disable</Text>
-                      </TouchableOpacity>
-                    : <TouchableOpacity onPress={() => enableRelay.mutate(relay.id)}
-                        style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
-                        <Text style={{ fontSize: 13, color: '#15803d' }}>Enable</Text>
-                      </TouchableOpacity>}
-                  <TouchableOpacity
-                    onPress={() => Alert.alert('Remove relay?', relay.inbox_url, [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Delete', style: 'destructive', onPress: () => deleteRelay.mutate(relay.id) },
-                    ])}
-                    style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
-                    <Text style={{ fontSize: 13, color: c.red }}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
+
+                {d.verification_status === 'verified' && d.approval_status === 'pending' && (
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                    <TouchableOpacity
+                      onPress={() => approveCustomDomain.mutate(d.id)}
+                      disabled={approveCustomDomain.isPending}
+                      style={[s.actionBtn, { backgroundColor: '#15803d', flex: 1 }]}>
+                      <Text style={{ color: 'white', fontSize: 14, fontWeight: '600' }}>Approve</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setRejectingDomain(rejectingDomain === d.id ? null : d.id)}
+                      style={[s.actionBtn, { borderWidth: 1, borderColor: c.border, backgroundColor: c.bg, flex: 1 }]}>
+                      <Text style={{ color: c.textMd, fontSize: 14, fontWeight: '600' }}>Reject</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {rejectingDomain === d.id && (
+                  <View style={[s.actionSection, { borderColor: c.border, marginTop: 10 }]}>
+                    <TextInput
+                      style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
+                      placeholder="Reason (shown to the user)" placeholderTextColor={c.textLight}
+                      value={domainRejectReasons[d.id] || ''}
+                      onChangeText={t => setDomainRejectReasons(f => ({ ...f, [d.id]: t }))}
+                    />
+                    <TouchableOpacity
+                      disabled={rejectCustomDomain.isPending}
+                      onPress={() => rejectCustomDomain.mutate({ id: d.id, reason: domainRejectReasons[d.id] || '' })}
+                      style={[s.actionBtn, { backgroundColor: '#ef4444' }]}>
+                      <Text style={{ color: 'white', fontSize: 14, fontWeight: '600' }}>Confirm reject</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             )
           })}
@@ -1024,7 +1282,7 @@ export default function AdminScreen() {
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
           <TouchableOpacity onPress={() => createInvite.mutate()} disabled={createInvite.isPending}
             style={[s.actionBtn, { backgroundColor: c.primary, marginBottom: 16 }]}>
-            <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>
+            <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>
               {createInvite.isPending ? 'Creating…' : '+ Create Invite Code'}
             </Text>
           </TouchableOpacity>
@@ -1083,7 +1341,7 @@ export default function AdminScreen() {
             <TouchableOpacity disabled={!newRuleForm.title.trim() || createRule.isPending}
               onPress={() => createRule.mutate()}
               style={[s.actionBtn, { backgroundColor: c.primary, opacity: !newRuleForm.title.trim() ? 0.5 : 1 }]}>
-              <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>Add rule</Text>
+              <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>Add rule</Text>
             </TouchableOpacity>
           </View>
 
@@ -1092,7 +1350,7 @@ export default function AdminScreen() {
             <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 20 }}>No rules yet.</Text>
           ) : rules.map((rule: any, idx: number) => (
             <View key={rule.id} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
-              {editingRule?.id === rule.id ? (
+              {editingRule && editingRule.id === rule.id ? (
                 <View style={{ gap: 8 }}>
                   <TextInput style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg }]}
                     value={editingRule.title} onChangeText={t => setEditingRule(e => e ? { ...e, title: t } : null)} />
@@ -1102,7 +1360,7 @@ export default function AdminScreen() {
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <TouchableOpacity onPress={() => updateRule.mutate()} disabled={updateRule.isPending}
                       style={[s.actionBtn, { backgroundColor: c.primary, flex: 1 }]}>
-                      <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>Save</Text>
+                      <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>Save</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => setEditingRule(null)}
                       style={[s.actionBtn, { borderWidth: 1, borderColor: c.border, flex: 1 }]}>
@@ -1151,10 +1409,63 @@ export default function AdminScreen() {
           {settingsLoading ? <Spinner /> : (
             <View style={{ gap: 12 }}>
               <Text style={[s.sectionTitle, { color: c.textMuted }]}>Instance Settings</Text>
-              {Object.entries(settings).filter(([key]) => key !== 'activitypub_enabled').map(([key, value]: [string, any]) => (
+              <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 8 }]}>Instance logo</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                  <View style={[s.logoPreview, { backgroundColor: c.bg, borderColor: c.border }]}>
+                    {settings.logo_url
+                      // logo_url is stored relative (/uploads/...); web resolves
+                      // it against its own origin, the app has to add the server.
+                      ? <Image source={{ uri: imgUrl(settings.logo_url) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      : <Text style={{ fontSize: 22, fontWeight: '700', color: c.textLight }}>{String(settings.instance_name || 'A')[0].toUpperCase()}</Text>}
+                  </View>
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <TouchableOpacity onPress={pickLogo} disabled={uploadingLogo || updateSettings.isPending}
+                      style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg, alignSelf: 'flex-start' }]}>
+                      {uploadingLogo
+                        ? <ActivityIndicator size="small" color={c.primary} />
+                        : <Text style={{ fontSize: 15, color: c.text }}>Upload logo</Text>}
+                    </TouchableOpacity>
+                    {!!settings.logo_url && (
+                      <TouchableOpacity onPress={() => Alert.alert('Remove logo?', undefined, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Remove', style: 'destructive', onPress: () => updateSettings.mutate({ logo_url: '' }) },
+                      ])}>
+                        <Text style={{ fontSize: 13, color: c.red }}>Remove logo</Text>
+                      </TouchableOpacity>
+                    )}
+                    <Text style={{ fontSize: 12, color: c.textMuted }}>Shown in the web sidebar. Square images work best.</Text>
+                  </View>
+                </View>
+              </View>
+              {/* logo_url has its own card above rather than a bare URL field. */}
+              {Object.entries(settings).filter(([key]) => key !== 'activitypub_enabled' && key !== 'logo_url').map(([key, value]: [string, any]) => (
                 <View key={key} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
                   <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>{key.replace(/_/g, ' ')}</Text>
-                  {BOOLEAN_SETTING_KEYS.has(key) ? (
+                  {ENUM_SETTINGS[key] ? (
+                    <View style={{ gap: 6 }}>
+                      {ENUM_SETTINGS[key].map(opt => {
+                        // Unset reads as the first option, matching the
+                        // backend's own default rather than showing nothing
+                        // selected on an instance that never set it.
+                        const selected = (String(value ?? '') || ENUM_SETTINGS[key][0].value) === opt.value
+                        return (
+                          <TouchableOpacity key={opt.value}
+                            onPress={() => updateSettings.mutate({ [key]: opt.value })}
+                            style={[s.smallBtn, {
+                              borderColor: selected ? c.primary : c.border,
+                              backgroundColor: selected ? c.primaryBg : c.bg,
+                              alignItems: 'flex-start',
+                            }]}>
+                            <Text style={{ fontSize: 15, fontWeight: selected ? '600' : '400', color: selected ? c.primary : c.text }}>
+                              {opt.label}
+                            </Text>
+                            <Text style={{ fontSize: 12, color: c.textMuted, marginTop: 2 }}>{opt.desc}</Text>
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </View>
+                  ) : BOOLEAN_SETTING_KEYS.has(key) ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Text style={{ color: c.text, fontSize: 16 }}>{value === 'true' ? 'Enabled' : 'Disabled'}</Text>
                       <Switch value={value === 'true'}
@@ -1196,8 +1507,20 @@ export default function AdminScreen() {
                       <Text style={{ fontSize: 16, fontWeight: '600', color: c.text }}>
                         {entry.action?.replace(/_/g, ' ') || 'Unknown action'}
                       </Text>
-                      {entry.admin_username && <Text style={{ fontSize: 13, color: c.textMuted }}>By @{entry.admin_username}</Text>}
-                      {entry.target_username && <Text style={{ fontSize: 13, color: c.textMuted }}>Target: @{entry.target_username}</Text>}
+                      {/* AMOBILE-222: the server sends actor_username; this
+                          read admin_username, which never existed, so who
+                          acted was never shown. target_username arrives with
+                          AGORA-397; anything else falls back to target_id,
+                          as on web. */}
+                      <Text style={{ fontSize: 13, color: c.textMuted }}>
+                        {entry.actor_username ? `By @${entry.actor_username}` : 'By a deleted account'}
+                      </Text>
+                      {(entry.target_username || entry.target_id) ? (
+                        <Text style={{ fontSize: 13, color: c.textMuted }}>
+                          Target: {entry.target_username ? `@${entry.target_username}`
+                            : entry.target_type === 'user' ? 'a deleted account' : entry.target_id}
+                        </Text>
+                      ) : null}
                       {entry.details && <Text style={{ fontSize: 13, color: c.textMd, marginTop: 3 }}>{entry.details}</Text>}
                     </View>
                     {entry.created_at && (
@@ -1227,9 +1550,12 @@ export default function AdminScreen() {
         </ScrollView>
       )}
 
-      {/* Storage/Media tab: orphaned media scan/cleanup */}
+      {/* Storage tab: orphaned media scan/cleanup, and (AMOBILE-213) the
+          remote media cache, as on web. The cache card's number fields sit
+          low on the screen, hence the keyboard insets. */}
       {tab === 'media' && (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}
+          automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
           <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>Orphaned Media</Text>
             <Text style={{ color: c.textMd, fontSize: 13, marginBottom: 10 }}>
@@ -1291,6 +1617,8 @@ export default function AdminScreen() {
               </View>
             )}
           </View>
+
+          <RemoteMediaCacheCard />
         </ScrollView>
       )}
 
@@ -1353,6 +1681,85 @@ export default function AdminScreen() {
   )
 }
 
+// InstanceRow is one peer in the Federation tab (AMOBILE-176).
+//
+// Extracted when the list gained direction grouping, so the two sections cannot
+// drift apart: an action added to one and forgotten in the other would be
+// invisible until an admin happened to look at the group that lacked it.
+function InstanceRow({ inst, c, onBlock, onUnblock, onDisconnect, onToggleTimeline }: {
+  inst: any, c: any,
+  onBlock: () => void, onUnblock: () => void,
+  onDisconnect: () => void, onToggleTimeline: () => void,
+}) {
+  const blocked = inst.status === 'blocked'
+  return (
+    <View style={[s.card, { backgroundColor: c.card, borderColor: c.border, opacity: blocked ? 0.6 : 1 }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 16, fontWeight: '600', color: c.text }}>{inst.name || inst.domain}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+            <Text style={{ fontSize: 13, color: c.textMuted }}>{inst.domain}</Text>
+            <View style={[s.violationBadge, { backgroundColor: inst.status === 'active' ? '#dcfce7' : '#fee2e2' }]}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: inst.status === 'active' ? '#15803d' : '#dc2626' }}>
+                {inst.status}
+              </Text>
+            </View>
+            {!!inst.direction && (
+              <View style={[s.violationBadge, { backgroundColor: c.bg }]}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: c.textMuted }}>
+                  {inst.direction === 'outbound' ? 'You added this'
+                    : inst.direction === 'inbound' ? 'They connected'
+                    : inst.direction === 'mutual' ? 'Mutual' : 'Unknown'}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+        {blocked
+          ? <TouchableOpacity onPress={onUnblock} style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
+              <Text style={{ fontSize: 13, color: c.textMd }}>Unblock</Text>
+            </TouchableOpacity>
+          : <TouchableOpacity onPress={onBlock} style={[s.smallBtn, { borderColor: c.border, backgroundColor: c.bg }]}>
+              <Text style={{ fontSize: 13, color: c.red }}>Block</Text>
+            </TouchableOpacity>}
+      </View>
+
+      {/* A blocked instance is deliberately given neither of these. Timeline
+          exchange is refused for one server-side, and disconnecting in one step
+          would silently stop refusing traffic the admin chose to refuse. */}
+      {!blocked && (
+        <View style={{ flexDirection: 'row', gap: 16, marginTop: 10 }}>
+          <TouchableOpacity onPress={onToggleTimeline}>
+            <Text style={{ fontSize: 13, fontWeight: inst.timeline_exchange ? '600' : '400', color: inst.timeline_exchange ? c.primary : c.textMuted }}>
+              {inst.timeline_exchange ? 'Carrying timeline' : 'Carry timeline'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onDisconnect}>
+            <Text style={{ fontSize: 13, color: c.textMuted }}>Disconnect</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Said once, under the row: these are the only two lines here that
+          describe an ongoing flow of content rather than a state. */}
+      {!blocked && (inst.timeline_exchange || inst.carries_our_timeline) && (
+        <View style={{ marginTop: 8, gap: 2 }}>
+          {!!inst.timeline_exchange && (
+            <Text style={{ fontSize: 12, color: c.textLight }}>
+              Public posts from {inst.domain} appear in your Explore tab. They never enter anyone's home feed.
+            </Text>
+          )}
+          {!!inst.carries_our_timeline && (
+            <Text style={{ fontSize: 12, color: c.textLight }}>
+              {inst.domain} carries this instance's public posts. They asked for this, and can stop at any time.
+            </Text>
+          )}
+        </View>
+      )}
+    </View>
+  )
+}
+
 const s = StyleSheet.create({
   tabBar:           { height: 46, flexGrow: 0, flexShrink: 0, borderBottomWidth: 1 },
   tabItem:          { paddingHorizontal: 14, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
@@ -1367,6 +1774,7 @@ const s = StyleSheet.create({
   miniInput:        { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 15 },
   sectionTitle:     { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
   smallBtn:         { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  logoPreview:      { width: 56, height: 56, borderRadius: 12, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   statsGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   statCard:         { flexBasis: '47%', flexGrow: 1, borderWidth: 1, borderRadius: 12, padding: 14 },
   statValue:        { fontSize: 27, fontWeight: '700' },

@@ -3,7 +3,9 @@ import { View, Text, TouchableOpacity, ScrollView, TextInput, Switch, Alert, Key
 import { router, Stack } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import * as FileSystem from 'expo-file-system'
+// AMOBILE-223: the legacy API. Since SDK 54, cacheDirectory and downloadAsync
+// imported from 'expo-file-system' itself throw, which broke Export your data.
+import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
 import Constants from 'expo-constants'
 import * as WebBrowser from 'expo-web-browser'
@@ -11,6 +13,8 @@ import { Screen } from '../components/ui'
 import { usersApi, authApi, instanceApi, interactionsApi } from '../api'
 import { resetWhatsNew } from '../components/WhatsNewModal'
 import { useAuthStore } from '../store/auth'
+import { meQueryKey, useMe } from '../components/welcome/useMe'
+import { promptSignOut } from '../utils/signOut'
 import { useWhatsNewStore } from '../store/whatsNew'
 import { useToastStore } from '../store/toast'
 import { C } from '../constants/colors'
@@ -23,13 +27,21 @@ export default function SettingsScreen() {
   const c = useC()
   const qc = useQueryClient()
   const showToast = useToastStore(s => s.show)
-  const { user, updateUser, logout } = useAuthStore()
+  const { user, updateUser } = useAuthStore()
+  const accountCount = useAuthStore((s) => s.accounts.length)
   const { preference, setPreference } = useThemeStore()
   const { enabled: diagnostics, setEnabled: setDiagnostics } = useDiagnosticsStore()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [section, setSection] = useState<'main' | 'password' | 'email'>('main')
-  const [deletionScheduledAt, setDeletionScheduledAt] = useState<string | null>(null)
+  // AMOBILE-226: a pending deletion comes from /auth/me, so the cancel row
+  // shows up whenever one is scheduled, not only right after scheduling it
+  // in this screen. Servers without the field just never show it.
+  const { data: me } = useMe({ staleTime: 0 })
+  const activeAccountId = useAuthStore((s) => s.activeAccountId)
+  const deletionScheduledAt: string | null = me?.deletion_scheduled_at ?? null
+  const setDeletionScheduledAt = (at: string | null) =>
+    qc.setQueryData(meQueryKey(activeAccountId), (old: any) => old && { ...old, deletion_scheduled_at: at })
   const [exportLoading, setExportLoading] = useState(false)
 
   const togglePrivacy = useMutation({
@@ -42,9 +54,13 @@ export default function SettingsScreen() {
     onSuccess: () => updateUser({ hide_timeline: !(user as any)?.hide_timeline } as any),
   })
 
+  // AMOBILE-206: wall_approval_required and dm_privacy (below) are the
+  // server's field names. This screen used to send approve_wall_posts and
+  // message_permissions, which PATCH /users/me silently ignores, so neither
+  // setting ever saved and both always showed their defaults.
   const toggleApproveWallPosts = useMutation({
-    mutationFn: () => usersApi.updateProfile({ approve_wall_posts: !(user as any)?.approve_wall_posts }),
-    onSuccess: () => updateUser({ approve_wall_posts: !(user as any)?.approve_wall_posts } as any),
+    mutationFn: () => usersApi.updateProfile({ wall_approval_required: !(user as any)?.wall_approval_required }),
+    onSuccess: () => updateUser({ wall_approval_required: !(user as any)?.wall_approval_required } as any),
   })
 
   const toggleActivityPub = useMutation({
@@ -72,10 +88,10 @@ export default function SettingsScreen() {
     { label: 'Friends only', value: 'friends' },
     { label: 'Nobody', value: 'nobody' },
   ]
-  const currentMsgPerm = (user as any)?.message_permissions ?? 'everyone'
+  const currentMsgPerm = (user as any)?.dm_privacy ?? 'everyone'
   const setMsgPerm = useMutation({
-    mutationFn: (value: string) => usersApi.updateProfile({ message_permissions: value }),
-    onSuccess: (_, value) => updateUser({ message_permissions: value } as any),
+    mutationFn: (value: string) => usersApi.updateProfile({ dm_privacy: value }),
+    onSuccess: (_, value) => updateUser({ dm_privacy: value } as any),
   })
 
   const { data: instanceData } = useQuery({
@@ -140,8 +156,10 @@ export default function SettingsScreen() {
   const requestDeletion = useMutation({
     mutationFn: () => usersApi.requestDeletion(),
     onSuccess: (res) => {
-      setDeletionScheduledAt(res.data.deletion_scheduled_at)
-      const date = new Date(res.data.deletion_scheduled_at).toLocaleDateString()
+      // Servers before AGORA-405 only send scheduled_at.
+      const at = res.data.deletion_scheduled_at ?? res.data.scheduled_at
+      setDeletionScheduledAt(at)
+      const date = new Date(at).toLocaleDateString()
       Alert.alert('Account deletion scheduled', `Your account will be permanently deleted on ${date}. You can cancel this before then.`)
     },
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not schedule deletion'),
@@ -242,10 +260,22 @@ export default function SettingsScreen() {
       <ScrollView>
         <Text style={[s.section, { color: c.textMuted }]}>Account</Text>
         <Row icon="person-outline" label="Edit profile" onPress={() => router.push('/edit-profile')} />
+        <Row
+          icon="people-circle-outline"
+          label="Accounts"
+          onPress={() => router.push('/manage-accounts')}
+          right={accountCount > 1
+            ? <Text style={{ color: c.textLight, fontSize: 15 }}>{accountCount}</Text>
+            : undefined}
+        />
         <Row icon="people-outline" label="Friend lists" onPress={() => router.push('/friend-lists')} />
         <Row icon="ban-outline" label="Blocked users" onPress={() => router.push('/blocked-users')} />
+        {/* AGORA-309: sits next to blocked users, since both are things the
+            user has chosen not to see. */}
+        <Row icon="eye-off-outline" label="Hidden posts" onPress={() => router.push('/hidden-posts')} />
         <Row icon="mail-outline" label="Change email" onPress={() => setSection('email')} />
         <Row icon="key-outline" label="Change password" onPress={() => setSection('password')} />
+        <Row icon="globe-outline" label="Custom domain" onPress={() => router.push('/custom-domain')} />
         {invitesEnabled && (
           <Row icon="mail-outline" label="Invite a friend" onPress={() => router.push('/invite-friend')} />
         )}
@@ -256,16 +286,21 @@ export default function SettingsScreen() {
           </>
         )}
         <Text style={[s.section, { color: c.textMuted }]}>Appearance</Text>
+        {/* AMOBILE-210: the picker drops to a line of its own when it and the
+            label don't both fit, which only happens at large text sizes.
+            Squeezed beside it, "Theme" broke one letter per line. */}
         <View style={[s.themeRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-          <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
-            <Ionicons name="color-palette-outline" size={18} color={c.primary} />
+          <View style={s.themeLabel}>
+            <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
+              <Ionicons name="color-palette-outline" size={18} color={c.primary} />
+            </View>
+            <Text style={[s.themeLabelText, { color: c.text }]}>Theme</Text>
           </View>
-          <Text style={[s.rowLabel, { color: c.text }]}>Theme</Text>
           <View style={[s.themePicker, { backgroundColor: c.bg, borderColor: c.border }]}>
             {(['light', 'system', 'dark'] as const).map(opt => (
               <TouchableOpacity key={opt} onPress={() => setPreference(opt)}
                 style={[s.themeOption, preference === opt && { backgroundColor: c.primary }]}>
-                <Text style={[s.themeOptionText, { color: preference === opt ? c.white : c.textMuted }]}>
+                <Text style={[s.themeOptionText, { color: preference === opt ? c.onPrimary : c.textMuted }]}>
                   {opt.charAt(0).toUpperCase() + opt.slice(1)}
                 </Text>
               </TouchableOpacity>
@@ -278,13 +313,18 @@ export default function SettingsScreen() {
         <Row icon="eye-off-outline" label="Hide timeline"
           right={<Switch value={!!(user as any)?.hide_timeline} onValueChange={() => toggleHideTimeline.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleHideTimeline.isPending} />} />
         <Row icon="checkmark-circle-outline" label="Approve wall posts"
-          right={<Switch value={!!(user as any)?.approve_wall_posts} onValueChange={() => toggleApproveWallPosts.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleApproveWallPosts.isPending} />} />
-        <View style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-          <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
-            <Ionicons name="chatbubble-ellipses-outline" size={18} color={c.primary} />
+          right={<Switch value={!!(user as any)?.wall_approval_required} onValueChange={() => toggleApproveWallPosts.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleApproveWallPosts.isPending} />} />
+        {/* AMOBILE-208: the choices sit on a line of their own under the
+            label. Beside it they took most of a phone's width and squeezed
+            "Messages from" until it broke mid-word. */}
+        <View style={[s.stackedRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
+          <View style={s.stackedRowTop}>
+            <View style={[s.rowIcon, { backgroundColor: c.primaryBg }]}>
+              <Ionicons name="chatbubble-ellipses-outline" size={18} color={c.primary} />
+            </View>
+            <Text style={[s.rowLabel, { color: c.text }]}>Messages from</Text>
           </View>
-          <Text style={[s.rowLabel, { color: c.text }]}>Messages from</Text>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
+          <View style={s.stackedChoices}>
             {MESSAGE_PERM_OPTIONS.map(opt => (
               <TouchableOpacity key={opt.value} onPress={() => setMsgPerm.mutate(opt.value)}
                 style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1,
@@ -297,17 +337,17 @@ export default function SettingsScreen() {
         </View>
         <Text style={[s.section, { color: c.textMuted }]}>Fediverse</Text>
         <Text style={[s.sectionHint, { color: c.textMuted }]}>
-          Agora can talk to Mastodon and the rest of the fediverse over ActivityPub. Turning this on lets people
+          Agora can talk to Mastodon and the rest of the Fediverse over ActivityPub. Turning this on lets people
           out there find, follow, and see your public posts. Private and friends-only posts are never federated.
         </Text>
         <Row icon="planet-outline" label="Fediverse (ActivityPub)"
           right={<Switch value={(user as any)?.activitypub_enabled ?? true} onValueChange={() => toggleActivityPub.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleActivityPub.isPending} />} />
         <Row icon="notifications-outline" label="Fediverse post notifications"
           right={<Switch value={(user as any)?.fediverse_notifications_enabled ?? true} onValueChange={() => toggleFediverseNotifications.mutate()} trackColor={{ false: c.border, true: c.primary }} disabled={toggleFediverseNotifications.isPending} />} />
-        <Row icon="people-outline" label="Manage fediverse follows" onPress={() => router.push('/connections?tab=fediverse' as any)} />
+        <Row icon="people-outline" label="Manage Fediverse follows" onPress={() => router.push('/connections?tab=fediverse' as any)} />
         <Text style={[s.section, { color: c.textMuted }]}>Bluesky</Text>
         <Text style={[s.sectionHint, { color: c.textMuted }]}>
-          Agora can also talk to Bluesky over AT Protocol, a separate network from the fediverse. Turning this on
+          Agora can also talk to Bluesky over AT Protocol, a separate network from the Fediverse. Turning this on
           lets people on Bluesky find, follow, and see your public posts.
         </Text>
         <Row icon="cloud-outline" label="Bluesky (AT Protocol)"
@@ -336,6 +376,11 @@ export default function SettingsScreen() {
             ])} right={<View />} />
         )}
         <Text style={[s.section, { color: c.textMuted }]}>Help</Text>
+        {/* AMOBILE-202: replay the getting started wizard. Only offered when
+            the server has it, which is when /auth/me reports the field. */}
+        {(user as any)?.onboarding_completed !== undefined && (
+          <Row icon="compass-outline" label="Getting started tour" onPress={() => router.push('/welcome')} />
+        )}
         <Row icon="help-circle-outline" label="Help & Documentation" onPress={() => {
           const instanceUrl = useAuthStore.getState().instanceUrl
           if (instanceUrl) WebBrowser.openBrowserAsync(`${instanceUrl}/docs#user/index`)
@@ -360,10 +405,7 @@ export default function SettingsScreen() {
         <Row icon="server-outline" label={`Instance: ${useAuthStore.getState().instanceUrl?.replace(/^https?:\/\//, '')}`} onPress={() => {}} right={<View />} />
         <Row icon="information-circle-outline" label={`Version ${Constants.expoConfig?.version ?? '—'}`} onPress={() => {}} right={<View />} />
         <View style={{ marginTop: 8 }}>
-          <Row icon="log-out-outline" label="Sign out" destructive onPress={() => Alert.alert('Sign out?', undefined, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Sign out', style: 'destructive', onPress: logout },
-          ])} right={<View />} />
+          <Row icon="log-out-outline" label={accountCount > 1 ? 'Sign out…' : 'Sign out'} destructive onPress={promptSignOut} right={<View />} />
         </View>
       </ScrollView>
     </Screen>
@@ -373,11 +415,20 @@ export default function SettingsScreen() {
 const s = StyleSheet.create({
   section: { fontSize: 12, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 6 },
   sectionHint: { fontSize: 13, lineHeight: 17, paddingHorizontal: 16, paddingBottom: 10 },
-  themeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
-  themePicker: { flexDirection: 'row', borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
+  themeRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
+  // Takes the label's natural width (not rowLabel's flex: 1, which would let
+  // it shrink to nothing), so the row wraps instead of squeezing it.
+  themeLabel: { flexDirection: 'row', alignItems: 'center', gap: 12, flexGrow: 1 },
+  themeLabelText: { fontSize: 17 },
+  // Keeps the picker at the right edge, on the label's line or its own.
+  themePicker: { flexDirection: 'row', borderWidth: 1, borderRadius: 10, overflow: 'hidden', marginLeft: 'auto' },
   themeOption: { paddingHorizontal: 12, paddingVertical: 6 },
   themeOptionText: { fontSize: 15, fontWeight: '500' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
+  stackedRow: { gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
+  stackedRowTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  // Indented by the icon and its gap, so the choices line up under the label.
+  stackedChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 46 },
   rowIcon: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { flex: 1, fontSize: 17, color: C.text },
   label: { fontSize: 16, fontWeight: '500', color: C.textMd, marginBottom: 6 },

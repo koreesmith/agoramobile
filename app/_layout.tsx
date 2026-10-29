@@ -1,14 +1,14 @@
 import { useEffect, useState, useRef } from 'react'
 import { Stack, router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { useColorScheme, StyleSheet, View, AppState, AppStateStatus } from 'react-native'
+import { StyleSheet, View, AppState, AppStateStatus } from 'react-native'
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import * as Notifications from 'expo-notifications'
-import * as Device from 'expo-device'
+import * as SecureStore from 'expo-secure-store'
 import { useAuthStore } from '../store/auth'
-import { usersApi } from '../api'
-import { ColorProvider } from '../constants/ColorContext'
+import { registerActivePush, clearPushForAccount } from '../utils/push'
+import { ColorProvider, useIsDark } from '../constants/ColorContext'
 import { useThemeStore } from '../store/theme'
 import { useBlockStore } from '../store/blocks'
 import { useDiagnosticsStore } from '../store/diagnostics'
@@ -45,6 +45,14 @@ function getRouteForNotification(data: Record<string, string>): string | null {
       return '/(tabs)/messages'
     case 'waitlist_signup':
       return '/admin?tab=waitlist'
+    // AMOBILE-161: a custom-domain status change is about the claim, so it
+    // opens the screen that shows the claim's status and what to fix.
+    case 'custom_domain_live':
+    case 'custom_domain_verified':
+    case 'custom_domain_failed':
+    case 'custom_domain_lost':
+    case 'custom_domain_rejected':
+      return '/custom-domain'
     default:
       return '/(tabs)/notifications'
   }
@@ -62,12 +70,16 @@ AppState.addEventListener('change', (status: AppStateStatus) => {
 
 function AppContent() {
   const { isAuthenticated, loadFromStorage } = useAuthStore()
+  const activeAccountId = useAuthStore((s) => s.activeAccountId)
   const { loadPreference } = useThemeStore()
   const { loadBlocked } = useBlockStore()
   const { loadPreference: loadDiagnosticsPreference } = useDiagnosticsStore()
-  const scheme = useColorScheme()
-  const notifListener = useRef<any>()
-  const responseListener = useRef<any>()
+  // AMOBILE-209: the in-app Theme, not the phone's appearance, or the status
+  // bar is drawn dark on dark (or light on light) whenever the two differ.
+  const isDark = useIsDark()
+  const notifListener = useRef<any>(null)
+  const responseListener = useRef<any>(null)
+  const lastSeenAccountRef = useRef<string | null>(null)
 
   useEffect(() => {
     // Synchronous reads — avoids async generator execution in Hermes at startup
@@ -86,13 +98,45 @@ function AppContent() {
     return () => clearTimeout(t)
   }, [])
 
+  // AMOBILE-194: the Expo push token follows the active account. Whenever the
+  // active account settles, register it and best-effort clear the token from
+  // every other account, so only one server ever pushes to this device (and
+  // rapid switching can't strand a token on the wrong account). Still
+  // deferred past the startup HadesGC crash window on iOS 26.3.1 — calling
+  // getExpoPushTokenAsync() immediately at startup generates a native ObjC
+  // exception that React Native cannot catch on the bridge queue.
   useEffect(() => {
     if (!isAuthenticated) return
-    // Defer past the startup HadesGC crash window on iOS 26.3.1 — calling
-    // getExpoPushTokenAsync() immediately at startup generates a native ObjC
-    // exception that React Native cannot catch on the bridge queue.
-    const t = setTimeout(registerForPushNotifications, 1500)
+    const t = setTimeout(() => {
+      const { accounts, activeAccountId: aid } = useAuthStore.getState()
+      for (const a of accounts) {
+        if (a.id !== aid) clearPushForAccount(a)
+      }
+      registerActivePush(aid)
+    }, 1500)
     return () => clearTimeout(t)
+  }, [isAuthenticated, activeAccountId])
+
+  // AMOBILE-195: a switch changes identity for every account-scoped query,
+  // so drop the cache rather than let the previous account's data linger.
+  // Only a genuine A -> B switch clears; login (null -> A) and logout
+  // (A -> null) do not.
+  useEffect(() => {
+    const prev = lastSeenAccountRef.current
+    lastSeenAccountRef.current = activeAccountId
+    if (prev && activeAccountId && prev !== activeAccountId) {
+      queryClient.clear()
+    }
+  }, [activeAccountId])
+
+  // AMOBILE-182: resume a group-invite redemption that had to pause for
+  // login. 'agora_pending_invite' must match app/invite/[token].tsx's key.
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const pending = SecureStore.getItem('agora_pending_invite')
+    if (!pending) return
+    SecureStore.deleteItemAsync('agora_pending_invite')
+    setTimeout(() => router.push(`/invite/${pending}` as any), 300)
   }, [isAuthenticated])
 
   // Defer all notification native module setup past the HadesGC-sensitive
@@ -108,8 +152,11 @@ function AppContent() {
           // Suppress the raw push for types where the backend sends placeholder text;
           // a properly-labelled local notification is fired by notifListener instead.
           const suppressRaw = data?.type === 'waitlist_signup'
+          // shouldShowAlert is deprecated; banner and list together are what it
+          // used to mean.
           return {
-            shouldShowAlert: !suppressRaw,
+            shouldShowBanner: !suppressRaw,
+            shouldShowList: !suppressRaw,
             shouldPlaySound: true,
             shouldSetBadge: true,
           }
@@ -159,10 +206,14 @@ function AppContent() {
 
   return (
     <>
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        {/* AMOBILE-202: no swipe back out of the getting started wizard.
+            Leaving it is "Skip setup", or Android's back button on the first
+            step. */}
+        <Stack.Screen name="welcome" options={{ gestureEnabled: false }} />
       </Stack>
     </>
   )
@@ -191,20 +242,3 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
 })
-
-async function registerForPushNotifications() {
-  if (!Device.isDevice) return
-  const { status: existing } = await Notifications.getPermissionsAsync()
-  let finalStatus = existing
-  if (existing !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync({
-      ios: { allowAlert: true, allowBadge: true, allowSound: true },
-    })
-    finalStatus = status
-  }
-  if (finalStatus !== 'granted') return
-  try {
-    const token = (await Notifications.getExpoPushTokenAsync()).data
-    await usersApi.updateProfile({ expo_push_token: token })
-  } catch {}
-}

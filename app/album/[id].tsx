@@ -172,10 +172,10 @@ export default function AlbumScreen() {
                 style={[s.addBtn, { backgroundColor: c.primary }]}
               >
                 {uploading
-                  ? <ActivityIndicator size="small" color="white" />
+                  ? <ActivityIndicator size="small" color={c.onPrimary} />
                   : <>
-                      <Ionicons name="add" size={18} color="white" />
-                      <Text style={s.addBtnText}>Add photos</Text>
+                      <Ionicons name="add" size={18} color={c.onPrimary} />
+                      <Text style={[s.addBtnText, { color: c.onPrimary }]}>Add photos</Text>
                     </>}
               </TouchableOpacity>
             )}

@@ -59,7 +59,7 @@ export default function ReportScreen() {
           Thank you. Our moderators will review this shortly.
         </Text>
         <TouchableOpacity onPress={() => router.back()} style={[s.btn, { backgroundColor: c.primary, marginTop: 24 }]}>
-          <Text style={s.btnText}>Done</Text>
+          <Text style={[s.btnText, { color: c.onPrimary }]}>Done</Text>
         </TouchableOpacity>
       </View>
     </Screen>
@@ -122,7 +122,7 @@ export default function ReportScreen() {
             ))}
             <TouchableOpacity onPress={() => setStep('details')} disabled={!selectedRuleId}
               style={[s.btn, { backgroundColor: selectedRuleId ? c.primary : c.primaryLt, marginTop: 12 }]}>
-              <Text style={s.btnText}>Continue</Text>
+              <Text style={[s.btnText, { color: c.onPrimary }]}>Continue</Text>
             </TouchableOpacity>
           </>
         )}

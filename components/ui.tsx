@@ -3,14 +3,30 @@ import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { C } from '../constants/colors'
-import { useC } from '../constants/ColorContext'
+import { useC, useIsDark } from '../constants/ColorContext'
 import { imgUrl } from '../api'
+import { URL_TOKEN, linkHref, trimUrl } from '../utils/linkify'
 
-export function Avatar({ url, name, size = 40, online }: { url?: string; name?: string; size?: number; online?: boolean }) {
+/**
+ * `locked` (AMOBILE-171) marks a fediverse account that approves follow
+ * requests by hand, and only while the viewer isn't through that gate yet.
+ * It rides on the same bottom-right slot the presence dot uses: the outer
+ * View is deliberately not clipped, so a badge can sit over the circle's edge
+ * without the avatar's own `overflow: 'hidden'` cropping it away.
+ *
+ * Fediverse only. AT Proto has no follow-approval mechanism at all (a follow
+ * is a public repo write with no Accept to wait on), so a Bluesky account can
+ * never be locked and callers should never pass one.
+ */
+export function Avatar({ url, name, size = 40, online, locked }: { url?: string; name?: string; size?: number; online?: boolean; locked?: boolean }) {
   const c = useC()
   const letter = (name || '?')[0].toUpperCase()
   const resolvedUrl = imgUrl(url)
   const dotSize = Math.round(size * 0.28)
+  // Slightly larger than the presence dot, which only has to be seen, where
+  // this has to be read as a specific glyph. Floored so the lock stays legible
+  // on the smallest avatars a caller might pass.
+  const lockSize = Math.max(16, Math.round(size * 0.34))
   return (
     <View style={{ width: size, height: size }}>
       <View style={[lay.avatarWrap, { width: size, height: size, borderRadius: size / 2, backgroundColor: c.primaryBg }]}>
@@ -20,6 +36,18 @@ export function Avatar({ url, name, size = 40, online }: { url?: string; name?: 
       </View>
       {online && (
         <View style={[lay.statusDot, { width: dotSize, height: dotSize, borderRadius: dotSize / 2 }]} />
+      )}
+      {locked && (
+        <View
+          accessibilityRole="image"
+          accessibilityLabel="Requires follow approval"
+          style={[lay.lockBadge, {
+            width: lockSize, height: lockSize, borderRadius: lockSize / 2,
+            backgroundColor: c.primary, borderColor: c.card,
+          }]}
+        >
+          <Ionicons name="lock-closed" size={Math.round(lockSize * 0.6)} color={c.onPrimary} />
+        </View>
       )}
     </View>
   )
@@ -32,11 +60,12 @@ export function Avatar({ url, name, size = 40, online }: { url?: string; name?: 
 // linkifying URLs. The dotted alternatives must come before the bare-local
 // one so a full remote handle is captured as one token rather than just its
 // @handle portion (AGORA-163 hit the equivalent ordering bug server-side).
-const LINK_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+|@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+|@[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)+|@[a-zA-Z0-9_-]+|\+[a-zA-Z0-9_-]+|#[a-zA-Z0-9_]+|:[a-zA-Z0-9_]+:)/g
+// URLs include scheme-less ones like bit.ly/... (AMOBILE-200, see
+// utils/linkify).
+const LINK_REGEX = new RegExp(`(${URL_TOKEN}|@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9.-]+|@[a-zA-Z0-9_-]+(?:\\.[a-zA-Z0-9_-]+)+|@[a-zA-Z0-9_-]+|\\+[a-zA-Z0-9_-]+|#[a-zA-Z0-9_]+|:[a-zA-Z0-9_]+:)`, 'g')
 const MENTION_RE = /^@[a-zA-Z0-9_-]+$|^@[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+$|^@[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)+$/
 const GROUP_TAG_RE = /^\+[a-zA-Z0-9_-]+$/
 const HASHTAG_RE = /^#[a-zA-Z0-9_]+$/
-const URL_PART_RE = /^https?:\/\//i
 const EMOJI_RE = /^:[a-zA-Z0-9_]+:$/
 
 // AGORA-258: Mastodon custom emoji — a shortcode like ":stl_blues:" in a
@@ -57,18 +86,28 @@ function emojiImg(shortcode: string, url: string, key: string | number) {
 /** Renders a string with URLs, @mentions, +group-slug tags as tappable
  * links, and (AGORA-258) recognized :shortcode: custom emoji as inline
  * images -- URLs open externally; mentions and group tags navigate in-app. */
-export function LinkedText({ text, style, linkStyle, emojis, numberOfLines }: { text: string; style?: object; linkStyle?: object; emojis?: EmojiMap; numberOfLines?: number }) {
+// mentionDomains (AMOBILE-225, mirroring web's AGORA-401) maps a mentioned
+// local username, lowercased, to its live custom domain, so a mention carries
+// the same verified mark CustomHandle puts beside a name.
+export function LinkedText({ text, style, linkStyle, emojis, numberOfLines, mentionDomains }: { text: string; style?: object; linkStyle?: object; emojis?: EmojiMap; numberOfLines?: number; mentionDomains?: Record<string, string> }) {
   const router = useRouter()
+  // CustomHandle's color: web's sky-600 and sky-400.
+  const badgeColor = useIsDark() ? '#38bdf8' : '#0284c7'
   const parts = text.split(LINK_REGEX)
 
   return (
     <Text style={style} numberOfLines={numberOfLines}>
       {parts.map((part, i) => {
         if (MENTION_RE.test(part)) {
+          // Only a bare @name is a local account; the name half of a dotted or
+          // Fediverse handle is someone else (the server skips those too).
+          const domain = /^@[a-zA-Z0-9_-]+$/.test(part) ? mentionDomains?.[part.slice(1).toLowerCase()] : undefined
           return (
             <Text key={i} style={[{ color: '#3b82f6', fontWeight: '600' }, linkStyle]}
-              onPress={() => router.push(`/profile/${part.slice(1)}` as any)}>
+              onPress={() => router.push(`/profile/${part.slice(1)}` as any)}
+              accessibilityLabel={domain ? `${part}, verified as ${domain}` : undefined}>
               {part}
+              {domain ? <Text>{'\u00A0'}<Ionicons name="checkmark-circle" size={13} color={badgeColor} /></Text> : null}
             </Text>
           )
         }
@@ -96,11 +135,17 @@ export function LinkedText({ text, style, linkStyle, emojis, numberOfLines }: { 
         if (emojis && EMOJI_RE.test(part) && emojis[part]) {
           return emojiImg(part, emojis[part], i)
         }
-        if (URL_PART_RE.test(part)) {
+        // Odd indexes are the captured tokens; even ones are the text between.
+        const url = trimUrl(part)
+        const href = i % 2 === 1 && url ? linkHref(url, parts[i - 1] || parts[i - 2] || '') : null
+        if (href) {
           return (
-            <Text key={i} style={[{ color: '#3b82f6', textDecorationLine: 'underline' }, linkStyle]}
-              onPress={() => Linking.openURL(part)}>
-              {part}
+            <Text key={i}>
+              <Text style={[{ color: '#3b82f6', textDecorationLine: 'underline' }, linkStyle]}
+                onPress={() => Linking.openURL(href)}>
+                {url}
+              </Text>
+              {part.slice(url.length)}
             </Text>
           )
         }
@@ -128,19 +173,43 @@ export function Screen({ children }: { children: React.ReactNode }) {
   return <View style={[lay.screen, { backgroundColor: c.bg }]}>{children}</View>
 }
 
-export function Header({ title, right, back }: { title: string; right?: React.ReactNode; back?: boolean }) {
+// AMOBILE-223: `left` is a custom leading control, for a screen whose back
+// button needs its own handler (Create Page confirms before discarding). The
+// Pages screens passed one before Header accepted it, so it was dropped and
+// they had no back button at all.
+export function Header({ title, right, back, left }: { title: string; right?: React.ReactNode; back?: boolean; left?: React.ReactNode }) {
+  const c = useC()
+  const router = useRouter()
+  const lead = left ?? (back
+    ? <TouchableOpacity onPress={() => router.back()} style={lay.headerBack}>
+        <Ionicons name="chevron-back" size={24} color={c.primary} />
+      </TouchableOpacity>
+    : null)
+  return (
+    <View style={[lay.header, { backgroundColor: c.card, borderBottomColor: c.border }]}>
+      {lead}
+      <Text style={[lay.headerTitle, { color: c.text, flex: lead ? 1 : undefined }]}>{title}</Text>
+      {right && <View>{right}</View>}
+    </View>
+  )
+}
+
+// AMOBILE-169: web put search in a bar that sits on every screen, so search has
+// to be reachable from every tab here too. The feed gets a full field above its
+// pills; everywhere else this icon is the equivalent that doesn't spend a row of
+// vertical space on a screen that has its own content to show.
+export function SearchIconButton() {
   const c = useC()
   const router = useRouter()
   return (
-    <View style={[lay.header, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-      {back
-        ? <TouchableOpacity onPress={() => router.back()} style={lay.headerBack}>
-            <Ionicons name="chevron-back" size={24} color={c.primary} />
-          </TouchableOpacity>
-        : null}
-      <Text style={[lay.headerTitle, { color: c.text, flex: back ? 1 : undefined }]}>{title}</Text>
-      {right && <View>{right}</View>}
-    </View>
+    <TouchableOpacity
+      onPress={() => router.push('/search')}
+      accessibilityRole="button"
+      accessibilityLabel="Search"
+      style={{ padding: 4 }}
+    >
+      <Ionicons name="search-outline" size={22} color={c.primary} />
+    </TouchableOpacity>
   )
 }
 
@@ -203,6 +272,10 @@ const lay = StyleSheet.create({
   avatarWrap: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
   avatarLetter: { fontWeight: 'bold' },
   statusDot: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#22c55e', borderWidth: 2, borderColor: '#ffffff' },
+  // Colours come from the theme at render time (see Avatar) rather than being
+  // baked in here the way statusDot's green is, so the ring keeps matching the
+  // card behind it in dark mode instead of punching a white hole in it.
+  lockBadge:  { position: 'absolute', bottom: -1, right: -1, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
   screen: { flex: 1 },
   header: { borderBottomWidth: 1, paddingHorizontal: 16, paddingTop: 56, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { fontSize: 22, fontWeight: 'bold' },

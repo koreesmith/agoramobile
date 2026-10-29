@@ -184,7 +184,7 @@ export default function CreatePageScreen() {
                     }]}
                   >
                     <View style={[s.typeIcon, { backgroundColor: pageType === t.value ? c.primary : c.bg }]}>
-                      <Ionicons name={t.icon as any} size={22} color={pageType === t.value ? 'white' : c.textMuted} />
+                      <Ionicons name={t.icon as any} size={22} color={pageType === t.value ? c.onPrimary : c.textMuted} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[s.typeLabel, { color: pageType === t.value ? c.primary : c.text }]}>{t.label}</Text>
@@ -288,8 +288,8 @@ export default function CreatePageScreen() {
           style={[s.nextBtn, { backgroundColor: !canNext() ? c.primaryLt : c.primary }]}
         >
           {createPage.isPending
-            ? <ActivityIndicator color="white" />
-            : <Text style={s.nextBtnText}>{step === TOTAL_STEPS ? 'Create Page' : 'Next'}</Text>
+            ? <ActivityIndicator color={c.onPrimary} />
+            : <Text style={[s.nextBtnText, { color: c.onPrimary }]}>{step === TOTAL_STEPS ? 'Create Page' : 'Next'}</Text>
           }
         </TouchableOpacity>
       </View>

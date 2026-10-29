@@ -4,6 +4,7 @@ import { router, Stack } from 'expo-router'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Avatar, Spinner } from '../components/ui'
+import { handle } from '../utils/handle'
 import { dmApi, friendsApi } from '../api'
 import { C } from '../constants/colors'
 import { useC } from '../constants/ColorContext'
@@ -56,7 +57,14 @@ export default function NewConversationScreen() {
                 <Avatar url={f.avatar_url} name={f.display_name || f.username} size={44} />
                 <View style={{ flex: 1 }}>
                   <Text style={s.name}>{f.display_name || f.username}</Text>
-                  <Text style={s.username}>@{f.username}</Text>
+                  {/* AMOBILE-173: remote friends were always in these results,
+                      but before AGORA-323 starting a conversation with one
+                      wrote a message that never left the instance. It reaches
+                      them now, so showing where they are makes picking one a
+                      deliberate choice rather than a surprise on the next
+                      screen. Reuses the shared handle helper, which already
+                      knows a remote username carries its own domain. */}
+                  <Text style={s.username}>{handle(f.username, f.is_remote, f.remote_instance)}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={c.textLight} />
               </TouchableOpacity>

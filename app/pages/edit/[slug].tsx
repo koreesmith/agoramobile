@@ -207,8 +207,8 @@ export default function EditPageScreen() {
             style={[s.saveBtn, { backgroundColor: !displayName.trim() ? c.primaryLt : c.primary }]}
           >
             {save.isPending
-              ? <ActivityIndicator color="white" />
-              : <Text style={s.saveBtnText}>Save changes</Text>
+              ? <ActivityIndicator color={c.onPrimary} />
+              : <Text style={[s.saveBtnText, { color: c.onPrimary }]}>Save changes</Text>
             }
           </TouchableOpacity>
         </ScrollView>

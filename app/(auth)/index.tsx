@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, StyleSheet, Image } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { router } from 'expo-router'
-import { useAuthStore } from '../../store/auth'
+import { router, useLocalSearchParams } from 'expo-router'
+import { useAuthStore, MAX_ACCOUNTS } from '../../store/auth'
 import { authApi } from '../../api'
 import { useC } from '../../constants/ColorContext'
 
@@ -18,7 +18,15 @@ const FEATURED_INSTANCES = [
 
 export default function LoginScreen() {
   const c = useC()
-  const { setAuth } = useAuthStore()
+  const { addAccount, setAddingAccount } = useAuthStore()
+  // AMOBILE-191: ?add=1 means we came here to add another account, not to
+  // do a first sign-in. Tell the store so the (auth) redirect guard stands
+  // down while we're here.
+  const { add } = useLocalSearchParams<{ add?: string }>()
+  const isAdding = add === '1'
+  useEffect(() => {
+    if (isAdding) setAddingAccount(true)
+  }, [isAdding])
   const [instanceUrl, setInstanceUrl] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -27,6 +35,14 @@ export default function LoginScreen() {
   const [instanceName, setInstanceName] = useState('')
   const [regMode, setRegMode] = useState('')
   const [showCustomUrl, setShowCustomUrl] = useState(false)
+
+  // AMOBILE-184: forgot/reset password. 'request' collects an email and
+  // calls forgot-password; 'reset' collects the emailed token (or the full
+  // link, since there's no in-app link handoff yet) plus a new password.
+  const [authMode, setAuthMode] = useState<'credentials' | 'forgot-request' | 'forgot-sent' | 'forgot-reset'>('credentials')
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [resetToken, setResetToken] = useState('')
+  const [resetPassword, setResetPassword] = useState('')
 
   const selectInstance = async (url: string) => {
     setInstanceUrl(url)
@@ -54,7 +70,18 @@ export default function LoginScreen() {
     try {
       const res = await authApi.login(instanceUrl, username.trim(), password)
       const me = await authApi.meWithUrl(instanceUrl, res.data.token)
-      await setAuth(me.data, res.data.token, instanceUrl)
+      const result = await addAccount(me.data, res.data.token, instanceUrl)
+      if (result.status === 'limit') {
+        Alert.alert(
+          'Account limit reached',
+          `You can be signed in to ${MAX_ACCOUNTS} accounts at once. Remove one from Manage accounts, then try again.`,
+        )
+        return
+      }
+      if (result.status === 'exists') {
+        Alert.alert('Already signed in', `You're already signed in as @${me.data.username}. Switched to that account.`)
+      }
+      setAddingAccount(false)
       router.replace('/(tabs)')
     } catch (err: any) {
       const raw = err?.response?.data?.error || 'Login failed. Check your credentials.'
@@ -62,6 +89,37 @@ export default function LoginScreen() {
         ? "Your account is on the waitlist and hasn't been approved yet. You'll receive an email with a login link when you're approved."
         : raw
       Alert.alert('Login failed', msg)
+    } finally { setLoading(false) }
+  }
+
+  const sendResetEmail = async () => {
+    const email = forgotEmail.trim()
+    if (!email) return
+    setLoading(true)
+    try {
+      await authApi.forgotPasswordWithUrl(instanceUrl, email)
+    } catch {
+      // Same message either way - the endpoint never reveals whether the
+      // email is registered.
+    } finally {
+      setLoading(false)
+      setAuthMode('forgot-sent')
+    }
+  }
+
+  const submitReset = async () => {
+    const raw = resetToken.trim()
+    if (!raw || resetPassword.length < 8) return
+    // Accept either the bare token or the full emailed link.
+    const token = raw.includes('token=') ? raw.split('token=').pop()!.split('&')[0] : raw
+    setLoading(true)
+    try {
+      await authApi.resetPasswordWithUrl(instanceUrl, token, resetPassword)
+      Alert.alert('Password reset', 'Your password has been reset. Sign in with your new password.')
+      setAuthMode('credentials')
+      setForgotEmail(''); setResetToken(''); setResetPassword('')
+    } catch (err: any) {
+      Alert.alert('Reset failed', err?.response?.data?.error || 'That reset link is invalid or has expired.')
     } finally { setLoading(false) }
   }
 
@@ -79,6 +137,9 @@ export default function LoginScreen() {
             <Text style={s.subtitle}>
               {step === 'instance'
                 ? 'Choose your community to get started'
+                : authMode === 'forgot-request' ? 'Enter your email to get a reset link'
+                : authMode === 'forgot-sent' ? 'Check your email'
+                : authMode === 'forgot-reset' ? 'Set a new password'
                 : `Sign in to ${instanceName}`}
             </Text>
           </View>
@@ -158,7 +219,7 @@ export default function LoginScreen() {
                 </View>
               )}
             </View>
-          ) : (
+          ) : authMode === 'credentials' ? (
             <View style={s.form}>
               {regMode === 'waitlist' && (
                 <View style={s.waitlistBanner}>
@@ -178,6 +239,9 @@ export default function LoginScreen() {
                 disabled={loading || !username.trim() || !password.trim()}
               >
                 {loading ? <ActivityIndicator color="white" /> : <Text style={s.btnText}>Sign in</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setAuthMode('forgot-request')} style={{ alignItems: 'center', paddingVertical: 8 }}>
+                <Text style={{ color: '#486581', fontSize: 16 }}>Forgot password?</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => router.push({ pathname: '/explore', params: { instanceUrl, instanceName } })}
@@ -209,6 +273,58 @@ export default function LoginScreen() {
                 onPress={() => router.push({ pathname: '/(auth)/register', params: { instanceUrl, instanceName } })}
               >
                 <Text style={s.signupBtnText}>Create an account</Text>
+              </TouchableOpacity>
+            </View>
+          ) : authMode === 'forgot-request' ? (
+            <View style={s.form}>
+              <Text style={s.label}>Email address</Text>
+              <TextInput style={s.input} placeholder="you@example.com" placeholderTextColor="#9ca3af"
+                value={forgotEmail} onChangeText={setForgotEmail} autoCapitalize="none" autoCorrect={false}
+                keyboardType="email-address" returnKeyType="go" onSubmitEditing={sendResetEmail} autoFocus />
+              <TouchableOpacity
+                style={[s.btn, (loading || !forgotEmail.trim()) && s.btnDisabled]}
+                onPress={sendResetEmail}
+                disabled={loading || !forgotEmail.trim()}
+              >
+                {loading ? <ActivityIndicator color="white" /> : <Text style={s.btnText}>Send reset link</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setAuthMode('forgot-reset')} style={{ alignItems: 'center', paddingVertical: 8 }}>
+                <Text style={{ color: '#486581', fontSize: 16 }}>Already have a reset link?</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setAuthMode('credentials')} style={s.backBtn}>
+                <Text style={{ color: '#486581', fontSize: 16 }}>← Back to sign in</Text>
+              </TouchableOpacity>
+            </View>
+          ) : authMode === 'forgot-sent' ? (
+            <View style={s.form}>
+              <Text style={{ fontSize: 16, color: '#374151', lineHeight: 22 }}>
+                If that email is registered, a reset link has been sent to it. Open the
+                link in a browser on this device, then come back and paste it below.
+              </Text>
+              <TouchableOpacity style={[s.btn, { marginTop: 16 }]} onPress={() => setAuthMode('forgot-reset')}>
+                <Text style={s.btnText}>I have the link</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setAuthMode('credentials')} style={s.backBtn}>
+                <Text style={{ color: '#486581', fontSize: 16 }}>← Back to sign in</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={s.form}>
+              <Text style={s.label}>Reset link or code</Text>
+              <TextInput style={s.input} placeholder="Paste the link or code from your email" placeholderTextColor="#9ca3af"
+                value={resetToken} onChangeText={setResetToken} autoCapitalize="none" autoCorrect={false} />
+              <Text style={[s.label, { marginTop: 12 }]}>New password</Text>
+              <TextInput style={s.input} placeholder="At least 8 characters" placeholderTextColor="#9ca3af"
+                value={resetPassword} onChangeText={setResetPassword} secureTextEntry returnKeyType="go" onSubmitEditing={submitReset} />
+              <TouchableOpacity
+                style={[s.btn, (loading || !resetToken.trim() || resetPassword.length < 8) && s.btnDisabled]}
+                onPress={submitReset}
+                disabled={loading || !resetToken.trim() || resetPassword.length < 8}
+              >
+                {loading ? <ActivityIndicator color="white" /> : <Text style={s.btnText}>Reset password</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setAuthMode('credentials')} style={s.backBtn}>
+                <Text style={{ color: '#486581', fontSize: 16 }}>← Back to sign in</Text>
               </TouchableOpacity>
             </View>
           )}

@@ -206,7 +206,7 @@ export default function PageProfileScreen() {
                 backgroundColor: page.is_subscribed ? c.primaryBg : c.primary },
             ]}
           >
-            <Text style={[s.subBtnText, { color: page.is_subscribed ? c.primary : '#fff' }]}>
+            <Text style={[s.subBtnText, { color: page.is_subscribed ? c.primary : c.onPrimary }]}>
               {page.is_subscribed ? 'Following' : 'Follow'}
             </Text>
           </TouchableOpacity>

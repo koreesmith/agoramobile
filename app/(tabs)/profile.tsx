@@ -1,18 +1,23 @@
-import { View, Text, ScrollView, TouchableOpacity, Image, RefreshControl, Alert, StyleSheet } from 'react-native'
+import { useState } from 'react'
+import { View, Text, ScrollView, TouchableOpacity, Image, RefreshControl, StyleSheet } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { Screen, Header, Spinner, Avatar } from '../../components/ui'
+import { Screen, Header, Spinner, Avatar, SearchIconButton } from '../../components/ui'
 import PostCard from '../../components/PostCard'
+import AccountSwitcherModal from '../../components/AccountSwitcherModal'
 import { feedApi, usersApi, instanceApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
+import { promptSignOut } from '../../utils/signOut'
 
 import { C } from '../../constants/colors'
 import { useC } from '../../constants/ColorContext'
 
 export default function ProfileScreen() {
   const c = useC()
-  const { user, logout } = useAuthStore()
+  const { user } = useAuthStore()
+  const accountCount = useAuthStore((s) => s.accounts.length)
+  const [switcherOpen, setSwitcherOpen] = useState(false)
 
   const { data: profile, isLoading: pl, refetch: rp, isRefetching: rpr } = useQuery({
     queryKey: ['profile', user?.username],
@@ -42,17 +47,26 @@ export default function ProfileScreen() {
     <Screen>
       <Header title="Profile" right={
         <View style={{ flexDirection: 'row', gap: 8 }}>
+          <SearchIconButton />
+          {/* AMOBILE-192: a visible way to reach the account switcher, since
+              the long-press on the Profile tab is undiscoverable. */}
+          <TouchableOpacity
+            onPress={() => setSwitcherOpen(true)}
+            style={{ padding: 4 }}
+            accessibilityLabel="Switch account"
+          >
+            <Ionicons name="people-outline" size={22} color={c.primary} />
+            {accountCount > 1 && <View style={[s.dot, { backgroundColor: c.primary, borderColor: c.card }]} />}
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/settings')} style={{ padding: 4 }}>
             <Ionicons name="settings-outline" size={22} color={c.primary} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => Alert.alert('Sign out?', undefined, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Sign out', style: 'destructive', onPress: logout },
-          ])} style={{ padding: 4 }}>
+          <TouchableOpacity onPress={promptSignOut} style={{ padding: 4 }}>
             <Ionicons name="log-out-outline" size={22} color="#ef4444" />
           </TouchableOpacity>
         </View>
       } />
+      <AccountSwitcherModal visible={switcherOpen} onClose={() => setSwitcherOpen(false)} />
 
       <View style={{ flex: 1 }}>
         <ScrollView refreshControl={<RefreshControl refreshing={rpr} onRefresh={() => { rp(); rpost() }} tintColor={c.primary} />}>
@@ -97,8 +111,8 @@ export default function ProfileScreen() {
             style={[s.fab, { backgroundColor: c.primary }]}
             activeOpacity={0.85}
           >
-            <Ionicons name="mail" size={20} color="white" />
-            <Text style={s.fabText}>Invite a Friend</Text>
+            <Ionicons name="mail" size={20} color={c.onPrimary} />
+            <Text style={[s.fabText, { color: c.onPrimary }]}>Invite a Friend</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -108,6 +122,7 @@ export default function ProfileScreen() {
 
 const s = StyleSheet.create({
   cover:       { height: 100 },
+  dot:         { position: 'absolute', top: 2, right: 2, width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
   profileCard: { paddingHorizontal: 16, paddingBottom: 16 },
   avatarRow:   { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: -36, marginBottom: 12 },
   avatarBorder:{ borderWidth: 4, borderRadius: 40 },

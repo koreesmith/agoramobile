@@ -7,26 +7,28 @@ import AutoGrowInput from './AutoGrowInput'
 import PollVotersModal from './PollVotersModal'
 import { router } from 'expo-router'
 import * as MediaLibrary from 'expo-media-library'
-import * as FileSystem from 'expo-file-system'
+// AMOBILE-223: the legacy API. Since SDK 54, cacheDirectory and downloadAsync
+// imported from 'expo-file-system' itself throw, which broke Save image.
+import * as FileSystem from 'expo-file-system/legacy'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import { feedApi, imgUrl, blockApi, moderationApi, friendsApi, pagesApi } from '../api'
+import { feedApi, imgUrl, blockApi, moderationApi, friendsApi, pagesApi, hiddenPostsApi } from '../api'
 import { trackInteraction } from '../utils/interactions'
+import { isShareable, sharePost } from '../utils/share'
 import { handle, timeAgo } from '../utils/handle'
 import { useAuthStore } from '../store/auth'
 import { useBlockStore } from '../store/blocks'
 import { useToastStore } from '../store/toast'
 import { Avatar, LinkedText, renderName } from './ui'
+import CustomHandle from './CustomHandle'
+import { AltBadge } from './AltText'
 import { useC } from '../constants/ColorContext'
 import ReactorsModal from './ReactorsModal'
+import { REACTIONS, reactionDisplay, pickerMetrics } from '../utils/reactions'
 
-const REACTIONS = [
-  { type: 'like', emoji: '❤️' }, { type: 'love', emoji: '😍' },
-  { type: 'laugh', emoji: '😂' }, { type: 'wow', emoji: '😮' },
-  { type: 'angry', emoji: '😡' }, { type: 'care', emoji: '🤗' },
-  { type: 'pride', emoji: '🏳️‍🌈' }, { type: 'thankful', emoji: '🙏' },
-  { type: 'vomit', emoji: '🤮' },
-]
+// AMOBILE-170: ten reactions no longer fit a narrow phone at the sizing used for
+// nine. See pickerMetrics for why the row is width-driven rather than glyph-driven.
+const PICKER = pickerMetrics(Dimensions.get('window').width)
 
 function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
   const c = useC()
@@ -149,7 +151,7 @@ function PollWidget({ post, onRefresh }: { post: any; onRefresh: () => void }) {
             disabled={!newOptionText.trim() || addOption.isPending}
             style={[pw.addBtn, { backgroundColor: c.primary }]}
           >
-            <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>
+            <Text style={{ color: c.onPrimary, fontSize: 15, fontWeight: '600' }}>
               {addOption.isPending ? '…' : 'Add'}
             </Text>
           </TouchableOpacity>
@@ -192,7 +194,7 @@ const pw = StyleSheet.create({
 })
 
 export default function PostCard({ post, queryKey }: { post: any; queryKey: any[] }) {
-  const { user } = useAuthStore()
+  const { user, instanceUrl } = useAuthStore()
   const { addBlock } = useBlockStore()
   const showToast = useToastStore(s => s.show)
   const qc = useQueryClient()
@@ -221,7 +223,15 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         gs.isPicking = true
         wrapperRef.current?.measure((_x, _y, _w, h, pageX, pageY) => {
           const sh = Dimensions.get('window').height
-          setPickerPosition({ bottom: sh - pageY - h + 40, left: pageX })
+          const sw = Dimensions.get('window').width
+          // AMOBILE-170: at ten reactions the row is wide enough to run off the
+          // right edge from a left-ish anchor. That is worse than it looks:
+          // onPanResponderMove maps a finger to an index by dividing the
+          // measured picker width by REACTIONS.length, so anything hanging off
+          // screen is not merely clipped, it is unreachable. Clamp the origin so
+          // the whole row is always on screen and the hit regions stay honest.
+          const left = Math.max(PICKER.margin, Math.min(pageX, sw - PICKER.width - PICKER.margin))
+          setPickerPosition({ bottom: sh - pageY - h + 40, left })
           setShowReactions(true)
         })
       }, 400)
@@ -311,9 +321,9 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
     }),
     onSuccess: () => {
       closeShareModal(); trackInteraction('repost', post.id); invalidate()
-      showToast('Shared!')
+      showToast('Reposted!')
     },
-    onError: (e: any) => showToast(e.response?.data?.error || 'Could not share post', 'error'),
+    onError: (e: any) => showToast(e.response?.data?.error || 'Could not repost', 'error'),
   })
 
   const closeShareModal = () => {
@@ -360,6 +370,16 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
     onError: () => Alert.alert('Error', 'Could not block user. Please try again.'),
   })
 
+  // AGORA-309. Shares the feed's queryKey invalidation with the actions above,
+  // so the post leaves the list it is sitting in without a bespoke removal
+  // path: from the reader's point of view hiding and blocking have the same
+  // immediate effect, and only one of them is about the person.
+  const hidePost = useMutation({
+    mutationFn: () => hiddenPostsApi.hide(post.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not hide post'),
+  })
+
   const isOwn    = user?.id === post.author_id
   // Page posts: use page identity for author display
   const isPagePost = !!post.page_id && !post.repost_of_id
@@ -382,7 +402,14 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
 
   // Normalize image URLs: prefer photo_urls array (AGORA-93), fall back to single image_url
   const rawImageUrls: string[] = post.photo_urls?.length ? post.photo_urls : post.image_url ? [post.image_url] : []
-  const postImageUrls = rawImageUrls.map((u: string) => imgUrl(u)).filter(Boolean) as string[]
+  // AMOBILE-224: photo_alts lines up with photo_urls; group and page feeds
+  // carry a lone image's description as image_alt instead. Paired before
+  // filtering so a dropped URL can't shift the descriptions after it.
+  const postImages = rawImageUrls
+    .map((u: string, i: number) => ({ uri: imgUrl(u), alt: (post.photo_alts?.[i] || (i === 0 ? post.image_alt : '') || '') as string }))
+    .filter(img => img.uri)
+  const postImageUrls = postImages.map(img => img.uri) as string[]
+  const postImageAlts = postImages.map(img => img.alt)
   const imageUrl = postImageUrls[0]
 
   const [videoPlaying, setVideoPlaying] = useState(false)
@@ -427,7 +454,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   }
   const reactionCounts: Record<string, number> = post.reaction_counts || {}
   const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + b, 0)
-  const myReactionEmoji = REACTIONS.find(r => r.type === post.my_reaction)?.emoji
+  const myReactionEmoji = post.my_reaction ? reactionDisplay(post.my_reaction).emoji : undefined
 
   return (
     <View style={[s.card, { backgroundColor: c.card }, post.group_slug && { borderLeftWidth: 3, borderLeftColor: c.primaryLt }]}>
@@ -486,7 +513,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               )}
               {pronouns ? <Text style={[s.pronouns, { color: c.textLight }]}>({pronouns})</Text> : null}
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
               <Text style={[s.authorMeta, { color: c.textMuted }]}>
                 {[
                   isPagePost ? (post.page_type || 'Page') : handle(username, post.is_remote, post.remote_instance),
@@ -502,6 +529,17 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 size={11}
                 color={c.textLight}
               />
+              {!isPagePost && <CustomHandle domain={post.author_custom_domain} />}
+              {/* AMOBILE-199/AGORA-372: only ever set on the viewer's own
+                  view of an external_only post — no other viewer's post
+                  list can contain one of these rows. Renders the server's
+                  own label rather than re-deriving it from federate_ap/
+                  federate_atproto, so the wording stays in one place. */}
+              {post.external_only && post.only_on && (
+                <View style={{ backgroundColor: c.primaryBg, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '500', color: c.primary }}>{post.only_on}</Text>
+                </View>
+              )}
             </View>
           </View>
           <TouchableOpacity onPress={() => setShowMenu(true)} style={{ padding: 4 }}>
@@ -532,7 +570,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         )}
 
         {(!post.content_warning || twExpanded) && content ? (
-          <LinkedText text={content} style={[s.content, { color: c.textMd }]} emojis={post.content_emojis} />
+          <LinkedText text={content} style={[s.content, { color: c.textMd }]} emojis={post.content_emojis} mentionDomains={post.mention_domains} />
         ) : null}
 
         {/* Quoted post — the original post being shared, nested so it reads as quoted material rather than the reposter's own words */}
@@ -551,9 +589,10 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 <Text style={[s.pronouns, { color: c.textLight }]}>({post.repost_author_pronouns})</Text>
               ) : null}
               <Text style={[s.quotedAuthorMeta, { color: c.textMuted }]}>{handle(post.repost_author_username)}</Text>
+              <CustomHandle domain={post.repost_author_custom_domain} />
             </View>
             {post.repost_content ? (
-              <LinkedText text={post.repost_content} style={[s.quotedContent, { color: c.textMd }]} emojis={post.repost_content_emojis} />
+              <LinkedText text={post.repost_content} style={[s.quotedContent, { color: c.textMd }]} emojis={post.repost_content_emojis} mentionDomains={post.mention_domains} />
             ) : null}
             {post.repost_image_url ? (
               <Image source={{ uri: imgUrl(post.repost_image_url) }} style={s.quotedImage} contentFit="cover" />
@@ -573,6 +612,43 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                     <Text style={[s.linkTitle, { color: c.text }]} numberOfLines={2}>{post.repost_link_title}</Text>
                   ) : null}
                 </View>
+              </TouchableOpacity>
+            ) : null}
+            {/* AMOBILE-228: the quoted post's own quote, one level further in and
+                kept compact, so the context it was reacting to survives. The
+                innermost touchable takes the tap, so the outer card doesn't open. */}
+            {post.repost_quote ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => router.push(`/post/${post.repost_quote.id}` as any)}
+                style={[s.nestedQuote, { borderColor: c.border }]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                  <Text style={[s.nestedQuoteName, { color: c.text }]}>
+                    {post.repost_quote.author_display_name ? renderName(post.repost_quote.author_display_name, post.repost_quote.author_emojis) : post.repost_quote.author_username}
+                  </Text>
+                  <Text style={[s.nestedQuoteMeta, { color: c.textMuted }]}>{handle(post.repost_quote.author_username)}</Text>
+                </View>
+                {post.repost_quote.content ? (
+                  <LinkedText text={post.repost_quote.content} style={[s.nestedQuoteContent, { color: c.textMd }]} emojis={post.repost_quote.content_emojis} numberOfLines={4} mentionDomains={post.mention_domains} />
+                ) : null}
+                {post.repost_quote.image_url ? (
+                  <Image source={{ uri: imgUrl(post.repost_quote.image_url) }} style={s.nestedQuoteImage} contentFit="cover" />
+                ) : null}
+                {post.repost_quote.link_url ? (
+                  <TouchableOpacity onPress={() => Linking.openURL(post.repost_quote.link_url)} activeOpacity={0.8}
+                    style={[s.quotedLinkPreview, { borderColor: c.border }]}>
+                    {post.repost_quote.link_image ? (
+                      <Image source={{ uri: imgUrl(post.repost_quote.link_image) }} style={s.nestedQuoteLinkImage} contentFit="cover" />
+                    ) : null}
+                    <View style={{ flex: 1, padding: 6 }}>
+                      <Text style={[s.nestedQuoteMeta, { color: c.textMuted }]}>{post.repost_quote.link_domain}</Text>
+                      {post.repost_quote.link_title ? (
+                        <Text style={[s.nestedQuoteLinkTitle, { color: c.text }]} numberOfLines={2}>{post.repost_quote.link_title}</Text>
+                      ) : null}
+                    </View>
+                  </TouchableOpacity>
+                ) : null}
               </TouchableOpacity>
             ) : null}
           </TouchableOpacity>
@@ -609,9 +685,12 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         {(!post.content_warning || twExpanded) && postImageUrls.length > 0 ? (
           <View style={s.imageWrapper}>
             {postImageUrls.length === 1 ? (
-              <TouchableOpacity onPress={() => openLightbox(0)} activeOpacity={0.9}>
-                <Image source={{ uri: postImageUrls[0] }} style={s.image} contentFit="cover" />
-              </TouchableOpacity>
+              <View>
+                <TouchableOpacity onPress={() => openLightbox(0)} activeOpacity={0.9} accessibilityRole="imagebutton" accessibilityLabel={postImageAlts[0] || undefined}>
+                  <Image source={{ uri: postImageUrls[0] }} style={s.image} contentFit="cover" />
+                </TouchableOpacity>
+                <AltBadge alt={postImageAlts[0]} />
+              </View>
             ) : (
               <ScrollView
                 horizontal
@@ -619,9 +698,12 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 contentContainerStyle={{ gap: 2 }}
               >
                 {postImageUrls.map((url, i) => (
-                  <TouchableOpacity key={i} onPress={() => openLightbox(i)} activeOpacity={0.9}>
-                    <Image source={{ uri: url }} style={s.imageMulti} contentFit="cover" />
-                  </TouchableOpacity>
+                  <View key={i}>
+                    <TouchableOpacity onPress={() => openLightbox(i)} activeOpacity={0.9} accessibilityRole="imagebutton" accessibilityLabel={postImageAlts[i] || undefined}>
+                      <Image source={{ uri: url }} style={s.imageMulti} contentFit="cover" />
+                    </TouchableOpacity>
+                    <AltBadge alt={postImageAlts[i]} />
+                  </View>
                 ))}
               </ScrollView>
             )}
@@ -653,6 +735,11 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                     </TouchableOpacity>
                   </View>
                 )}
+                {postImageAlts[lightboxIndex] ? (
+                  <ScrollView style={s.lightboxAltWrap}>
+                    <Text style={s.lightboxAlt}>{postImageAlts[lightboxIndex]}</Text>
+                  </ScrollView>
+                ) : null}
                 <Text style={s.lightboxClose}>✕ tap to close · pinch to zoom · hold to save</Text>
               </View>
             </Modal>
@@ -679,7 +766,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         {totalReactions > 0 && (
           <View style={s.reactionCounts}>
             {Object.entries(reactionCounts).filter(([,v]) => v > 0).map(([type, count]) => {
-              const emoji = REACTIONS.find(r => r.type === type)?.emoji ?? '❤️'
+              const emoji = reactionDisplay(type).emoji
               const isActive = post.my_reaction === type
               return (
                 <TouchableOpacity key={type} onPress={() => { setReactorsTab(type); setShowReactors(true) }}
@@ -695,7 +782,12 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         <View style={[s.actions, { borderTopColor: c.border }]}>
           <View ref={wrapperRef}>
             <View style={s.actionBtn} {...panResponder.panHandlers}>
-              <Text style={{ fontSize: 21 }}>{myReactionEmoji ?? '🤍'}</Text>
+              {/* Unreacted is an outline thumb, matching the sibling action
+                  icons. The filled glyph only appears once the viewer has
+                  actually reacted (AMOBILE-170). */}
+              {myReactionEmoji
+                ? <Text style={{ fontSize: 21 }}>{myReactionEmoji}</Text>
+                : <Ionicons name="thumbs-up-outline" size={19} color={c.textMuted} />}
               {totalReactions > 0 && <Text style={[s.actionCount, { color: c.textMuted }]}>{totalReactions}</Text>}
             </View>
           </View>
@@ -707,11 +799,20 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
 
           <TouchableOpacity
             style={s.actionBtn}
-            onPress={() => post.visibility === 'public' ? setShowShare(true) : Alert.alert('Cannot share', 'Friends-only posts cannot be shared.')}
+            accessibilityLabel="Repost"
+            onPress={() => post.visibility === 'public' ? setShowShare(true) : Alert.alert('Cannot repost', 'Friends-only posts cannot be reposted.')}
           >
             <Ionicons name="repeat" size={17} color={post.reposted ? c.primary : post.visibility !== 'public' ? c.border : c.textMuted} />
             {post.repost_count > 0 && <Text style={[s.actionCount, { color: post.reposted ? c.primary : c.textMuted }]}>{post.repost_count}</Text>}
           </TouchableOpacity>
+
+          {/* AMOBILE-229: send the post's link somewhere else through the
+              system share sheet, as distinct from Repost beside it. */}
+          {isShareable(post) && (
+            <TouchableOpacity style={s.actionBtn} accessibilityLabel="Share" onPress={() => sharePost(post, instanceUrl)}>
+              <Ionicons name="share-outline" size={17} color={c.textMuted} />
+            </TouchableOpacity>
+          )}
 
         </View>
 
@@ -776,6 +877,20 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               </>
             ) : (
               <>
+                {/* AGORA-309: hiding one post, for when a specific post is
+                    unwanted but the author is not. Deliberately first and in
+                    ordinary colour: it is the lightest of the three actions
+                    here, reversible, private, and the only one that is not
+                    about the person. Needs no confirmation for the same
+                    reasons. */}
+                <TouchableOpacity style={s.menuItem} onPress={() => {
+                  setShowMenu(false)
+                  hidePost.mutate()
+                }}>
+                  <Ionicons name="eye-off-outline" size={18} color={c.textMd} />
+                  <Text style={[s.menuItemText, { color: c.textMd }]}>Hide post</Text>
+                </TouchableOpacity>
+                <View style={[s.menuDivider, { backgroundColor: c.border }]} />
                 <TouchableOpacity style={s.menuItem} onPress={() => {
                   setShowMenu(false)
                   router.push({ pathname: '/report', params: { postId: post.id } } as any)
@@ -929,20 +1044,20 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
         </View>
       </Modal>
 
-      {/* ── Share modal ───────────────────────────────────────────── */}
+      {/* ── Repost modal ──────────────────────────────────────────── */}
       <Modal visible={showShare} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeShareModal}>
         <View style={[s.editModal, { backgroundColor: c.card }]}>
           <View style={[s.editHeader, { borderBottomColor: c.border }]}>
             <TouchableOpacity onPress={closeShareModal}>
               <Text style={{ fontSize: 18, color: c.textMuted }}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[s.editTitle, { color: c.text }]}>Share post</Text>
+            <Text style={[s.editTitle, { color: c.text }]}>Repost</Text>
             <TouchableOpacity
               onPress={() => repost.mutate()}
               disabled={repost.isPending || (shareVisibility === 'group' && !shareFriendListId) || (showShareCW && !shareCW.trim())}
               style={[s.editSaveBtn, (repost.isPending || (shareVisibility === 'group' && !shareFriendListId) || (showShareCW && !shareCW.trim())) && { backgroundColor: c.primaryLt }]}
             >
-              <Text style={s.editSaveBtnText}>{repost.isPending ? '…' : 'Share'}</Text>
+              <Text style={s.editSaveBtnText}>{repost.isPending ? '…' : 'Repost'}</Text>
             </TouchableOpacity>
           </View>
 
@@ -1056,7 +1171,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                 {post.author_display_name ? renderName(post.author_display_name, post.author_emojis) : post.author_username}
                 <Text style={{ color: c.textMuted, fontWeight: '400' }}> {handle(post.author_username, post.is_remote, post.remote_instance)}</Text>
               </Text>
-              {post.content ? <LinkedText text={post.content} style={[s.sharePreviewContent, { color: c.textMd }]} emojis={post.content_emojis} numberOfLines={3} /> : null}
+              {post.content ? <LinkedText text={post.content} style={[s.sharePreviewContent, { color: c.textMd }]} emojis={post.content_emojis} numberOfLines={3} mentionDomains={post.mention_domains} /> : null}
               {(post.photo_urls?.length > 1 ? true : post.image_url) ? (
                 <Text style={{ fontSize: 13, color: c.textMuted, marginTop: 4 }}>
                   📷 {post.photo_urls?.length > 1 ? `${post.photo_urls.length} photos` : 'Photo'}
@@ -1098,7 +1213,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
                     hoveredReaction === r.type && { transform: [{ scale: 1.25 }] },
                   ]}
                 >
-                  <Text style={{ fontSize: 27 }}>{r.emoji}</Text>
+                  <Text style={{ fontSize: PICKER.emoji, textAlign: 'center' }}>{r.emoji}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -1132,6 +1247,13 @@ const s = StyleSheet.create({
   quotedImage: { width: '100%', aspectRatio: 1.4, borderRadius: 8, marginTop: 6 },
   quotedLinkPreview: { flexDirection: 'row', marginTop: 6, borderWidth: 1, borderRadius: 8, overflow: 'hidden' },
   quotedLinkImage: { width: 56, height: 56 },
+  nestedQuote: { borderWidth: 1, borderRadius: 10, padding: 8, marginTop: 8 },
+  nestedQuoteName: { fontWeight: '600', fontSize: 13 },
+  nestedQuoteMeta: { fontSize: 12 },
+  nestedQuoteContent: { fontSize: 13, lineHeight: 17, marginTop: 2 },
+  nestedQuoteImage: { width: '100%', height: 140, borderRadius: 6, marginTop: 6 },
+  nestedQuoteLinkImage: { width: 44, height: 44 },
+  nestedQuoteLinkTitle: { fontSize: 13, fontWeight: '600' },
   imageWrapper: { marginHorizontal: -14, marginVertical: 8 },
   image: { width: '100%', aspectRatio: 1 },
   imageMulti: { width: Dimensions.get('window').width * 0.72, aspectRatio: 1 },
@@ -1150,11 +1272,13 @@ const s = StyleSheet.create({
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   actionCount: { fontSize: 13 },
   picker: { position: 'absolute', bottom: 40, left: 0, borderWidth: 1, borderRadius: 24, padding: 8, flexDirection: 'row', gap: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10, zIndex: 99 },
-  pickerModal: { position: 'absolute', borderWidth: 1, borderRadius: 24, padding: 8, flexDirection: 'row', gap: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10 },
-  pickerItem: { borderRadius: 10, padding: 3 },
+  pickerModal: { position: 'absolute', width: PICKER.width, borderWidth: 1, borderRadius: 24, paddingVertical: 8, flexDirection: 'row', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10 },
+  pickerItem: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 10, paddingVertical: 3 },
   pickerItemActive: { borderRadius: 10 },
   lightboxBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' },
   lightboxClose: { color: 'rgba(255,255,255,0.5)', fontSize: 15, marginTop: 16 },
+  lightboxAltWrap: { maxHeight: 96, flexGrow: 0, marginTop: 12, paddingHorizontal: 20 },
+  lightboxAlt:   { color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 20 },
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
   menuSheet: { borderRadius: 16, borderWidth: 1, overflow: 'hidden', minWidth: 220 },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16 },

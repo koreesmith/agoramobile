@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { timeAgo } from '../../utils/handle'
 import { Ionicons } from '@expo/vector-icons'
-import { Screen, Header, Spinner, EmptyState, Avatar } from '../../components/ui'
+import { Screen, Header, Spinner, EmptyState, Avatar, SearchIconButton } from '../../components/ui'
 import { dmApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
 
@@ -33,9 +33,12 @@ export default function MessagesScreen() {
   return (
     <Screen>
       <Header title="Messages" right={
-        <TouchableOpacity onPress={() => router.push('/new-conversation')} style={{ padding: 4 }}>
-          <Ionicons name="create-outline" size={22} color={c.primary} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <SearchIconButton />
+          <TouchableOpacity onPress={() => router.push('/new-conversation')} style={{ padding: 4 }}>
+            <Ionicons name="create-outline" size={22} color={c.primary} />
+          </TouchableOpacity>
+        </View>
       } />
 
       <View style={[s.searchWrap, { backgroundColor: c.card, borderBottomColor: c.border }]}>
