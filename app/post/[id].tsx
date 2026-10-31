@@ -280,6 +280,10 @@ export default function PostScreen() {
   // replyTo: { username, commentId } — when set, we're replying to a comment
   const [replyTo, setReplyTo] = useState<{ username: string; commentId: string } | null>(null)
   const inputRef = useRef<TextInput>(null)
+  // Pull to refresh's own spinner shows only for a pull. Tied to the queries'
+  // loading state it also showed on first load, a second spinner above the
+  // one in place of the post.
+  const [pulling, setPulling] = useState(false)
 
   const { data: postData, isLoading: pl, error: postError, refetch } = useQuery({
     queryKey: ['post', id],
@@ -352,7 +356,10 @@ export default function PostScreen() {
         headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
       }} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={insets.top + 44}>
-        <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={pl || cl} onRefresh={() => { refetch(); rc() }} tintColor={c.primary} />}>
+        <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => {
+          setPulling(true)
+          Promise.all([refetch(), rc()]).finally(() => setPulling(false))
+        }} tintColor={c.primary} />}>
           {post ? <ThreadContext post={post} /> : null}
           {pl || redirectTo ? <Spinner /> : post ? <PostCard post={post} queryKey={['post', id]} /> : (
             <PostUnavailable error={postError} onRetry={() => { refetch(); rc() }} />
