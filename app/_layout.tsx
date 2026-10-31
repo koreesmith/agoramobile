@@ -34,9 +34,19 @@ function getRouteForNotification(data: Record<string, string>): string | null {
     case 'wall_post_pending':
     case 'fediverse_post':
     case 'atproto_post':
+    // AGORA-420: types the server now pushes that are about a post. The
+    // server sends the post a comment is on, so these open the thread.
+    case 'comment_like':
+    case 'comment_reaction':
+    case 'user_post':
+    case 'page_post':
+    case 'group_tag':
+    case 'wall_post_approved':
       return post_id ? `/post/${post_id}` : null
     case 'friend_request':
     case 'friend_accepted':
+    case 'fediverse_follow':
+    case 'atproto_follow':
       return actor_username ? `/profile/${actor_username}` : '/(tabs)/connections'
     case 'group_join_request':
     case 'group_join_approved':
@@ -44,6 +54,8 @@ function getRouteForNotification(data: Record<string, string>): string | null {
     case 'new_message':
       return '/(tabs)/messages'
     case 'waitlist_signup':
+    // AGORA-420: what the server actually calls it.
+    case 'waitlist_join':
       return '/admin?tab=waitlist'
     // AMOBILE-161: a custom-domain status change is about the claim, so it
     // opens the screen that shows the claim's status and what to fix.
@@ -79,6 +91,7 @@ function AppContent() {
   const isDark = useIsDark()
   const notifListener = useRef<any>(null)
   const responseListener = useRef<any>(null)
+  const tokenListener = useRef<any>(null)
   const lastSeenAccountRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -149,6 +162,11 @@ function AppContent() {
       Notifications.setNotificationHandler({
         handleNotification: async (notification) => {
           const data = notification.request.content.data as Record<string, string>
+          // AGORA-420: the server sends a badge-only push when notifications are
+          // read elsewhere, to bring the icon's count down. It has nothing to show.
+          if (data?.type === 'badge_sync') {
+            return { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: true }
+          }
           // Suppress the raw push for types where the backend sends placeholder text;
           // a properly-labelled local notification is fired by notifListener instead.
           const suppressRaw = data?.type === 'waitlist_signup'
@@ -166,6 +184,11 @@ function AppContent() {
       // Re-fire certain push notifications as local ones with correct actor labels.
       notifListener.current = Notifications.addNotificationReceivedListener(notification => {
         const data = notification.request.content.data as Record<string, string>
+        // AGORA-420: a push that arrives while the app is open means the unread
+        // count, and so the tab badge and the icon badge set from it, is stale
+        // now rather than at the next 30-second poll.
+        queryClient.invalidateQueries({ queryKey: ['unread-count'] })
+        if (data?.type !== 'badge_sync') queryClient.invalidateQueries({ queryKey: ['notifications'] })
         if (data?.type === 'waitlist_signup') {
           const actor = data.actor_display_name || data.actor_username || 'Someone'
           Notifications.scheduleNotificationAsync({
@@ -195,12 +218,20 @@ function AppContent() {
           setTimeout(() => router.push(route as any), 500)
         }
       })
+
+      // AGORA-420: APNs and FCM can rotate a device's token (a restore, a
+      // reinstall, an OS update). Until now the server only heard about it at
+      // the next cold start, and every push in between went to a dead token.
+      tokenListener.current = Notifications.addPushTokenListener(() => {
+        if (useAuthStore.getState().isAuthenticated) registerActivePush(useAuthStore.getState().activeAccountId)
+      })
     }, 1500)
 
     return () => {
       clearTimeout(t)
       if (notifListener.current) notifListener.current.remove()
       if (responseListener.current) responseListener.current.remove()
+      if (tokenListener.current) tokenListener.current.remove()
     }
   }, [])
 
