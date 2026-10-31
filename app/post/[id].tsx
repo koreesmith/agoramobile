@@ -11,6 +11,7 @@ import { timeAgo } from '../../utils/handle'
 import { Screen, Spinner, Avatar, LinkedText, renderName } from '../../components/ui'
 import PostCard from '../../components/PostCard'
 import ReactorsModal from '../../components/ReactorsModal'
+import ThreadContext from '../../components/ThreadContext'
 import { feedApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { C } from '../../constants/colors'
@@ -337,6 +338,7 @@ export default function PostScreen() {
       }} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={insets.top + 44}>
         <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={pl || cl} onRefresh={() => { refetch(); rc() }} tintColor={c.primary} />}>
+          {post ? <ThreadContext post={post} /> : null}
           {pl ? <Spinner /> : post ? <PostCard post={post} queryKey={['post', id]} /> : null}
           <View style={{ paddingHorizontal: 16, paddingBottom: 24 }}>
             <Text style={[s.commentsHeader, { color: c.textMuted }]}>
