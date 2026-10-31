@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Stack, router } from 'expo-router'
+import { Stack, router, usePathname } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { StyleSheet, View, AppState, AppStateStatus } from 'react-native'
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query'
@@ -52,7 +52,8 @@ function getRouteForNotification(data: Record<string, string>): string | null {
     case 'group_join_approved':
       return '/(tabs)/notifications'
     case 'new_message':
-      return '/(tabs)/messages'
+      // AGORA-425: the server names the conversation, so open it.
+      return data.conversation_id ? `/conversation/${data.conversation_id}` : '/(tabs)/messages'
     case 'waitlist_signup':
     // AGORA-420: what the server actually calls it.
     case 'waitlist_join':
@@ -93,6 +94,11 @@ function AppContent() {
   const responseListener = useRef<any>(null)
   const tokenListener = useRef<any>(null)
   const lastSeenAccountRef = useRef<string | null>(null)
+  // AGORA-425: read by the notification handler, which is installed once and
+  // so can't use the hook itself.
+  const pathname = usePathname()
+  const pathnameRef = useRef(pathname)
+  pathnameRef.current = pathname
 
   useEffect(() => {
     // Synchronous reads — avoids async generator execution in Hermes at startup
@@ -167,6 +173,12 @@ function AppContent() {
           if (data?.type === 'badge_sync') {
             return { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: true }
           }
+          // AGORA-425: a message in the conversation already on screen arrives
+          // in it over the socket; a banner on top would only repeat it.
+          if (data?.type === 'new_message' && data.conversation_id
+              && pathnameRef.current === `/conversation/${data.conversation_id}`) {
+            return { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: true }
+          }
           // Suppress the raw push for types where the backend sends placeholder text;
           // a properly-labelled local notification is fired by notifListener instead.
           const suppressRaw = data?.type === 'waitlist_signup'
@@ -188,7 +200,8 @@ function AppContent() {
         // count, and so the tab badge and the icon badge set from it, is stale
         // now rather than at the next 30-second poll.
         queryClient.invalidateQueries({ queryKey: ['unread-count'] })
-        if (data?.type !== 'badge_sync') queryClient.invalidateQueries({ queryKey: ['notifications'] })
+        if (data?.type === 'new_message') queryClient.invalidateQueries({ queryKey: ['conversations'] })
+        else if (data?.type !== 'badge_sync') queryClient.invalidateQueries({ queryKey: ['notifications'] })
         if (data?.type === 'waitlist_signup') {
           const actor = data.actor_display_name || data.actor_username || 'Someone'
           Notifications.scheduleNotificationAsync({
