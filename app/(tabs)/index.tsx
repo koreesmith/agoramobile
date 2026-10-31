@@ -655,45 +655,48 @@ export default function FeedScreen() {
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           >
+          {/* AGORA-427: the header holds only Cancel, the title and Post, so
+              Post stays on screen at any font or display size; the
+              attachment controls get a toolbar row of their own below it. */}
           <View style={[s.modalHeader, { borderBottomColor: c.border }]}>
             <TouchableOpacity onPress={resetCompose}>
               <Text style={[s.cancelText, { color: c.textMuted }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[s.modalTitle, { color: c.text }]}>New post</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {/* CW toggle */}
-              <TouchableOpacity onPress={() => setShowCW(v => !v)}
-                style={[s.cwBtn, showCW && { backgroundColor: '#fef3c7', borderColor: '#fcd34d' }]}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: showCW ? '#92400e' : c.textMuted }}>TW</Text>
-              </TouchableOpacity>
-              {/* Poll toggle */}
-              <TouchableOpacity onPress={() => setShowPoll(v => !v)}
-                style={[s.cwBtn, showPoll && { backgroundColor: c.primaryBg, borderColor: c.primaryLt }]}>
-                <Ionicons name="bar-chart-outline" size={16} color={showPoll ? c.primary : c.textMuted} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={pickImage} disabled={uploading || showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl || videoProcessing}>
-                {uploading
-                  ? <ActivityIndicator size="small" color={c.primary} />
-                  : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                      <Ionicons name="image-outline" size={22} color={(showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl || videoProcessing) ? c.border : c.primary} />
-                      {imageUrls.length > 0 && !showPoll && (
-                        <Text style={{ fontSize: 12, color: c.primary, fontWeight: '600' }}>{imageUrls.length}/{MAX_IMAGES}</Text>
-                      )}
-                    </View>}
-              </TouchableOpacity>
-              <TouchableOpacity onPress={pickVideo} disabled={uploading || showPoll || imageUrls.length > 0 || !!videoUrl || videoProcessing}>
-                {videoProcessing
-                  ? <ActivityIndicator size="small" color={c.primary} />
-                  : <Ionicons name="videocam-outline" size={22} color={(showPoll || imageUrls.length > 0 || !!videoUrl) ? c.border : c.primary} />}
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => createPost.mutate()}
-                disabled={(!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || !validTargeting || createPost.isPending || videoProcessing}
-                style={[s.submitBtn, ((!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || !validTargeting || videoProcessing) && s.submitBtnDisabled]}
-              >
-                <Text style={s.submitBtnText}>{createPost.isPending ? '…' : 'Post'}</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={[s.modalTitle, { color: c.text }]} numberOfLines={1}>New post</Text>
+            <TouchableOpacity
+              onPress={() => createPost.mutate()}
+              disabled={(!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || !validTargeting || createPost.isPending || videoProcessing}
+              style={[s.submitBtn, ((!content.trim() && imageUrls.length === 0 && !videoUrl && !(showPoll && pollOptions.filter(o=>o.trim()).length>=2)) || !validTargeting || videoProcessing) && s.submitBtnDisabled]}
+            >
+              <Text style={s.submitBtnText}>{createPost.isPending ? '…' : 'Post'}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={[s.composeToolbar, { borderBottomColor: c.border }]}>
+            {/* CW toggle */}
+            <TouchableOpacity onPress={() => setShowCW(v => !v)}
+              style={[s.cwBtn, showCW && { backgroundColor: '#fef3c7', borderColor: '#fcd34d' }]}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: showCW ? '#92400e' : c.textMuted }}>TW</Text>
+            </TouchableOpacity>
+            {/* Poll toggle */}
+            <TouchableOpacity onPress={() => setShowPoll(v => !v)}
+              style={[s.cwBtn, showPoll && { backgroundColor: c.primaryBg, borderColor: c.primaryLt }]}>
+              <Ionicons name="bar-chart-outline" size={16} color={showPoll ? c.primary : c.textMuted} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={pickImage} disabled={uploading || showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl || videoProcessing}>
+              {uploading
+                ? <ActivityIndicator size="small" color={c.primary} />
+                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <Ionicons name="image-outline" size={22} color={(showPoll || imageUrls.length >= MAX_IMAGES || !!videoUrl || videoProcessing) ? c.border : c.primary} />
+                    {imageUrls.length > 0 && !showPoll && (
+                      <Text style={{ fontSize: 12, color: c.primary, fontWeight: '600' }}>{imageUrls.length}/{MAX_IMAGES}</Text>
+                    )}
+                  </View>}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={pickVideo} disabled={uploading || showPoll || imageUrls.length > 0 || !!videoUrl || videoProcessing}>
+              {videoProcessing
+                ? <ActivityIndicator size="small" color={c.primary} />
+                : <Ionicons name="videocam-outline" size={22} color={(showPoll || imageUrls.length > 0 || !!videoUrl) ? c.border : c.primary} />}
+            </TouchableOpacity>
           </View>
 
           {/* Identity switcher. AMOBILE-212: also shown, as a plain label,
@@ -1178,7 +1181,8 @@ const s = StyleSheet.create({
   modal: { flex: 1, backgroundColor: 'white' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
   cancelText: { color: '#6b7280', fontSize: 18 },
-  modalTitle: { fontWeight: '600', color: '#111827', fontSize: 18 },
+  modalTitle: { flex: 1, textAlign: 'center', marginHorizontal: 12, fontWeight: '600', color: '#111827', fontSize: 18 },
+  composeToolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 16, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1 },
   submitBtn: { backgroundColor: '#486581', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 6 },
   submitBtnDisabled: { backgroundColor: '#9fb3c8' },
   submitBtnText: { color: 'white', fontWeight: '600' },
