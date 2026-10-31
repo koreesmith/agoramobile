@@ -12,6 +12,7 @@ import { Screen, Spinner, Avatar, LinkedText, renderName } from '../../component
 import PostCard from '../../components/PostCard'
 import ReactorsModal from '../../components/ReactorsModal'
 import ThreadContext from '../../components/ThreadContext'
+import MentionSuggestions from '../../components/MentionSuggestions'
 import { feedApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { C } from '../../constants/colors'
@@ -400,6 +401,8 @@ export default function PostScreen() {
               </TouchableOpacity>
             </View>
           ) : null}
+          {/* AGORA-418: above the input, since the keyboard sits below it. */}
+          <MentionSuggestions text={comment} onChangeText={setComment} max={4} style={{ marginHorizontal: 12, marginTop: 8 }} />
           <View style={s.composer}>
             <Avatar url={user?.avatar_url} name={user?.display_name} size={30} />
             <TextInput

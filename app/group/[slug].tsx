@@ -8,6 +8,7 @@ import { normalizeImageOrientation } from '../../utils/image'
 import { Screen, Spinner, Avatar, UploadingModal } from '../../components/ui'
 import { PostingAsLine } from '../../components/ActiveAccount'
 import PostCard from '../../components/PostCard'
+import MentionSuggestions from '../../components/MentionSuggestions'
 import { AltTextModal, AltEditButton } from '../../components/AltText'
 import { groupsApi, feedApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
@@ -172,6 +173,7 @@ export default function GroupScreen() {
                     )}
                     <TextInput style={[s.composeInput, { color: c.text }]} placeholder={`Post to ${group.name}…`} placeholderTextColor={c.textLight}
                       value={content} onChangeText={setContent} multiline autoFocus={!showCW} />
+                    <MentionSuggestions text={content} onChangeText={setContent} style={{ marginBottom: 8 }} />
                     {imageUrls.length > 0 ? (
                       <ScrollView
                         horizontal

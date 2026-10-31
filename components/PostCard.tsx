@@ -24,6 +24,7 @@ import CustomHandle from './CustomHandle'
 import { AltBadge } from './AltText'
 import { useC } from '../constants/ColorContext'
 import ReactorsModal from './ReactorsModal'
+import MentionSuggestions from './MentionSuggestions'
 import { REACTIONS, reactionDisplay, pickerMetrics } from '../utils/reactions'
 
 // AMOBILE-170: ten reactions no longer fit a narrow phone at the sizing used for
@@ -1034,6 +1035,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               placeholderTextColor={c.textLight}
               placeholder="What's on your mind?"
             />
+            <MentionSuggestions text={editContent} onChangeText={setEditContent} style={{ marginBottom: 8 }} />
             <TouchableOpacity
               onPress={() => setShowEditCW(v => !v)}
               style={[s.editCWBtn, { borderColor: showEditCW ? '#fcd34d' : c.border, backgroundColor: showEditCW ? '#fef3c7' : 'transparent' }]}
@@ -1159,6 +1161,7 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               placeholderTextColor={c.textLight}
               placeholder="Say something about this… (optional)"
             />
+            <MentionSuggestions text={shareContent} onChangeText={setShareContent} style={{ marginBottom: 8 }} />
             <TouchableOpacity
               onPress={() => setShowShareCW(v => !v)}
               style={[s.editCWBtn, { borderColor: showShareCW ? '#fcd34d' : c.border, backgroundColor: showShareCW ? '#fef3c7' : 'transparent' }]}
