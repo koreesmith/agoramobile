@@ -7,7 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import * as Notifications from 'expo-notifications'
 import * as SecureStore from 'expo-secure-store'
 import { useAuthStore } from '../store/auth'
-import { registerActivePush, clearPushForAccount } from '../utils/push'
+import { registerActivePush, clearPushForAccount, devicePushTokenChanged } from '../utils/push'
 import { ColorProvider, useIsDark } from '../constants/ColorContext'
 import { useThemeStore } from '../store/theme'
 import { useBlockStore } from '../store/blocks'
@@ -235,8 +235,9 @@ function AppContent() {
       // AGORA-420: APNs and FCM can rotate a device's token (a restore, a
       // reinstall, an OS update). Until now the server only heard about it at
       // the next cold start, and every push in between went to a dead token.
-      tokenListener.current = Notifications.addPushTokenListener(() => {
-        if (useAuthStore.getState().isAuthenticated) registerActivePush(useAuthStore.getState().activeAccountId)
+      // Our own registrations fire this too, so it only acts on a new token.
+      tokenListener.current = Notifications.addPushTokenListener(({ data }) => {
+        if (useAuthStore.getState().isAuthenticated) devicePushTokenChanged(String(data), useAuthStore.getState().activeAccountId)
       })
     }, 1500)
 

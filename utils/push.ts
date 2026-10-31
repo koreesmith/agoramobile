@@ -51,6 +51,23 @@ export async function registerActivePush(activeAccountId: string | null): Promis
   } catch {}
 }
 
+// AGORA-420: the device token the push token listener last heard.
+let lastDeviceToken: string | null = null
+
+// Called by the push token listener. Only a token that actually changed is
+// re-registered. The listener can't tell a rotation from an echo: on iOS every
+// getExpoPushTokenAsync() asks APNs for the device token again and the answer
+// fires the listener too, so re-registering on every event made each
+// registration start the next one. On a real phone that loop ran nonstop and
+// got the phone rate limited by the server, so nothing in the app loaded. The
+// first event is one of our own registrations, already in progress.
+export function devicePushTokenChanged(deviceToken: string, activeAccountId: string | null): void {
+  if (deviceToken === lastDeviceToken) return
+  const first = lastDeviceToken === null
+  lastDeviceToken = deviceToken
+  if (!first) registerActivePush(activeAccountId)
+}
+
 // Best-effort: drop this device's token from an account we are leaving so its
 // server stops pushing to this device. Talks to that account directly rather
 // than through the shared api instance, which by now points at the new active
