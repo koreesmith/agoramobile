@@ -84,10 +84,12 @@ export default function TabsLayout() {
   })
   const unreadMessages: number = (convsData?.conversations ?? []).reduce((sum: number, c: any) => sum + (c.unread_count ?? 0), 0)
 
+  // AGORA-425: unread messages count toward the icon too, matching the badge
+  // the server now puts on pushes, so the two don't fight each other.
   useEffect(() => {
     if (!notificationsReady || (unread === 0 && !unreadData)) return
-    Notifications.setBadgeCountAsync(unread).catch(() => {})
-  }, [unread, unreadData, notificationsReady])
+    Notifications.setBadgeCountAsync(unread + unreadMessages).catch(() => {})
+  }, [unread, unreadData, unreadMessages, notificationsReady])
 
   return (
     <>

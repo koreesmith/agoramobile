@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, Image, RefreshControl, Alert, StyleSheet } from 'react-native'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -18,10 +19,19 @@ export default function ProfileViewScreen() {
   const { addBlock, removeBlock, isBlocked } = useBlockStore()
   const qc = useQueryClient()
 
-  const { data: profile, isLoading, refetch, isRefetching } = useQuery({
+  const { data: profile, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['profile', username],
     queryFn: () => usersApi.getProfile(username!).then(r => r.data),
+    // AGORA-426: always asked again on open. Whether there's a block between
+    // the two accounts can change from anywhere (web, another phone, the other
+    // account), and within the app's default 30 seconds a reopened profile
+    // showed the copy from before it, block state and all.
+    staleTime: 0,
   })
+  // AGORA-426: a refetch that fails leaves the last good copy in place, so a
+  // profile that has since become "not found" kept showing. A 404 is the
+  // answer, whatever was loaded before it.
+  const notFound = (error as any)?.response?.status === 404
 
   const isSelf = me?.username === username
   const status = profile?.friend_status
@@ -144,7 +154,23 @@ export default function ProfileViewScreen() {
     onError: () => Alert.alert('Error', 'Could not update notification settings'),
   })
 
-  const blocked = profile ? isBlocked(profile.id) : false
+  // AGORA-426: the server says whether the viewer blocked this account. This
+  // read only the device's own list, which knew nothing of a block made on web
+  // or another phone and kept one undone elsewhere. The list is still what the
+  // feed filters on, so it follows the server here.
+  const blocked = !!(profile as any)?.is_blocked
+  useEffect(() => {
+    if (!profile?.id) return
+    if (blocked) addBlock(profile.id)
+    else if (isBlocked(profile.id)) removeBlock(profile.id)
+  }, [profile?.id, blocked])
+
+  // A block or unblock changes what the notifications list and count show.
+  const invBlock = () => {
+    qc.invalidateQueries({ queryKey: ['profile', username] })
+    qc.invalidateQueries({ queryKey: ['notifications'] })
+    qc.invalidateQueries({ queryKey: ['unread-count'] })
+  }
 
   const blockUser = useMutation({
     mutationFn: async () => {
@@ -158,6 +184,7 @@ export default function ProfileViewScreen() {
     },
     onSuccess: () => {
       addBlock(profile!.id)
+      invBlock()
       Alert.alert('User blocked', `@${username} has been blocked and removed from your feed.`)
       router.back()
     },
@@ -168,6 +195,7 @@ export default function ProfileViewScreen() {
     mutationFn: () => blockApi.unblockUser(username),
     onSuccess: () => {
       removeBlock(profile!.id)
+      invBlock()
       Alert.alert('Unblocked', `@${username} has been unblocked.`)
     },
     onError: () => Alert.alert('Error', 'Could not unblock user. Please try again.'),
@@ -176,9 +204,52 @@ export default function ProfileViewScreen() {
   const posts = postsData?.posts || []
 
   if (isLoading) return <Screen><Spinner /></Screen>
-  if (!profile) return (
+  if (!profile || notFound) return (
     <Screen>
+      {/* A header, so there's a Back button out of here. */}
+      <Stack.Screen options={{
+        headerShown: true,
+        headerTitle: '',
+        headerBackTitle: 'Back',
+        headerStyle: { backgroundColor: c.card },
+        headerTintColor: c.primary,
+      }} />
       <Text style={{ textAlign: 'center', marginTop: 80, color: c.textMuted }}>User not found</Text>
+    </Screen>
+  )
+
+  // AGORA-426: an account the viewer blocked shows who it is and Unblock, and
+  // nothing else, the same as web.
+  if (blocked && !isSelf) return (
+    <Screen>
+      <Stack.Screen options={{
+        headerShown: true,
+        headerTitle: profile.display_name || username,
+        headerBackTitle: 'Back',
+        headerStyle: { backgroundColor: c.card },
+        headerTintColor: c.primary,
+      }} />
+      <View style={s.blockedWrap}>
+        <Avatar url={profile.avatar_url} name={profile.display_name || profile.username} size={72} />
+        <Text style={[s.name, { color: c.text, marginTop: 10, textAlign: 'center' }]}>
+          {profile.display_name ? renderName(profile.display_name, profile.emojis) : profile.username}
+        </Text>
+        <Text style={[s.username, { color: c.textMuted }]}>{handle(profile.username, (profile as any).is_remote, (profile as any).remote_instance)}</Text>
+        <Text style={[s.blockedText, { color: c.textMuted }]}>
+          You blocked this account. You won't see its posts or notifications, and it can't see your profile or contact you here.
+        </Text>
+        <TouchableOpacity
+          onPress={() => Alert.alert('Unblock user?', `@${username} will be able to appear in your feed again.`, [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Unblock', onPress: () => unblockUser.mutate() },
+          ])}
+          disabled={unblockUser.isPending}
+          style={[s.actionBtn, { borderColor: c.border, marginTop: 16 }]}
+        >
+          <Ionicons name="remove-circle-outline" size={15} color={c.textMuted} />
+          <Text style={[s.actionBtnText, { color: c.textMuted }]}>Unblock</Text>
+        </TouchableOpacity>
+      </View>
     </Screen>
   )
 
@@ -513,6 +584,8 @@ export default function ProfileViewScreen() {
 }
 
 const s = StyleSheet.create({
+  blockedWrap:   { alignItems: 'center', paddingHorizontal: 32, paddingTop: 48 },
+  blockedText:   { fontSize: 15, lineHeight: 21, textAlign: 'center', marginTop: 14 },
   cover:         { height: 100 },
   profileCard:   { paddingHorizontal: 16, paddingBottom: 16 },
   avatarRow:     { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', marginTop: -36, marginBottom: 12 },

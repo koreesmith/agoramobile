@@ -7,7 +7,7 @@ import { Screen, Header, Spinner, Avatar, renderName } from '../components/ui'
 import PostCard from '../components/PostCard'
 import { searchApi, pagesApi, atprotoApi, federationApi, imgUrl } from '../api'
 import { useC } from '../constants/ColorContext'
-import { handle, timeAgo } from '../utils/handle'
+import { handle, isDomainHandle, timeAgo } from '../utils/handle'
 import CustomHandle from '../components/CustomHandle'
 
 type Tab = 'users' | 'posts' | 'pages'
@@ -31,6 +31,10 @@ export default function SearchScreen() {
   }, [inputValue])
 
   const isFederated = query.includes('@') && query.includes('.')
+  // AGORA-416: a bare Bluesky handle names one account too, and the same
+  // lookup resolves it to an in-app profile instead of a link out to bsky.app.
+  const isBskyHandle = isDomainHandle(query)
+  const isFullHandle = isFederated || isBskyHandle
 
   const { data: usersData, isLoading: usersLoading } = useQuery({
     queryKey: ['search-users', query],
@@ -73,7 +77,10 @@ export default function SearchScreen() {
   const { data: lookupData, isLoading: lookupLoading } = useQuery({
     queryKey: ['federation-lookup', query],
     queryFn: () => federationApi.lookupUser(query).then(r => r.data),
-    enabled: isFederated && query.length >= 2,
+    enabled: isFullHandle && query.length >= 2,
+    // A 404 is the answer, not a blip: retrying it just held the spinner for
+    // several seconds before "no results" could show.
+    retry: false,
   })
 
   const users: any[] = usersData?.users || []
@@ -86,14 +93,15 @@ export default function SearchScreen() {
   // already-cached users/posts result sets.
   const agoraUsers = users.filter(u => !u.is_remote)
   const fediverseUsers = users.filter(u => u.is_remote && u.remote_instance !== 'bsky.app')
-  const bskyActors: any[] = bskyActorsData?.disabled ? [] : (bskyActorsData?.actors || [])
-
-  // The native lookup can resolve a remote Agora user who isn't in the
-  // local users table yet, so /search/users won't have returned them —
-  // only show it as its own row if it's not already present there.
-  const lookedUpUser = lookupData?.user || (lookupData?.id ? lookupData : null)
+  // The native lookup can resolve a remote user who isn't in the local users
+  // table yet, so /search/users won't have returned them — only show it as its
+  // own row if it's not already present there.
+  const lookedUpUser = isFullHandle ? (lookupData?.user || (lookupData?.id ? lookupData : null)) : null
   const federatedLookupUsers: any[] =
     lookedUpUser && !users.some(u => u.id === lookedUpUser.id) ? [lookedUpUser] : []
+  // Nor listed a second time as a bsky.app link once it has a profile here.
+  const bskyActors: any[] = (bskyActorsData?.disabled ? [] : (bskyActorsData?.actors || []))
+    .filter((a: any) => !lookedUpUser || a.handle?.toLowerCase() !== lookedUpUser.username?.toLowerCase())
 
   const agoraPosts = posts.filter(p => !p.is_remote)
   const fediversePosts = posts.filter(p => p.is_remote && p.remote_instance !== 'bsky.app')
@@ -132,7 +140,7 @@ export default function SearchScreen() {
     )
   }
 
-  const isLoading = activeTab === 'users' ? (usersLoading || bskyActorsLoading || (isFederated && lookupLoading))
+  const isLoading = activeTab === 'users' ? (usersLoading || bskyActorsLoading || (isFullHandle && lookupLoading))
     : activeTab === 'posts' ? (postsLoading || bskyPostsLoading)
     : pagesLoading
 
@@ -188,7 +196,7 @@ export default function SearchScreen() {
               </Text>
             </View>
           )}
-          <ResultGroup title="Agora (federated lookup)" count={federatedLookupUsers.length} c={c}>
+          <ResultGroup title="Exact match" count={federatedLookupUsers.length} c={c}>
             <FlatList data={federatedLookupUsers} keyExtractor={u => u.id} renderItem={renderUserRow} scrollEnabled={false} />
           </ResultGroup>
           <ResultGroup title="On Agora" count={agoraUsers.length} c={c}>

@@ -26,6 +26,18 @@ export function handle(username?: string | null, isRemote?: boolean, remoteInsta
 }
 
 /**
+ * AGORA-416: whether a search query is a bare Bluesky handle (foo.bsky.social,
+ * koree.net) — a domain with no @. The backend's /federation/lookup resolves
+ * one to a profile just like it does user@instance.com. The final label can't
+ * be all digits, so an IP address or a version number doesn't count.
+ */
+export function isDomainHandle(q: string): boolean {
+  const h = q.trim().replace(/^@/, '')
+  return h.length <= 253
+    && /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]*[a-z][a-z0-9-]*$/i.test(h)
+}
+
+/**
  * Relative timestamp for display, or '' when the date is missing or unparseable.
  *
  * date-fns throws a RangeError on an invalid Date, which inside a render is a

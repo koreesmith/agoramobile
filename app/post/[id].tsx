@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { View, Text, Image, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, RefreshControl, StyleSheet, Modal, Dimensions } from 'react-native'
 import ZoomableImage from '../../components/ZoomableImage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -11,6 +11,8 @@ import { timeAgo } from '../../utils/handle'
 import { Screen, Spinner, Avatar, LinkedText, renderName } from '../../components/ui'
 import PostCard from '../../components/PostCard'
 import ReactorsModal from '../../components/ReactorsModal'
+import ThreadContext from '../../components/ThreadContext'
+import MentionSuggestions from '../../components/MentionSuggestions'
 import { feedApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { C } from '../../constants/colors'
@@ -278,15 +280,33 @@ export default function PostScreen() {
   // replyTo: { username, commentId } — when set, we're replying to a comment
   const [replyTo, setReplyTo] = useState<{ username: string; commentId: string } | null>(null)
   const inputRef = useRef<TextInput>(null)
+  // Pull to refresh's own spinner shows only for a pull. Tied to the queries'
+  // loading state it also showed on first load, a second spinner above the
+  // one in place of the post.
+  const [pulling, setPulling] = useState(false)
 
-  const { data: postData, isLoading: pl, refetch } = useQuery({
+  const { data: postData, isLoading: pl, error: postError, refetch } = useQuery({
     queryKey: ['post', id],
     queryFn: () => feedApi.getPost(id!).then(r => r.data),
+    // A 403 or 404 is the answer, not a blip; retrying it only held the
+    // spinner before the screen could say so.
+    retry: (count, err: any) => !(err?.response?.status >= 400 && err?.response?.status < 500) && count < 3,
   })
   const { data: commentsData, isLoading: cl, refetch: rc } = useQuery({
     queryKey: ['comments', id],
     queryFn: () => feedApi.getComments(id!).then(r => r.data),
   })
+
+  // AGORA-417: the id can belong to a comment rather than a post. A repost or
+  // quote of a Bluesky reply this instance already holds as a comment points
+  // at that comment, and GetPost answers with the post it belongs to instead.
+  // The web client always followed that; this screen ignored it and rendered
+  // nothing but an empty comment list, which is why it only happened for some
+  // reposts. replace, so Back returns to where the tap came from.
+  const redirectTo: string | undefined = postData?.redirect_to_post
+  useEffect(() => {
+    if (redirectTo) router.replace(`/post/${redirectTo}` as any)
+  }, [redirectTo])
 
   const createComment = useMutation({
     mutationFn: () => feedApi.createComment(id!, {
@@ -336,8 +356,15 @@ export default function PostScreen() {
         headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
       }} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={insets.top + 44}>
-        <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={pl || cl} onRefresh={() => { refetch(); rc() }} tintColor={c.primary} />}>
-          {pl ? <Spinner /> : post ? <PostCard post={post} queryKey={['post', id]} /> : null}
+        <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => {
+          setPulling(true)
+          Promise.all([refetch(), rc()]).finally(() => setPulling(false))
+        }} tintColor={c.primary} />}>
+          {post ? <ThreadContext post={post} /> : null}
+          {pl || redirectTo ? <Spinner /> : post ? <PostCard post={post} queryKey={['post', id]} /> : (
+            <PostUnavailable error={postError} onRetry={() => { refetch(); rc() }} />
+          )}
+          {post ? (
           <View style={{ paddingHorizontal: 16, paddingBottom: 24 }}>
             <Text style={[s.commentsHeader, { color: c.textMuted }]}>
               {rootComments.length} {rootComments.length === 1 ? 'comment' : 'comments'}
@@ -354,9 +381,11 @@ export default function PostScreen() {
               />
             ))}
           </View>
+          ) : null}
         </ScrollView>
 
-        {/* Composer */}
+        {/* Composer — only once there's a post to comment on. */}
+        {post ? (
         <View style={[s.composerWrap, { borderTopColor: c.border, backgroundColor: c.card, paddingBottom: insets.bottom }]}>
           {/* Reply banner */}
           {replyTo && (
@@ -379,6 +408,8 @@ export default function PostScreen() {
               </TouchableOpacity>
             </View>
           ) : null}
+          {/* AGORA-418: above the input, since the keyboard sits below it. */}
+          <MentionSuggestions text={comment} onChangeText={setComment} max={4} style={{ marginHorizontal: 12, marginTop: 8 }} />
           <View style={s.composer}>
             <Avatar url={user?.avatar_url} name={user?.display_name} size={30} />
             <TextInput
@@ -402,12 +433,70 @@ export default function PostScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        ) : null}
       </KeyboardAvoidingView>
     </Screen>
   )
 }
 
+// AGORA-417: what the screen says when there's no post to show, in place of the
+// blank page and "0 comments" it used to fall through to. The reasons are the
+// ones GetPost's 403 carries, worded the way the web post page words them.
+function PostUnavailable({ error, onRetry }: { error: any; onRetry: () => void }) {
+  const c = useC()
+  const status = error?.response?.status
+  const reason = error?.response?.data?.reason
+  let icon: keyof typeof Ionicons.glyphMap = 'document-outline'
+  let title = 'Post not found'
+  let message = 'This post may have been deleted or doesn\'t exist.'
+  let retry = false
+
+  if (status === 403) {
+    icon = 'lock-closed-outline'
+    title = 'Post unavailable'
+    message = 'You don\'t have permission to view this post.'
+    if (reason === 'not_friends') {
+      title = 'Friends only'
+      message = 'This post was shared with friends only. You\'ll need to be friends with the author to view it.'
+    } else if (reason === 'not_group_member') {
+      title = 'Members only'
+      const group = error?.response?.data?.group_name
+      message = group
+        ? `This post is in the private group "${group}". You need to be a member to view it.`
+        : 'This post is in a private group. You need to be a member to view it.'
+    } else if (reason === 'private_profile') {
+      title = 'Private profile'
+      message = 'This person has a private profile. You\'ll need to be friends with them to view their posts.'
+    } else if (reason === 'private') {
+      title = 'Private post'
+      message = 'This post is private and can only be seen by its author.'
+    }
+  } else if (error && status !== 404) {
+    icon = 'cloud-offline-outline'
+    title = 'Couldn\'t load this post'
+    message = 'Check your connection and try again.'
+    retry = true
+  }
+
+  return (
+    <View style={s.unavailable}>
+      <Ionicons name={icon} size={40} color={c.textMuted} style={{ marginBottom: 10 }} />
+      <Text style={[s.unavailableTitle, { color: c.text }]}>{title}</Text>
+      <Text style={[s.unavailableText, { color: c.textMuted }]}>{message}</Text>
+      {retry ? (
+        <TouchableOpacity onPress={onRetry} style={[s.unavailableBtn, { borderColor: c.border }]}>
+          <Text style={{ color: c.primary, fontWeight: '600' }}>Try again</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  )
+}
+
 const s = StyleSheet.create({
+  unavailable:      { alignItems: 'center', paddingHorizontal: 32, paddingVertical: 48 },
+  unavailableTitle: { fontSize: 17, fontWeight: '600', marginBottom: 6, textAlign: 'center' },
+  unavailableText:  { fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  unavailableBtn:   { marginTop: 16, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 18, borderWidth: 1 },
   commentsHeader:  { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, paddingVertical: 12 },
   comment:         { flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: 1 },
   commentAuthor:   { fontWeight: '600', fontSize: 15 },

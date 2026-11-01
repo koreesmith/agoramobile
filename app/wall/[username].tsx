@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { Screen, Spinner, Avatar, LinkedText, renderName } from '../../components/ui'
 import { PostingAsLine } from '../../components/ActiveAccount'
 import PostCard from '../../components/PostCard'
+import MentionSuggestions from '../../components/MentionSuggestions'
 import { feedApi, usersApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { useC } from '../../constants/ColorContext'
@@ -100,6 +101,7 @@ export default function WallScreen() {
                   numberOfLines={3}
                   autoFocus
                 />
+                <MentionSuggestions text={content} onChangeText={setContent} />
                 <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
                   <TouchableOpacity onPress={() => { setShowComposer(false); setContent('') }} style={[s.btn, { borderWidth: 1, borderColor: c.border, backgroundColor: c.bg }]}>
                     <Text style={{ color: c.textMd, fontWeight: '600', fontSize: 14 }}>Cancel</Text>
