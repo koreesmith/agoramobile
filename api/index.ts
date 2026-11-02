@@ -113,7 +113,7 @@ export const feedApi = {
   createComment:(id: string, data: any) => api.post(`/posts/${id}/comments`, data),
   deleteComment:(postId: string, commentId: string) => api.delete(`/posts/${postId}/comments/${commentId}`),
   editComment:  (postId: string, commentId: string, content: string) => api.patch(`/posts/${postId}/comments/${commentId}`, { content }),
-  getUserPosts: (username: string)   => api.get(`/users/${username}/posts`),
+  getUserPosts: (username: string, params?: { offset?: number, limit?: number }) => api.get(`/users/${username}/posts`, { params }),
   // AMOBILE-186: the active half of the wall feature (approve_wall_posts is
   // already wired up in settings.tsx, but posting/reviewing had no path).
   getWall:      (username: string)   => api.get(`/users/${username}/wall`),

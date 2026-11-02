@@ -5,12 +5,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Spinner, Avatar, LinkedText, renderName } from '../../components/ui'
 import PostCard from '../../components/PostCard'
-import { usersApi, friendsApi, feedApi, dmApi, imgUrl, blockApi, moderationApi, albumsApi, federationApi, atprotoApi } from '../../api'
+import { usersApi, friendsApi, dmApi, imgUrl, blockApi, moderationApi, albumsApi, federationApi, atprotoApi } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { useBlockStore } from '../../store/blocks'
 import { useC } from '../../constants/ColorContext'
 import { handle } from '../../utils/handle'
 import CustomHandle from '../../components/CustomHandle'
+import ProfilePostsFooter from '../../components/ProfilePostsFooter'
+import { useProfilePosts } from '../../utils/useProfilePosts'
 
 export default function ProfileViewScreen() {
   const c = useC()
@@ -37,11 +39,8 @@ export default function ProfileViewScreen() {
   const status = profile?.friend_status
   const canSeeTimeline = isSelf || (!profile?.hide_timeline && (!profile?.profile_private || status === 'accepted'))
 
-  const { data: postsData } = useQuery({
-    queryKey: ['user-posts', username],
-    queryFn: () => feedApi.getUserPosts(username!).then(r => r.data),
-    enabled: !!profile && canSeeTimeline,
-  })
+  const { posts, onScroll: onPostsScroll, loadMore: loadMorePosts, isFetchingNextPage: loadingMorePosts, loadMoreFailed: morePostsFailed } =
+    useProfilePosts(username, !!profile && canSeeTimeline)
 
   const { data: albumsData } = useQuery({
     queryKey: ['user-albums', username],
@@ -201,8 +200,6 @@ export default function ProfileViewScreen() {
     onError: () => Alert.alert('Error', 'Could not unblock user. Please try again.'),
   })
 
-  const posts = postsData?.posts || []
-
   if (isLoading) return <Screen><Spinner /></Screen>
   if (!profile || notFound) return (
     <Screen>
@@ -262,7 +259,11 @@ export default function ProfileViewScreen() {
         headerStyle: { backgroundColor: c.card },
         headerTintColor: c.primary,
       }} />
-      <ScrollView refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={c.primary} />}>
+      <ScrollView
+        onScroll={onPostsScroll}
+        scrollEventThrottle={200}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={c.primary} />}
+      >
 
         {/* Cover */}
         <View style={[s.cover, { backgroundColor: c.primaryBg }]}>
@@ -589,6 +590,7 @@ export default function ProfileViewScreen() {
             {posts.length === 0 && (
               <Text style={[s.noPosts, { color: c.textLight }]}>No posts yet.</Text>
             )}
+            <ProfilePostsFooter loading={loadingMorePosts} failed={morePostsFailed} onRetry={loadMorePosts} />
           </View>
         )}
       </ScrollView>

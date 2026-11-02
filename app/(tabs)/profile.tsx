@@ -6,7 +6,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Spinner, Avatar, SearchIconButton } from '../../components/ui'
 import PostCard from '../../components/PostCard'
 import AccountSwitcherModal from '../../components/AccountSwitcherModal'
-import { feedApi, usersApi, instanceApi, imgUrl } from '../../api'
+import ProfilePostsFooter from '../../components/ProfilePostsFooter'
+import { useProfilePosts } from '../../utils/useProfilePosts'
+import { usersApi, instanceApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { promptSignOut } from '../../utils/signOut'
 
@@ -25,11 +27,8 @@ export default function ProfileScreen() {
     enabled: !!user,
   })
 
-  const { data: postsData, isLoading: postL, refetch: rpost } = useQuery({
-    queryKey: ['user-posts', user?.username],
-    queryFn: () => feedApi.getUserPosts(user!.username).then(r => r.data),
-    enabled: !!user,
-  })
+  const { posts, isLoading: postL, refetch: rpost, onScroll: onPostsScroll, loadMore: loadMorePosts, isFetchingNextPage: loadingMorePosts, loadMoreFailed: morePostsFailed } =
+    useProfilePosts(user?.username, !!user)
 
   const { data: instanceData } = useQuery({
     queryKey: ['instance-info'],
@@ -38,7 +37,6 @@ export default function ProfileScreen() {
   })
   const invitesEnabled = instanceData?.user_invites_enabled === 'true'
 
-  const posts = postsData?.posts || []
   const p = profile || user
 
   if (pl) return <Screen><Header title="Profile" /><Spinner /></Screen>
@@ -69,7 +67,11 @@ export default function ProfileScreen() {
       <AccountSwitcherModal visible={switcherOpen} onClose={() => setSwitcherOpen(false)} />
 
       <View style={{ flex: 1 }}>
-        <ScrollView refreshControl={<RefreshControl refreshing={rpr} onRefresh={() => { rp(); rpost() }} tintColor={c.primary} />}>
+        <ScrollView
+          onScroll={onPostsScroll}
+          scrollEventThrottle={200}
+          refreshControl={<RefreshControl refreshing={rpr} onRefresh={() => { rp(); rpost() }} tintColor={c.primary} />}
+        >
           <View style={[s.cover, { backgroundColor: c.primaryBg }]}>
             {p?.cover_url ? <Image source={{ uri: imgUrl(p.cover_url) }} style={{ width: '100%', height: 100 }} resizeMode="cover" /> : null}
           </View>
@@ -107,6 +109,7 @@ export default function ProfileScreen() {
             ) : posts.map((post: any) => (
               <PostCard key={post.id} post={post} queryKey={['user-posts', user?.username]} />
             ))}
+            <ProfilePostsFooter loading={loadingMorePosts} failed={morePostsFailed} onRetry={loadMorePosts} />
           </View>
 
           {/* Bottom padding so FAB doesn't cover last post */}
