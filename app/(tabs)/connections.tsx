@@ -135,6 +135,20 @@ export default function ConnectionsScreen() {
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not add this friend'),
   })
 
+  // AGORA-421: a search preview isn't a followed account yet, so there is no
+  // local profile to open until the lookup creates one. Same lookup as
+  // addFederatedFriend above; this one routes to the profile instead.
+  const openProfile = useMutation({
+    mutationFn: async (handle: string) => {
+      const res = await federationApi.lookupUser(handle)
+      const username = res.data?.user?.username
+      if (!username) throw new Error('could not resolve this account')
+      return username as string
+    },
+    onSuccess: (username) => router.push(`/profile/${username}` as any),
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not open that profile'),
+  })
+
   const friends = friendsData?.friends || []
   const incoming = reqData?.incoming || []
   const outgoing = reqData?.outgoing || []
@@ -466,6 +480,13 @@ export default function ConnectionsScreen() {
               )}
               {fediPreview && !isBridgedBlueskyInstance(fediPreview.instance) && (
                 <View style={[s.previewRow, { borderColor: c.border }]}>
+                  <TouchableOpacity
+                    onPress={() => openProfile.mutate(`${fediPreview.preferred_username}@${fediPreview.instance}`)}
+                    disabled={openProfile.isPending}
+                    accessibilityRole="button"
+                    accessibilityLabel="View profile"
+                    style={{ flex: 1, flexDirection: 'row' }}
+                  >
                   <Avatar url={fediPreview.icon_url} name={fediPreview.name || fediPreview.preferred_username} size={44} />
                   <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={[s.previewName, { color: c.text }]} numberOfLines={1}>
@@ -478,6 +499,7 @@ export default function ConnectionsScreen() {
                       <Text style={[s.previewSummary, { color: c.textMuted }]} numberOfLines={2}>{fediPreview.summary}</Text>
                     )}
                   </View>
+                  </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => followFedi.mutate(fediPreview.actor_url)}
                     disabled={followFedi.isPending || !!alreadyFollowingFedi}
@@ -706,6 +728,13 @@ export default function ConnectionsScreen() {
 
               {bskyPreview && (
                 <View style={[s.previewRow, { borderColor: c.border }]}>
+                  <TouchableOpacity
+                    onPress={() => openProfile.mutate(bskyPreview.handle)}
+                    disabled={openProfile.isPending}
+                    accessibilityRole="button"
+                    accessibilityLabel="View profile"
+                    style={{ flex: 1, flexDirection: 'row' }}
+                  >
                   <Avatar url={bskyPreview.avatar_url} name={bskyPreview.display_name || bskyPreview.handle} size={44} />
                   <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={[s.previewName, { color: c.text }]} numberOfLines={1}>
@@ -718,6 +747,7 @@ export default function ConnectionsScreen() {
                       <Text style={[s.previewSummary, { color: c.textMuted }]} numberOfLines={2}>{bskyPreview.description}</Text>
                     )}
                   </View>
+                  </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => followBsky.mutate(bskyPreview.did)}
                     disabled={followBsky.isPending || !!alreadyFollowingBsky}
