@@ -519,9 +519,22 @@ export default function ProfileViewScreen() {
               </Text>
             </View>
           ) : (
-            <Text style={[s.friends, { color: c.textMuted }]}>
-              <Text style={{ fontWeight: 'bold', color: c.text }}>{profile.friend_count || 0}</Text> friends
-            </Text>
+            // AGORA-422: followers and following total every network (Agora, Fediverse, Bluesky)
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 16, rowGap: 2 }}>
+              <Text style={[s.friends, { color: c.textMuted }]}>
+                <Text style={{ fontWeight: 'bold', color: c.text }}>{profile.friend_count || 0}</Text> friends
+              </Text>
+              {(profile as any).follower_count != null && (
+                <Text style={[s.friends, { color: c.textMuted }]}>
+                  <Text style={{ fontWeight: 'bold', color: c.text }}>{(profile as any).follower_count}</Text> followers
+                </Text>
+              )}
+              {(profile as any).following_count != null && (
+                <Text style={[s.friends, { color: c.textMuted }]}>
+                  <Text style={{ fontWeight: 'bold', color: c.text }}>{(profile as any).following_count}</Text> following
+                </Text>
+              )}
+            </View>
           )}
           {showAlbums && (
             <TouchableOpacity

@@ -89,7 +89,16 @@ export default function ProfileScreen() {
             </View>
             <Text style={[s.username, { color: c.textMuted }]}>@{p?.username}</Text>
             {p?.bio ? <Text style={[s.bio, { color: c.textMd }]}>{p.bio}</Text> : null}
-            <Text style={[s.friends, { color: c.textMuted }]}><Text style={[s.friendCount, { color: c.text }]}>{(p as any)?.friend_count || 0}</Text> friends</Text>
+            {/* AGORA-422: followers and following total every network (Agora, Fediverse, Bluesky); older servers don't send them */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 16, rowGap: 2 }}>
+              <Text style={[s.friends, { color: c.textMuted }]}><Text style={[s.friendCount, { color: c.text }]}>{(p as any)?.friend_count || 0}</Text> friends</Text>
+              {(p as any)?.follower_count != null && (
+                <Text style={[s.friends, { color: c.textMuted }]}><Text style={[s.friendCount, { color: c.text }]}>{(p as any).follower_count}</Text> followers</Text>
+              )}
+              {(p as any)?.following_count != null && (
+                <Text style={[s.friends, { color: c.textMuted }]}><Text style={[s.friendCount, { color: c.text }]}>{(p as any).following_count}</Text> following</Text>
+              )}
+            </View>
           </View>
 
           <View style={{ marginTop: 8 }}>
