@@ -96,6 +96,10 @@ export default function ConnectionsScreen() {
   // AGORA-364: previews from directly federated Agora instances have no
   // local id yet, so "sent" tracking keys off username@instance instead.
   const [federatedSent, setFederatedSent] = useState<Set<string>>(new Set())
+  // AGORA-423: dismissed suggestions vanish at once; the server remembers them.
+  // Fediverse and Bluesky suggestions are follows, tracked here by their key.
+  const [dismissedSugg, setDismissedSugg] = useState<Set<string>>(new Set())
+  const [followedSugg, setFollowedSugg] = useState<Set<string>>(new Set())
 
   const { data: friendsData, isLoading: fl, refetch: rf, isRefetching: rfr } = useQuery({ queryKey: ['friends'], queryFn: () => friendsApi.listFriends().then(r => r.data) })
   const { data: reqData, refetch: rr } = useQuery({ queryKey: ['requests'], queryFn: () => friendsApi.listRequests().then(r => r.data) })
@@ -135,6 +139,23 @@ export default function ConnectionsScreen() {
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not add this friend'),
   })
 
+  const dismissSuggestion = (kind: 'user' | 'peer' | 'fediverse' | 'bluesky', key: string) => {
+    const k = `${kind}:${key}`
+    setDismissedSugg(prev => new Set(prev).add(k))
+    usersApi.dismissSuggestion(kind, key).catch(() => {
+      setDismissedSugg(prev => { const n = new Set(prev); n.delete(k); return n })
+    })
+  }
+  const followSuggestion = useMutation({
+    mutationFn: async (u: { kind: 'fediverse' | 'bluesky'; key: string }) => {
+      if (u.kind === 'fediverse') await federationApi.followFediverseAccount(u.key)
+      else await atprotoApi.followBlueskyAccount(u.key)
+      return u
+    },
+    onSuccess: (u) => setFollowedSugg(prev => new Set(prev).add(`${u.kind}:${u.key}`)),
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not follow this account'),
+  })
+
   // AGORA-421: a search preview isn't a followed account yet, so there is no
   // local profile to open until the lookup creates one. Same lookup as
   // addFederatedFriend above; this one routes to the profile instead.
@@ -152,8 +173,16 @@ export default function ConnectionsScreen() {
   const friends = friendsData?.friends || []
   const incoming = reqData?.incoming || []
   const outgoing = reqData?.outgoing || []
-  const discover = discoverData?.users || []
-  const federatedSuggestions: any[] = discoverData?.federated_suggestions || []
+  const shown = (kind: string, key: string) => !dismissedSugg.has(`${kind}:${key}`)
+  const discover = (discoverData?.users || []).filter((u: any) => shown('user', u.id))
+  const federatedSuggestions: any[] = (discoverData?.federated_suggestions || [])
+    .filter((u: any) => shown('peer', `${u.username}@${u.instance}`))
+  const fediverseSuggestions: any[] = (discoverData?.fediverse_suggestions || [])
+    .filter((u: any) => shown('fediverse', u.actor_url))
+  const blueskySuggestions: any[] = (discoverData?.bluesky_suggestions || [])
+    .filter((u: any) => shown('bluesky', u.did))
+  const noSuggestions = discover.length === 0 && federatedSuggestions.length === 0
+    && fediverseSuggestions.length === 0 && blueskySuggestions.length === 0
   const pendingCount = incoming.length
 
   const filtered = friends.filter((f: any) => !search || f.username.toLowerCase().includes(search.toLowerCase()) || (f.display_name || '').toLowerCase().includes(search.toLowerCase()))
@@ -283,14 +312,49 @@ export default function ConnectionsScreen() {
     resolveBskyHandle.mutate(trimmed)
   }
 
-  const PersonRow = ({ user, right }: { user: any; right: React.ReactNode }) => (
+  const PersonRow = ({ user, right, sub, onDismiss }: { user: any; right: React.ReactNode; sub?: string; onDismiss?: () => void }) => (
     <TouchableOpacity onPress={() => router.push(`/profile/${user.username}`)} style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
       <Avatar url={user.avatar_url} name={user.display_name || user.username} size={44} />
       <View style={{ flex: 1 }}>
         <Text style={[s.name, { color: c.text }]}>{user.display_name ? renderName(user.display_name, user.emojis) : user.username}</Text>
         <Text style={[s.username, { color: c.textMuted }]}>@{user.username}</Text>
+        {!!sub && <Text style={[s.username, { color: c.textMuted }]} numberOfLines={2}>{sub}</Text>}
       </View>
       <View style={{ flexShrink: 0 }}>{right}</View>
+      {onDismiss && <DismissButton onPress={onDismiss} />}
+    </TouchableOpacity>
+  )
+
+  // AGORA-423: a Fediverse or Bluesky account to follow. The row has no local
+  // profile to open, so it is not tappable.
+  const FollowRow = ({ kind, id, name, handleText, avatarUrl, reason }: { kind: 'fediverse' | 'bluesky'; id: string; name: string; handleText: string; avatarUrl?: string; reason?: string }) => {
+    const done = followedSugg.has(`${kind}:${id}`)
+    return (
+      <View style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
+        <Avatar url={avatarUrl} name={name} size={44} />
+        <View style={{ flex: 1 }}>
+          <Text style={[s.name, { color: c.text }]}>{name}</Text>
+          <Text style={[s.username, { color: c.textMuted }]}>{handleText}</Text>
+          {!!reason && <Text style={[s.username, { color: c.textMuted }]} numberOfLines={2}>{reason}</Text>}
+        </View>
+        {done ? (
+          <Text style={{ fontSize: 13, color: c.textMuted, fontWeight: '500' }}>Following</Text>
+        ) : (
+          <TouchableOpacity
+            onPress={() => followSuggestion.mutate({ kind, key: id })}
+            disabled={followSuggestion.isPending}
+            style={[s.acceptBtn, { backgroundColor: c.primary }]}>
+            <Text style={[s.acceptBtnText, { color: c.onPrimary }]}>Follow</Text>
+          </TouchableOpacity>
+        )}
+        <DismissButton onPress={() => dismissSuggestion(kind, id)} />
+      </View>
+    )
+  }
+
+  const DismissButton = ({ onPress }: { onPress: () => void }) => (
+    <TouchableOpacity onPress={onPress} hitSlop={8} accessibilityLabel="Not interested" style={{ paddingLeft: 10 }}>
+      <Ionicons name="close" size={18} color={c.textMuted} />
     </TouchableOpacity>
   )
 
@@ -362,7 +426,7 @@ export default function ConnectionsScreen() {
           dl ? <Spinner /> : (
             <FlatList data={discover} keyExtractor={(u: any) => u.id}
               refreshControl={<RefreshControl refreshing={false} onRefresh={dr} tintColor={c.primary} />}
-              ListEmptyComponent={federatedSuggestions.length === 0 ? <EmptyState icon="🔍" title="No suggestions" /> : null}
+              ListEmptyComponent={noSuggestions ? <EmptyState icon="🔍" title="No suggestions" /> : null}
               ListFooterComponent={
                 <>
                   {/* AGORA-364: previews from directly federated Agora
@@ -392,15 +456,38 @@ export default function ConnectionsScreen() {
                                 <Text style={[s.acceptBtnText, { color: c.onPrimary }]}>Add</Text>
                               </TouchableOpacity>
                             )}
+                            <DismissButton onPress={() => dismissSuggestion('peer', key)} />
                           </View>
                         )
                       })}
                     </View>
                   )}
+                  {fediverseSuggestions.length > 0 && (
+                    <View>
+                      <Text style={[s.sectionHeader, { color: c.textMuted }]}>On the Fediverse</Text>
+                      {fediverseSuggestions.map((u: any) => (
+                        <FollowRow key={u.actor_url} kind="fediverse" id={u.actor_url}
+                          name={u.display_name || u.username} handleText={`@${u.username}@${u.instance}`}
+                          avatarUrl={u.avatar_url} reason={u.reason} />
+                      ))}
+                    </View>
+                  )}
+                  {blueskySuggestions.length > 0 && (
+                    <View>
+                      <Text style={[s.sectionHeader, { color: c.textMuted }]}>On Bluesky</Text>
+                      {blueskySuggestions.map((u: any) => (
+                        <FollowRow key={u.did} kind="bluesky" id={u.did}
+                          name={u.display_name || u.handle} handleText={`@${u.handle}`}
+                          avatarUrl={u.avatar_url} reason={u.reason} />
+                      ))}
+                    </View>
+                  )}
                   {invitesEnabled && <View style={{ height: 88 }} />}
                 </>
               }
-              renderItem={({ item: u }) => <PersonRow user={u} right={
+              renderItem={({ item: u }) => <PersonRow user={u}
+                sub={(u.reasons?.length ? u.reasons : ['Member of this instance']).slice(0, 2).join(' · ')}
+                onDismiss={() => dismissSuggestion('user', u.id)} right={
                 u.friend_status === 'pending' ? (
                   <TouchableOpacity onPress={() => cancelReq.mutate(u.id)} disabled={cancelReq.isPending}
                     style={[s.declineBtn, { backgroundColor: c.bg, borderColor: c.border }]}>

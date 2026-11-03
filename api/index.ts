@@ -158,6 +158,9 @@ export const usersApi = {
     return api.post('/users/me/cover', form, { headers: { 'Content-Type': 'multipart/form-data' } })
   },
   discover:        ()                 => api.get('/users/discover'),
+  // AGORA-423: stop offering someone in Find Friends. key is the network's id
+  // for them: a user id, username@instance, an actor URL, or a DID.
+  dismissSuggestion: (kind: 'user' | 'peer' | 'fediverse' | 'bluesky', key: string) => api.post('/users/discover/dismiss', { kind, key }),
   mentionSearch:   (q: string)        => api.get('/users/mention-search', { params: { q } }),
   followNotifications:   (username: string) => api.post(`/users/${username}/notify`),
   unfollowNotifications: (username: string) => api.delete(`/users/${username}/notify`),
