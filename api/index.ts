@@ -113,7 +113,7 @@ export const feedApi = {
   createComment:(id: string, data: any) => api.post(`/posts/${id}/comments`, data),
   deleteComment:(postId: string, commentId: string) => api.delete(`/posts/${postId}/comments/${commentId}`),
   editComment:  (postId: string, commentId: string, content: string) => api.patch(`/posts/${postId}/comments/${commentId}`, { content }),
-  getUserPosts: (username: string)   => api.get(`/users/${username}/posts`),
+  getUserPosts: (username: string, params?: { offset?: number, limit?: number }) => api.get(`/users/${username}/posts`, { params }),
   // AMOBILE-186: the active half of the wall feature (approve_wall_posts is
   // already wired up in settings.tsx, but posting/reviewing had no path).
   getWall:      (username: string)   => api.get(`/users/${username}/wall`),
@@ -158,6 +158,9 @@ export const usersApi = {
     return api.post('/users/me/cover', form, { headers: { 'Content-Type': 'multipart/form-data' } })
   },
   discover:        ()                 => api.get('/users/discover'),
+  // AGORA-423: stop offering someone in Find Friends. key is the network's id
+  // for them: a user id, username@instance, an actor URL, or a DID.
+  dismissSuggestion: (kind: 'user' | 'peer' | 'fediverse' | 'bluesky', key: string) => api.post('/users/discover/dismiss', { kind, key }),
   mentionSearch:   (q: string)        => api.get('/users/mention-search', { params: { q } }),
   followNotifications:   (username: string) => api.post(`/users/${username}/notify`),
   unfollowNotifications: (username: string) => api.delete(`/users/${username}/notify`),
@@ -351,6 +354,22 @@ export const hiddenPostsApi = {
   list:   ()               => api.get('/hidden-posts'),
   hide:   (postId: string) => api.post(`/posts/${postId}/hide`),
   unhide: (postId: string) => api.delete(`/posts/${postId}/hide`),
+}
+
+// AGORA-429: saving a post to come back to. Private to the user; nothing is
+// federated and the author is not told.
+export const bookmarksApi = {
+  list:   (params?: any)   => api.get('/bookmarks', { params }),
+  add:    (postId: string) => api.post(`/posts/${postId}/bookmark`),
+  remove: (postId: string) => api.delete(`/posts/${postId}/bookmark`),
+}
+
+// AGORA-428: words the user has muted from their timelines. days omitted or 0
+// means forever.
+export const keywordMutesApi = {
+  list:   ()                               => api.get('/keyword-mutes'),
+  add:    (keyword: string, days?: number) => api.post('/keyword-mutes', { keyword, days: days || 0 }),
+  remove: (id: string)                     => api.delete(`/keyword-mutes/${id}`),
 }
 
 export const blockApi = {

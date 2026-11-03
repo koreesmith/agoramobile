@@ -56,7 +56,7 @@ export default function FindPeopleStep({ instance, me, setNotes, next, back }: S
 
   const suggested: Person[] = [
     ...(suggestions?.inviter ? [{ ...suggestions.inviter, note: 'Invited you to Agora' }] : []),
-    ...(suggestions?.people ?? []).map((u: any) => ({ ...u, note: 'Joined recently' })),
+    ...(suggestions?.people ?? []).map((u: any) => ({ ...u, note: u.reason || 'Joined recently' })),
   ]
   const found: Person[] = (results ?? [])
     .filter(u => !u.is_remote && u.friendship_status !== 'self')

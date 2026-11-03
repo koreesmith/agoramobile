@@ -273,6 +273,10 @@ export default function SettingsScreen() {
         {/* AGORA-309: sits next to blocked users, since both are things the
             user has chosen not to see. */}
         <Row icon="eye-off-outline" label="Hidden posts" onPress={() => router.push('/hidden-posts')} />
+        {/* AGORA-428 */}
+        <Row icon="volume-mute-outline" label="Muted keywords" onPress={() => router.push('/muted-keywords')} />
+        {/* AGORA-429 */}
+        <Row icon="bookmark-outline" label="Bookmarks" onPress={() => router.push('/bookmarks')} />
         <Row icon="mail-outline" label="Change email" onPress={() => setSection('email')} />
         <Row icon="key-outline" label="Change password" onPress={() => setSection('password')} />
         <Row icon="globe-outline" label="Custom domain" onPress={() => router.push('/custom-domain')} />

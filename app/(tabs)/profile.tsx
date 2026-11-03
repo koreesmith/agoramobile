@@ -6,7 +6,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header, Spinner, Avatar, SearchIconButton } from '../../components/ui'
 import PostCard from '../../components/PostCard'
 import AccountSwitcherModal from '../../components/AccountSwitcherModal'
-import { feedApi, usersApi, instanceApi, imgUrl } from '../../api'
+import ProfilePostsFooter from '../../components/ProfilePostsFooter'
+import { useProfilePosts } from '../../utils/useProfilePosts'
+import { usersApi, instanceApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
 import { promptSignOut } from '../../utils/signOut'
 
@@ -25,11 +27,8 @@ export default function ProfileScreen() {
     enabled: !!user,
   })
 
-  const { data: postsData, isLoading: postL, refetch: rpost } = useQuery({
-    queryKey: ['user-posts', user?.username],
-    queryFn: () => feedApi.getUserPosts(user!.username).then(r => r.data),
-    enabled: !!user,
-  })
+  const { posts, isLoading: postL, refetch: rpost, onScroll: onPostsScroll, loadMore: loadMorePosts, isFetchingNextPage: loadingMorePosts, loadMoreFailed: morePostsFailed } =
+    useProfilePosts(user?.username, !!user)
 
   const { data: instanceData } = useQuery({
     queryKey: ['instance-info'],
@@ -38,7 +37,6 @@ export default function ProfileScreen() {
   })
   const invitesEnabled = instanceData?.user_invites_enabled === 'true'
 
-  const posts = postsData?.posts || []
   const p = profile || user
 
   if (pl) return <Screen><Header title="Profile" /><Spinner /></Screen>
@@ -58,6 +56,10 @@ export default function ProfileScreen() {
             <Ionicons name="people-outline" size={22} color={c.primary} />
             {accountCount > 1 && <View style={[s.dot, { backgroundColor: c.primary, borderColor: c.card }]} />}
           </TouchableOpacity>
+          {/* AGORA-429 */}
+          <TouchableOpacity onPress={() => router.push('/bookmarks')} style={{ padding: 4 }} accessibilityLabel="Bookmarks">
+            <Ionicons name="bookmark-outline" size={22} color={c.primary} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/settings')} style={{ padding: 4 }}>
             <Ionicons name="settings-outline" size={22} color={c.primary} />
           </TouchableOpacity>
@@ -69,7 +71,11 @@ export default function ProfileScreen() {
       <AccountSwitcherModal visible={switcherOpen} onClose={() => setSwitcherOpen(false)} />
 
       <View style={{ flex: 1 }}>
-        <ScrollView refreshControl={<RefreshControl refreshing={rpr} onRefresh={() => { rp(); rpost() }} tintColor={c.primary} />}>
+        <ScrollView
+          onScroll={onPostsScroll}
+          scrollEventThrottle={200}
+          refreshControl={<RefreshControl refreshing={rpr} onRefresh={() => { rp(); rpost() }} tintColor={c.primary} />}
+        >
           <View style={[s.cover, { backgroundColor: c.primaryBg }]}>
             {p?.cover_url ? <Image source={{ uri: imgUrl(p.cover_url) }} style={{ width: '100%', height: 100 }} resizeMode="cover" /> : null}
           </View>
@@ -89,7 +95,16 @@ export default function ProfileScreen() {
             </View>
             <Text style={[s.username, { color: c.textMuted }]}>@{p?.username}</Text>
             {p?.bio ? <Text style={[s.bio, { color: c.textMd }]}>{p.bio}</Text> : null}
-            <Text style={[s.friends, { color: c.textMuted }]}><Text style={[s.friendCount, { color: c.text }]}>{(p as any)?.friend_count || 0}</Text> friends</Text>
+            {/* AGORA-422: followers and following total every network (Agora, Fediverse, Bluesky); older servers don't send them */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 16, rowGap: 2 }}>
+              <Text style={[s.friends, { color: c.textMuted }]}><Text style={[s.friendCount, { color: c.text }]}>{(p as any)?.friend_count || 0}</Text> friends</Text>
+              {(p as any)?.follower_count != null && (
+                <Text style={[s.friends, { color: c.textMuted }]}><Text style={[s.friendCount, { color: c.text }]}>{(p as any).follower_count}</Text> followers</Text>
+              )}
+              {(p as any)?.following_count != null && (
+                <Text style={[s.friends, { color: c.textMuted }]}><Text style={[s.friendCount, { color: c.text }]}>{(p as any).following_count}</Text> following</Text>
+              )}
+            </View>
           </View>
 
           <View style={{ marginTop: 8 }}>
@@ -98,6 +113,7 @@ export default function ProfileScreen() {
             ) : posts.map((post: any) => (
               <PostCard key={post.id} post={post} queryKey={['user-posts', user?.username]} />
             ))}
+            <ProfilePostsFooter loading={loadingMorePosts} failed={morePostsFailed} onRetry={loadMorePosts} />
           </View>
 
           {/* Bottom padding so FAB doesn't cover last post */}

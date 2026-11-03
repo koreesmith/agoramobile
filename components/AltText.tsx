@@ -90,32 +90,38 @@ export function AltEditButton({ hasAlt, onPress }: { hasAlt: boolean, onPress: (
  * An "ALT" badge for an image that has a description (AMOBILE-224). The
  * description is already the image's accessibility label for screen
  * readers; the badge is for everyone else, the way Mastodon and Bluesky show
- * it. Tapping it shows the text over the image without opening the lightbox.
+ * it. Tapping it shows the text below the image without opening the lightbox.
+ *
+ * AGORA-414: the description sits under the image in normal layout, never
+ * over it, so opening it hides none of the photo. The badge therefore lives
+ * in the image's top-left corner, where it stays put as the panel grows.
  *
  * Renders nothing without a description. Place it inside a container that
- * wraps the image, as a sibling of whatever opens the image.
+ * wraps the image, as a sibling of whatever opens the image and after it,
+ * since the panel is the container's last in-flow child.
  */
 export function AltBadge({ alt }: { alt?: string }) {
+  const c = useC()
   const [open, setOpen] = useState(false)
   if (!alt) return null
   return (
     <>
-      {open && (
-        <TouchableOpacity activeOpacity={1} onPress={() => setOpen(false)} style={s.altPanel}>
-          <ScrollView style={{ maxHeight: 180 }}>
-            <Text style={s.altText}>{alt}</Text>
-          </ScrollView>
-        </TouchableOpacity>
-      )}
       <TouchableOpacity
         onPress={() => setOpen(o => !o)}
-        style={s.badge}
+        style={s.badgeTop}
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={open ? 'Hide image description' : 'Show image description'}
       >
         <Text style={s.badgeText}>ALT</Text>
       </TouchableOpacity>
+      {open && (
+        <TouchableOpacity activeOpacity={1} onPress={() => setOpen(false)} style={[s.altPanel, { backgroundColor: c.bg }]}>
+          <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled>
+            <Text style={[s.altText, { color: c.text }]}>{alt}</Text>
+          </ScrollView>
+        </TouchableOpacity>
+      )}
     </>
   )
 }
@@ -136,6 +142,7 @@ const s = StyleSheet.create({
   btnText:   { fontWeight: '600', fontSize: 15 },
   badge:     { position: 'absolute', left: 8, bottom: 8, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
   badgeText: { color: 'white', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-  altPanel:  { position: 'absolute', left: 8, right: 8, bottom: 36, backgroundColor: 'rgba(0,0,0,0.85)', borderRadius: 10, padding: 10 },
-  altText:   { color: 'white', fontSize: 13, lineHeight: 18 },
+  badgeTop:  { position: 'absolute', left: 8, top: 8, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
+  altPanel:  { marginHorizontal: 8, marginTop: 6, borderRadius: 10, padding: 10 },
+  altText:   { fontSize: 13, lineHeight: 18 },
 })

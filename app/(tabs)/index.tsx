@@ -879,10 +879,12 @@ export default function FeedScreen() {
               </View>
             )}
 
+            {/* AGORA-430: it started at 64pt, about three lines, and the text
+                scrolled inside it out of view; start with room to write. */}
             <AutoGrowInput
-              minHeight={64}
-              maxHeight={260}
-              style={[s.composeInput, { color: c.text, flex: undefined }]}
+              minHeight={160}
+              maxHeight={420}
+              style={[s.composeInput, { color: c.text, flex: undefined, textAlignVertical: 'top' }]}
               placeholder={showPoll ? 'Ask a question…' : 'What\'s on your mind?'}
               placeholderTextColor={c.textLight}
               value={content} onChangeText={handleContentChange} autoFocus={!showCW}
