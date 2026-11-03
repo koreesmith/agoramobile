@@ -12,7 +12,7 @@ import * as MediaLibrary from 'expo-media-library'
 import * as FileSystem from 'expo-file-system/legacy'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
-import { feedApi, imgUrl, blockApi, moderationApi, friendsApi, pagesApi, hiddenPostsApi } from '../api'
+import { feedApi, imgUrl, blockApi, moderationApi, friendsApi, pagesApi, hiddenPostsApi, bookmarksApi } from '../api'
 import { trackInteraction } from '../utils/interactions'
 import { isShareable, sharePost } from '../utils/share'
 import { handle, timeAgo } from '../utils/handle'
@@ -379,6 +379,21 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
     mutationFn: () => hiddenPostsApi.hide(post.id),
     onSuccess: () => qc.invalidateQueries({ queryKey }),
     onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not hide post'),
+  })
+
+  // AGORA-429: the saved state is optimistic and re-synced from the post when
+  // the list reloads. Only the bookmarks list is refetched, not the timeline
+  // the card is in, so saving a post never reshuffles it.
+  const [bookmarked, setBookmarked] = useState(!!post.bookmarked)
+  useEffect(() => setBookmarked(!!post.bookmarked), [post.bookmarked])
+  const toggleBookmark = useMutation({
+    mutationFn: (save: boolean) => save ? bookmarksApi.add(post.id) : bookmarksApi.remove(post.id),
+    onMutate: (save: boolean) => setBookmarked(save),
+    onError: (e: any, save: boolean) => {
+      setBookmarked(!save)
+      showToast(e.response?.data?.error || 'Could not update your bookmark', 'error')
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['bookmarks'] }),
   })
 
   const isOwn    = user?.id === post.author_id
@@ -814,6 +829,15 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
               <Ionicons name="share-outline" size={17} color={c.textMuted} />
             </TouchableOpacity>
           )}
+
+          {/* AGORA-429: save for later. */}
+          <TouchableOpacity
+            style={s.actionBtn}
+            accessibilityLabel={bookmarked ? 'Remove bookmark' : 'Bookmark'}
+            onPress={() => toggleBookmark.mutate(!bookmarked)}
+          >
+            <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={17} color={bookmarked ? c.primary : c.textMuted} />
+          </TouchableOpacity>
 
         </View>
 

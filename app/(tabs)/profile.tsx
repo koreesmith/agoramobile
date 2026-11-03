@@ -56,6 +56,10 @@ export default function ProfileScreen() {
             <Ionicons name="people-outline" size={22} color={c.primary} />
             {accountCount > 1 && <View style={[s.dot, { backgroundColor: c.primary, borderColor: c.card }]} />}
           </TouchableOpacity>
+          {/* AGORA-429 */}
+          <TouchableOpacity onPress={() => router.push('/bookmarks')} style={{ padding: 4 }} accessibilityLabel="Bookmarks">
+            <Ionicons name="bookmark-outline" size={22} color={c.primary} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/settings')} style={{ padding: 4 }}>
             <Ionicons name="settings-outline" size={22} color={c.primary} />
           </TouchableOpacity>
