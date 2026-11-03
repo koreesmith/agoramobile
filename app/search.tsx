@@ -108,16 +108,19 @@ export default function SearchScreen() {
   const cachedBskyPosts = posts.filter(p => p.is_remote && p.remote_instance === 'bsky.app')
   const liveBskyPosts: any[] = bskyPostsData?.disabled ? [] : (bskyPostsData?.posts || [])
 
-  const friendStatusLabel = (status: string | undefined) => {
-    if (!status || status === 'none') return null
-    if (status === 'accepted') return 'Friends'
-    if (status === 'pending') return 'Pending'
-    if (status === 'sent') return 'Requested'
+  // AGORA-432: the API reports friendship_status (not friend_status) plus
+  // following / follow_pending for a remote account, so a result for someone
+  // you already follow or are friends with says so.
+  const relationshipLabel = (u: any) => {
+    if (u.friendship_status === 'accepted') return 'Friends'
+    if (u.following) return 'Following'
+    if (u.follow_pending) return 'Requested'
+    if (u.friendship_status === 'pending') return 'Pending'
     return null
   }
 
   const renderUserRow = ({ item }: { item: any }) => {
-    const label = friendStatusLabel(item.friend_status)
+    const label = relationshipLabel(item)
     return (
       <TouchableOpacity
         style={[s.userRow, { borderBottomColor: c.border, backgroundColor: c.card }]}
@@ -369,7 +372,7 @@ function ResultGroup({ title, count, c, children }: { title: string, count: numb
 function BlueskyActorRow({ actor: a, c, onFollow, followPending }: {
   actor: any, c: any, onFollow: () => void, followPending: boolean
 }) {
-  const [followed, setFollowed] = useState(false)
+  const [followed, setFollowed] = useState(!!a.following)
   const handleFollow = () => { setFollowed(true); onFollow() }
 
   return (
