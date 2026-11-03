@@ -1,8 +1,9 @@
 import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useC } from '../constants/ColorContext'
-import { FLEX_SLOTS, TAB_DESTINATIONS } from '../constants/tabDestinations'
-import { useBar, useTabBarStore } from '../store/tabBar'
+import { FLEX_SLOTS } from '../constants/tabDestinations'
+import { useTabBarStore } from '../store/tabBar'
+import { useDestinations } from '../utils/useDestinations'
 
 // AGORA-446: choose which destinations sit in the bottom bar. Opened by a
 // long-press on any tab except Profile (which opens the account switcher), by
@@ -13,7 +14,7 @@ export default function CustomizeTabBarModal({ visible, onClose }: {
   onClose: () => void
 }) {
   const c = useC()
-  const bar = useBar()
+  const { destinations, bar } = useDestinations()
   const toggle = useTabBarStore((s) => s.toggle)
   const reset = useTabBarStore((s) => s.reset)
   const full = bar.length >= FLEX_SLOTS
@@ -45,7 +46,7 @@ export default function CustomizeTabBarModal({ visible, onClose }: {
 
           {fixed('Feed', 'home-outline')}
 
-          {TAB_DESTINATIONS.map((d) => {
+          {destinations.map((d) => {
             const checked = bar.includes(d.id)
             const disabled = !checked && full
             return (

@@ -12,7 +12,7 @@ import AccountSwitcherModal from '../../components/AccountSwitcherModal'
 import CustomizeTabBarModal from '../../components/CustomizeTabBarModal'
 import TabBarButton from '../../components/TabBarButton'
 import { TAB_DESTINATIONS, destinationById } from '../../constants/tabDestinations'
-import { useBar } from '../../store/tabBar'
+import { useDestinations } from '../../utils/useDestinations'
 import { useUnreadCounts } from '../../utils/useUnreadCounts'
 import { ProfileTabIcon, useActiveAccount } from '../../components/ActiveAccount'
 import { useMe } from '../../components/welcome/useMe'
@@ -27,7 +27,7 @@ export default function TabsLayout() {
   const [notificationsReady, setNotificationsReady] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [customizeOpen, setCustomizeOpen] = useState(false)
-  const bar = useBar()
+  const { destinations, bar } = useDestinations()
   const segments = useSegments() as string[]
   const { handle } = useActiveAccount()
   const insets = useSafeAreaInsets()
@@ -88,12 +88,12 @@ export default function TabsLayout() {
     return n > 0 ? (n > 9 ? '9+' : n) : undefined
   }
   // Unread counts for destinations that aren't in the bar show on More instead.
-  const hiddenUnread = TAB_DESTINATIONS
+  const hiddenUnread = destinations
     .filter((d) => !bar.includes(d.id))
     .reduce((sum, d) => sum + (d.badge === 'alerts' ? unread : d.badge === 'messages' ? unreadMessages : 0), 0)
   // One of the destinations in More is open: light More so the bar still
   // shows where you are.
-  const hiddenOpen = segments[0] === '(tabs)' && !!segments[1] && !!destinationById(segments[1]) && !bar.includes(segments[1] as any)
+  const hiddenOpen = segments[0] === '(tabs)' && !!segments[1] && !!destinationById(segments[1]) && !bar.includes(segments[1])
 
   return (
     <>
@@ -125,6 +125,8 @@ export default function TabsLayout() {
             name={d.id}
             options={{
               title: d.title,
+              // Hidden from the bar when moved to More, or (Reels only) when
+              // the server doesn't have it.
               ...(bar.includes(d.id) ? {} : { href: null }),
               tabBarIcon: ({ color, size }) => <Ionicons name={d.icon} size={size} color={color} />,
               tabBarBadge: badgeFor(d.badge),

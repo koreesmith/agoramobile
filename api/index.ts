@@ -267,6 +267,14 @@ export const onboardingApi = {
   suggestions: () => api.get('/onboarding/suggestions'),
 }
 
+// ── Reels (AGORA-442; server side AGORA-438) ──────────────────────────────────
+// tab is 'following' or 'discover'. cursor is the previous page's next_cursor,
+// and include_viewed brings back videos already watched.
+export const reelsApi = {
+  list:   (params: { tab: string; cursor?: string; limit?: number; include_viewed?: boolean }) => api.get('/reels', { params }),
+  viewed: (id: string) => api.post(`/reels/${id}/viewed`),
+}
+
 // ── Instance ──────────────────────────────────────────────────────────────────
 export const instanceApi = {
   getInfo: () => api.get('/instance'),

@@ -6,7 +6,7 @@ import type { Ionicons } from '@expo/vector-icons'
 // get one lives in the More tab. Each id is the name of a screen in
 // app/(tabs)/, so a destination stays a real route (and every existing link
 // to it keeps working) whether or not it is currently in the bar.
-export type TabDestinationId = 'notifications' | 'messages' | 'connections' | 'groups'
+export type TabDestinationId = 'reels' | 'notifications' | 'messages' | 'connections' | 'groups'
 
 export interface TabDestination {
   id: TabDestinationId
@@ -16,9 +16,9 @@ export interface TabDestination {
   badge?: 'alerts' | 'messages'
 }
 
-// Canonical order, which is also the order they appear in the bar. Reels is
-// added here (and to DEFAULT_BAR) when its screen exists (AGORA-442).
+// Canonical order, which is also the order they appear in the bar.
 export const TAB_DESTINATIONS: TabDestination[] = [
+  { id: 'reels',         title: 'Reels',       icon: 'film-outline' },
   { id: 'notifications', title: 'Alerts',      icon: 'notifications-outline', badge: 'alerts' },
   { id: 'messages',      title: 'Messages',    icon: 'chatbubble-outline',    badge: 'messages' },
   { id: 'connections',   title: 'Connections', icon: 'person-add-outline' },
@@ -28,6 +28,6 @@ export const TAB_DESTINATIONS: TabDestination[] = [
 // The bar is five slots plus More. Feed and Profile take two of the five.
 export const FLEX_SLOTS = 3
 
-export const DEFAULT_BAR: TabDestinationId[] = ['notifications', 'messages']
+export const DEFAULT_BAR: TabDestinationId[] = ['reels', 'notifications', 'messages']
 
 export const destinationById = (id: string) => TAB_DESTINATIONS.find((d) => d.id === id)

@@ -5,8 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { Screen, Header } from '../../components/ui'
 import CustomizeTabBarModal from '../../components/CustomizeTabBarModal'
 import { useC } from '../../constants/ColorContext'
-import { TAB_DESTINATIONS } from '../../constants/tabDestinations'
-import { useBar } from '../../store/tabBar'
+import { useDestinations } from '../../utils/useDestinations'
 import { useUnreadCounts } from '../../utils/useUnreadCounts'
 
 // AGORA-446: the More tab. Lists every destination that isn't in the bottom
@@ -15,11 +14,11 @@ import { useUnreadCounts } from '../../utils/useUnreadCounts'
 // here is the same as tapping it in the bar.
 export default function MoreScreen() {
   const c = useC()
-  const bar = useBar()
+  const { destinations, bar } = useDestinations()
   const { unread, unreadMessages } = useUnreadCounts()
   const [customizeOpen, setCustomizeOpen] = useState(false)
 
-  const hidden = TAB_DESTINATIONS.filter((d) => !bar.includes(d.id))
+  const hidden = destinations.filter((d) => !bar.includes(d.id))
   const badgeFor = (badge?: 'alerts' | 'messages') =>
     badge === 'alerts' ? unread : badge === 'messages' ? unreadMessages : 0
 
