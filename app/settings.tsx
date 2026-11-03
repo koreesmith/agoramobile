@@ -10,6 +10,7 @@ import * as Sharing from 'expo-sharing'
 import Constants from 'expo-constants'
 import * as WebBrowser from 'expo-web-browser'
 import { Screen } from '../components/ui'
+import CustomizeTabBarModal from '../components/CustomizeTabBarModal'
 import { usersApi, authApi, instanceApi, interactionsApi } from '../api'
 import { resetWhatsNew } from '../components/WhatsNewModal'
 import { useAuthStore } from '../store/auth'
@@ -43,6 +44,7 @@ export default function SettingsScreen() {
   const setDeletionScheduledAt = (at: string | null) =>
     qc.setQueryData(meQueryKey(activeAccountId), (old: any) => old && { ...old, deletion_scheduled_at: at })
   const [exportLoading, setExportLoading] = useState(false)
+  const [customizeTabBarOpen, setCustomizeTabBarOpen] = useState(false)
 
   const togglePrivacy = useMutation({
     mutationFn: () => usersApi.updateProfile({ profile_private: !user?.profile_private }),
@@ -277,6 +279,8 @@ export default function SettingsScreen() {
         <Row icon="volume-mute-outline" label="Muted keywords" onPress={() => router.push('/muted-keywords')} />
         {/* AGORA-429 */}
         <Row icon="bookmark-outline" label="Bookmarks" onPress={() => router.push('/bookmarks')} />
+        {/* AGORA-446 */}
+        <Row icon="options-outline" label="Customize bottom bar" onPress={() => setCustomizeTabBarOpen(true)} />
         <Row icon="mail-outline" label="Change email" onPress={() => setSection('email')} />
         <Row icon="key-outline" label="Change password" onPress={() => setSection('password')} />
         <Row icon="globe-outline" label="Custom domain" onPress={() => router.push('/custom-domain')} />
@@ -412,6 +416,7 @@ export default function SettingsScreen() {
           <Row icon="log-out-outline" label={accountCount > 1 ? 'Sign out…' : 'Sign out'} destructive onPress={promptSignOut} right={<View />} />
         </View>
       </ScrollView>
+      <CustomizeTabBarModal visible={customizeTabBarOpen} onClose={() => setCustomizeTabBarOpen(false)} />
     </Screen>
   )
 }

@@ -11,6 +11,7 @@ import { registerActivePush, clearPushForAccount, devicePushTokenChanged } from 
 import { ColorProvider, useIsDark } from '../constants/ColorContext'
 import { useThemeStore } from '../store/theme'
 import { useBlockStore } from '../store/blocks'
+import { useTabBarStore } from '../store/tabBar'
 import { useDiagnosticsStore } from '../store/diagnostics'
 import SplashScreen from '../components/SplashScreen'
 import Toast from '../components/Toast'
@@ -86,6 +87,7 @@ function AppContent() {
   const activeAccountId = useAuthStore((s) => s.activeAccountId)
   const { loadPreference } = useThemeStore()
   const { loadBlocked } = useBlockStore()
+  const loadTabBar = useTabBarStore((s) => s.load)
   const { loadPreference: loadDiagnosticsPreference } = useDiagnosticsStore()
   // AMOBILE-209: the in-app Theme, not the phone's appearance, or the status
   // bar is drawn dark on dark (or light on light) whenever the two differ.
@@ -106,6 +108,7 @@ function AppContent() {
     loadFromStorage()
     loadPreference()
     loadBlocked()
+    loadTabBar()
     // Read before the deferred report below fires, so it sees the real setting.
     loadDiagnosticsPreference()
   }, [])
