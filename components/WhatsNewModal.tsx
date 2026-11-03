@@ -5,89 +5,52 @@ import * as SecureStore from 'expo-secure-store'
 import { Ionicons } from '@expo/vector-icons'
 import { useC } from '../constants/ColorContext'
 
-// AMOBILE-217: the list grew after 4.0.0 first reached people, so the stored
-// marker moved on once to show the fuller list to anyone who had already
-// dismissed the original.
-const WHATS_NEW_VERSION = '4.0.0-2'
+// AGORA-435: moved on for 4.1.0 so anyone who dismissed the 4.0.0 list sees the
+// new one once.
+const WHATS_NEW_VERSION = '4.1.0'
 const STORAGE_KEY = 'last_seen_whats_new'
 
 const FEATURES: { icon: string; title: string; desc: string; link?: string; linkText?: string }[] = [
   {
-    icon: 'send-outline',
-    title: 'Choose where each post goes',
-    desc: 'Pick Agora, the Fediverse, Bluesky, or any mix of them for each post. You can even post to the Fediverse or Bluesky without posting on Agora.',
-    link: '/',
-    linkText: 'Try it in the composer →',
+    icon: 'bookmark-outline',
+    title: 'Bookmarks',
+    desc: 'Save any post to come back to later. Tap the bookmark under a post, then find everything you saved in Bookmarks. Only you can see them.',
+    link: '/bookmarks',
+    linkText: 'Open Bookmarks →',
   },
   {
-    icon: 'git-network-outline',
-    title: 'Friends across Agora instances',
-    desc: "Friend requests, friends-only posts, and their replies and reactions now reach your friends even when they're on a different Agora instance, not just your own.",
-    link: '/connections',
-    linkText: 'See your friends →',
-  },
-  {
-    icon: 'mail-outline',
-    title: 'Direct messages across instances',
-    desc: 'Send and receive DMs with friends on other Agora instances, not just your own.',
-    link: '/messages',
-    linkText: 'Open Messages →',
-  },
-  {
-    icon: 'people-circle-outline',
-    title: 'More than one account',
-    desc: 'Sign in to several accounts, on one server or many, and switch between them by pressing and holding the Profile tab.',
-    link: '/manage-accounts',
-    linkText: 'Manage accounts →',
+    icon: 'volume-mute-outline',
+    title: 'Muted keywords',
+    desc: 'Hide posts that contain words or phrases you choose, for a set number of days or for good. It applies to your timelines, including posts from the Fediverse and Bluesky.',
+    link: '/muted-keywords',
+    linkText: 'Mute a word →',
   },
   {
     icon: 'compass-outline',
-    title: 'Find people on other Agora instances',
-    desc: 'Find Friends now suggests people from Agora instances this one connects with, and you can find a private profile by its exact handle to send a friend request.',
+    title: 'Better Find Friends',
+    desc: 'Suggestions now say why someone is suggested, you can dismiss the ones you do not want, and they include people from the Fediverse and Bluesky.',
     link: '/connections?tab=discover',
     linkText: 'Find friends →',
   },
   {
     icon: 'search-outline',
-    title: 'Search from anywhere',
-    desc: 'Search now sits above your feed pills, one tap away from every tab.',
-    link: '/search',
-    linkText: 'Try a search →',
+    title: 'Search shows who you follow',
+    desc: 'Search results now show when you already follow someone or are friends with them.',
   },
   {
-    icon: 'globe-outline',
-    title: 'Bring your own domain',
-    desc: "Use your own domain as your Bluesky handle. Once it's verified, it's your handle everywhere on Bluesky.",
-    link: '/custom-domain',
-    linkText: 'Set it up →',
+    icon: 'stats-chart-outline',
+    title: 'Accurate follower counts',
+    desc: 'Follower and following counts are now correct across Agora, the Fediverse and Bluesky.',
   },
   {
-    icon: 'create-outline',
-    title: 'Wall posts',
-    desc: "Write on a friend's wall from their profile, and choose in Settings whether posts on your own wall wait for your approval.",
+    icon: 'infinite-outline',
+    title: 'Keep scrolling on profiles',
+    desc: 'Posts on a profile page now keep loading as you scroll, instead of stopping after the first batch.',
   },
   {
-    icon: 'pin-outline',
-    title: 'Pinned feed pills',
-    desc: 'Pin your favorite feeds to the top of your feed bar, with an overflow sheet for the rest.',
-    link: '/',
-    linkText: 'Try it →',
-  },
-  { icon: 'happy-outline', title: 'Refreshed reactions', desc: 'A realigned reaction set, shared consistently between posts and Messages.' },
-  {
-    icon: 'eye-outline',
-    title: 'See your followers',
-    desc: "View your Fediverse and Bluesky follower and following lists, now with a dedicated Followers segment in each tab. You'll also get a notification when someone new follows you.",
-    link: '/connections?tab=fediverse&sub=followers',
-    linkText: 'Check your followers →',
-  },
-  { icon: 'eye-off-outline', title: 'Hide a post', desc: 'Remove a post from your own timeline without deleting it.' },
-  {
-    icon: 'map-outline',
-    title: 'Getting started tour',
-    desc: 'A short tour for setting up your profile, privacy, and networks. Take it again anytime from Settings, under Help.',
-    link: '/welcome',
-    linkText: 'Take the tour →',
+    icon: 'repeat-outline',
+    title: 'Reposts reach Bluesky',
+    desc: "When you repost a public post that isn't on Bluesky, it now appears there as a post from you with the original text and a link back.",
   },
 ]
 
@@ -131,7 +94,7 @@ export default function WhatsNewModal({ visible, onDismiss }: { visible: boolean
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleDismiss}>
       <View style={[s.container, { backgroundColor: c.card }]}>
         <View style={[s.header, { borderBottomColor: c.border }]}>
-          <Text style={[s.title, { color: c.text }]}>What's New in 4.0</Text>
+          <Text style={[s.title, { color: c.text }]}>What's New in 4.1</Text>
           <TouchableOpacity onPress={handleDismiss} style={s.closeBtn}>
             <Ionicons name="close" size={22} color={c.textMuted} />
           </TouchableOpacity>
