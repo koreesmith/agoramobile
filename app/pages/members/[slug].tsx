@@ -115,9 +115,9 @@ export default function PageMembersScreen() {
             const isOwner = member.role === 'owner'
             return (
               <View key={member.user_id || member.id} style={[s.memberRow, { borderBottomColor: c.border, backgroundColor: c.card }]}>
-                <Avatar url={imgUrl(member.avatar_url)} name={member.display_name} size={42} />
+                <TouchableOpacity onPress={() => router.push(`/profile/${member.username}` as any)} accessibilityRole="link"><Avatar url={imgUrl(member.avatar_url)} name={member.display_name} size={42} /></TouchableOpacity>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.memberName, { color: c.text }]}>{member.display_name}</Text>
+                  <Text onPress={() => router.push(`/profile/${member.username}` as any)} style={[s.memberName, { color: c.text }]}>{member.display_name}</Text>
                   <Text style={[s.memberUsername, { color: c.textMuted }]}>@{member.username}</Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
