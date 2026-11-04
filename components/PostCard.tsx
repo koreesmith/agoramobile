@@ -19,6 +19,7 @@ import { handle, timeAgo } from '../utils/handle'
 import { useAuthStore } from '../store/auth'
 import { useBlockStore } from '../store/blocks'
 import { useToastStore } from '../store/toast'
+import { setReactionInCache, withReaction } from '../utils/reactionCache'
 import { Avatar, LinkedText, renderName } from './ui'
 import CustomHandle from './CustomHandle'
 import { AltBadge } from './AltText'
@@ -303,15 +304,37 @@ export default function PostCard({ post, queryKey, showPinned = false }: { post:
 
   const invalidate = () => qc.invalidateQueries({ queryKey })
 
+  // AGORA-456: the reaction shows at once and the list is not fetched again.
+  // The post is changed in place in the query cache, so every list that holds
+  // it updates; `shown` carries the same change for a card whose post is not
+  // in the cache. If the server does not take the reaction, both go back.
+  const [override, setOverride] = useState<any>(null)
+  useEffect(() => { setOverride(null) }, [post.my_reaction, post.reaction_count])
+  const shown: any = override ?? post
+
   const react = useMutation({
-    mutationFn: ({ type }: { type: string }) =>
-      post.my_reaction === type ? feedApi.unreactPost(post.id) : feedApi.reactPost(post.id, type),
+    mutationFn: ({ type, remove }: { type: string; remove: boolean; prev: string }) =>
+      remove ? feedApi.unreactPost(post.id) : feedApi.reactPost(post.id, type),
+    onError: (_e, vars) => {
+      setOverride(null)
+      setReactionInCache(qc, post.id, vars.prev)
+      showToast("Couldn't save your reaction. Check your connection.", 'error')
+    },
     onSuccess: (_data, vars) => {
-      if (post.my_reaction !== vars.type) trackInteraction('like', post.id)
-      invalidate()
+      if (!vars.remove) trackInteraction('like', post.id)
+      // Out of date, not refetched: it refreshes the next time it would anyway.
+      qc.invalidateQueries({ queryKey, refetchType: 'none' })
     },
   })
-  reactMutateRef.current = (vars) => react.mutate(vars)
+  const pickReaction = ({ type }: { type: string }) => {
+    const prev: string = shown.my_reaction || ''
+    const remove = prev === type
+    const next = remove ? '' : type
+    setOverride(withReaction(shown, next))
+    setReactionInCache(qc, post.id, next)
+    react.mutate({ type, remove, prev })
+  }
+  reactMutateRef.current = pickReaction
 
   const repost = useMutation({
     mutationFn: () => feedApi.repostPost(post.id, {
@@ -486,9 +509,9 @@ export default function PostCard({ post, queryKey, showPinned = false }: { post:
       { text: 'Save', onPress: () => saveImageToLibrary(url) },
     ])
   }
-  const reactionCounts: Record<string, number> = post.reaction_counts || {}
+  const reactionCounts: Record<string, number> = shown.reaction_counts || {}
   const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + b, 0)
-  const myReactionEmoji = post.my_reaction ? reactionDisplay(post.my_reaction).emoji : undefined
+  const myReactionEmoji = shown.my_reaction ? reactionDisplay(shown.my_reaction).emoji : undefined
 
   return (
     <View style={[s.card, { backgroundColor: c.card }, post.group_slug && { borderLeftWidth: 3, borderLeftColor: c.primaryLt }]}>
@@ -813,7 +836,7 @@ export default function PostCard({ post, queryKey, showPinned = false }: { post:
           <View style={s.reactionCounts}>
             {Object.entries(reactionCounts).filter(([,v]) => v > 0).map(([type, count]) => {
               const emoji = reactionDisplay(type).emoji
-              const isActive = post.my_reaction === type
+              const isActive = shown.my_reaction === type
               return (
                 <TouchableOpacity key={type} onPress={() => { setReactorsTab(type); setShowReactors(true) }}
                   style={[s.chip, { borderColor: isActive ? c.primaryLt : c.border, backgroundColor: isActive ? c.primaryBg : c.bg }]}>
@@ -1279,10 +1302,10 @@ export default function PostCard({ post, queryKey, showPinned = false }: { post:
               {REACTIONS.map(r => (
                 <TouchableOpacity
                   key={r.type}
-                  onPress={() => { react.mutate({ type: r.type }); setShowReactions(false); setHoveredReaction(null) }}
+                  onPress={() => { pickReaction({ type: r.type }); setShowReactions(false); setHoveredReaction(null) }}
                   style={[
                     s.pickerItem,
-                    (post.my_reaction === r.type || hoveredReaction === r.type) && { backgroundColor: c.primaryBg },
+                    (shown.my_reaction === r.type || hoveredReaction === r.type) && { backgroundColor: c.primaryBg },
                     hoveredReaction === r.type && { transform: [{ scale: 1.25 }] },
                   ]}
                 >
