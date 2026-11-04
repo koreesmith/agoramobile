@@ -286,6 +286,15 @@ export const onboardingApi = {
   suggestions: () => api.get('/onboarding/suggestions'),
 }
 
+// ── Draft posts (AGORA-431) ───────────────────────────────────────────────────
+// data is the composer's own fields, kept as sent by the server.
+export const draftsApi = {
+  list:   ()                                              => api.get('/drafts'),
+  create: (data: { content: string; data: any })          => api.post('/drafts', data),
+  update: (id: string, data: { content: string; data: any }) => api.put(`/drafts/${id}`, data),
+  remove: (id: string)                                    => api.delete(`/drafts/${id}`),
+}
+
 // ── Reels (AGORA-442; server side AGORA-438) ──────────────────────────────────
 // tab is 'following' or 'discover'. cursor is the previous page's next_cursor,
 // and include_viewed brings back videos already watched.

@@ -18,9 +18,11 @@ import AutoGrowInput from '../../components/AutoGrowInput'
 import { AltTextModal, AltEditButton } from '../../components/AltText'
 import PostCard from '../../components/PostCard'
 import MentionSuggestions from '../../components/MentionSuggestions'
+import { useToastStore } from '../../store/toast'
 import NetworkChip from '../../components/NetworkChip'
+import DraftsSheet, { Draft } from '../../components/DraftsSheet'
 import AudienceReach from '../../components/AudienceReach'
-import { feedApi, feedsApi, friendsApi, instanceApi, pagesApi, groupMentionApi, imgUrl } from '../../api'
+import { feedApi, feedsApi, friendsApi, instanceApi, pagesApi, groupMentionApi, imgUrl , draftsApi } from '../../api'
 import { trackInteraction } from '../../utils/interactions'
 import WhatsNewModal, { shouldShowWhatsNew } from '../../components/WhatsNewModal'
 import { useAuthStore } from '../../store/auth'
@@ -122,6 +124,9 @@ export default function FeedScreen() {
   const [feedQuery, setFeedQuery] = useState('')
   const [postAsPageSlug, setPostAsPageSlug] = useState<string | null>(null)
   const [showWhatsNew, setShowWhatsNew] = useState(false)
+  // AGORA-431: the draft this post is being written from, if any
+  const [draftId, setDraftId] = useState<string | null>(null)
+  const [showDrafts, setShowDrafts] = useState(false)
 
   const selectFeed = useCallback((id: string | null) => {
     setActiveFeedId(id)
@@ -177,7 +182,9 @@ export default function FeedScreen() {
 
   const selectedFriendList = friendLists.find((g: any) => g.id === friendListId)
 
-  const resetCompose = () => {
+  // Empties the compose box without closing it (AGORA-431), so a draft can be
+  // loaded into it; resetCompose below also closes it.
+  const clearCompose = () => {
     // AMOBILE-180: a post can only submit once a pending video finishes (the
     // submit button stays disabled while videoProcessing), so there's never
     // a job actually in flight here — stopping regardless is just defensive.
@@ -192,6 +199,11 @@ export default function FeedScreen() {
     setAgoraEnabled(true); setFederateAP(true); setFederateATProto(true)
     setLinkPreview(null); setLinkFetching(false)
     setPostAsPageSlug(null)
+    setDraftId(null)
+  }
+
+  const resetCompose = () => {
+    clearCompose()
     setShowCompose(false)
   }
 
@@ -352,6 +364,7 @@ export default function FeedScreen() {
     link_description: linkPreview?.description ?? '',
     link_image: linkPreview?.image ?? '',
     link_domain: linkPreview?.domain ?? '',
+    ...(draftId && !postAsPageSlug ? { draft_id: draftId } : {}), // AGORA-431
     ...targeting,
   }
 
@@ -359,9 +372,80 @@ export default function FeedScreen() {
     mutationFn: () => postAsPageSlug
       ? pagesApi.createPost(postAsPageSlug, postData)
       : feedApi.createPost(postData),
-    onSuccess: () => { resetCompose(); qc.invalidateQueries({ queryKey: ['feed'] }) },
+    onSuccess: () => { resetCompose(); qc.invalidateQueries({ queryKey: ['feed'] }); qc.invalidateQueries({ queryKey: ['drafts'] }) },
     onError: () => Alert.alert('Error', 'Could not create post'),
   })
+
+  // ── AGORA-431: drafts ──────────────────────────────────────────────────────
+  // What the composer holds, as the server keeps it. A link preview isn't kept:
+  // it is found again from the text.
+  const { data: draftsData } = useQuery({
+    queryKey: ['drafts'],
+    queryFn: () => draftsApi.list().then(r => r.data),
+    enabled: showCompose,
+    staleTime: 60_000,
+  })
+  const hasSomething = !!content.trim() || imageUrls.length > 0 || !!videoUrl || (showPoll && pollOptions.some(o => o.trim()))
+  const saveDraft = useMutation({
+    mutationFn: () => {
+      const body = {
+        content,
+        data: {
+          visibility, group_id: visibility === 'group' ? friendListId : undefined,
+          content_warning: showCW && cwLabel.trim() ? cwLabel.trim() : '',
+          image_urls: imageUrls, image_alts: imageUrls.map(u => altByUrl[u] || ''),
+          video_url: videoUrl ?? undefined, video_thumb_url: videoThumbUrl ?? undefined,
+          poll_options: showPoll ? pollOptions : [],
+          poll_multiple_choice: showPoll ? pollMultiple : false,
+          poll_allows_new_options: showPoll ? pollAllowsNew : false,
+          poll_expires_hours: showPoll ? pollExpiresHours : 24,
+          agora_enabled: agoraEnabled, federate_activitypub: federateAP, federate_atproto: federateATProto,
+        },
+      }
+      return draftId ? draftsApi.update(draftId, body) : draftsApi.create(body)
+    },
+    onSuccess: () => {
+      resetCompose()
+      qc.invalidateQueries({ queryKey: ['drafts'] })
+      useToastStore.getState().show('Draft saved')
+    },
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not save your draft'),
+  })
+  const pickDraft = (d: Draft) => {
+    const load = () => {
+      const x = d.data || {}
+      clearCompose()
+      setContent(d.content)
+      setImageUrls(x.image_urls ?? [])
+      const alts: Record<string, string> = {}
+      ;(x.image_urls ?? []).forEach((u: string, i: number) => { if (x.image_alts?.[i]) alts[u] = x.image_alts[i] })
+      setAltByUrl(alts)
+      setVideoUrl(x.video_url ?? null)
+      setVideoThumbUrl(x.video_thumb_url ?? null)
+      setVisibility(x.visibility || 'friends')
+      setFriendListId(x.group_id ?? '')
+      if (x.content_warning) { setShowCW(true); setCwLabel(x.content_warning) }
+      const opts: string[] = x.poll_options ?? []
+      if (opts.some(o => o?.trim())) {
+        setShowPoll(true)
+        setPollOptions(opts.length >= 2 ? opts : [...opts, ''])
+        setPollMultiple(!!x.poll_multiple_choice)
+        setPollAllowsNew(!!x.poll_allows_new_options)
+        setPollExpiresHours(x.poll_expires_hours ?? 24)
+      }
+      setAgoraEnabled(x.agora_enabled ?? true)
+      setFederateAP(x.federate_activitypub ?? true)
+      setFederateATProto(x.federate_atproto ?? true)
+      setDraftId(d.id)
+      setShowDrafts(false)
+    }
+    if (hasSomething) {
+      Alert.alert('Replace what you are writing?', 'This draft will take its place.', [
+        { text: 'Keep writing', style: 'cancel' },
+        { text: 'Use the draft', onPress: load },
+      ])
+    } else load()
+  }
 
   const pickImage = async () => {
     const remaining = MAX_IMAGES - imageUrls.length
@@ -653,6 +737,7 @@ export default function FeedScreen() {
       <Modal visible={showCompose} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: c.card, paddingTop: Platform.OS === 'android' ? insets.top : 0 }}>
           <UploadingModal visible={showUploadModal} />
+          <DraftsSheet visible={showDrafts} onPick={pickDraft} onClose={() => setShowDrafts(false)} />
           <KeyboardAvoidingView
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -698,6 +783,24 @@ export default function FeedScreen() {
               {videoProcessing
                 ? <ActivityIndicator size="small" color={c.primary} />
                 : <Ionicons name="videocam-outline" size={22} color={(showPoll || imageUrls.length > 0 || !!videoUrl) ? c.border : c.primary} />}
+            </TouchableOpacity>
+            {/* AGORA-431: drafts. Icons only, so the row still fits at large text sizes. */}
+            <View style={{ flex: 1 }} />
+            <TouchableOpacity onPress={() => setShowDrafts(true)} accessibilityRole="button"
+              accessibilityLabel={`Drafts${draftsData?.drafts?.length ? `, ${draftsData.drafts.length} saved` : ''}`}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <Ionicons name="documents-outline" size={22} color={c.primary} />
+                {draftsData?.drafts?.length ? <Text style={{ fontSize: 12, color: c.primary, fontWeight: '600' }}>{draftsData.drafts.length}</Text> : null}
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => saveDraft.mutate()}
+              disabled={!hasSomething || saveDraft.isPending || uploading || videoProcessing || !!postAsPageSlug}
+              accessibilityRole="button"
+              accessibilityLabel={postAsPageSlug ? 'Drafts are for your own posts, not page posts' : videoProcessing ? 'Wait for the video to finish processing' : 'Save draft'}>
+              {saveDraft.isPending
+                ? <ActivityIndicator size="small" color={c.primary} />
+                : <Ionicons name="save-outline" size={22} color={(!hasSomething || uploading || videoProcessing || !!postAsPageSlug) ? c.border : c.primary} />}
             </TouchableOpacity>
           </View>
 
