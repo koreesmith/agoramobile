@@ -272,11 +272,6 @@ export default function SettingsScreen() {
         />
         <Row icon="people-outline" label="Friend lists" onPress={() => router.push('/friend-lists')} />
         <Row icon="ban-outline" label="Blocked users" onPress={() => router.push('/blocked-users')} />
-        {/* AGORA-309: sits next to blocked users, since both are things the
-            user has chosen not to see. */}
-        <Row icon="eye-off-outline" label="Hidden posts" onPress={() => router.push('/hidden-posts')} />
-        {/* AGORA-428 */}
-        <Row icon="volume-mute-outline" label="Muted keywords" onPress={() => router.push('/muted-keywords')} />
         {/* AGORA-429 */}
         <Row icon="bookmark-outline" label="Bookmarks" onPress={() => router.push('/bookmarks')} />
         {/* AGORA-446 */}
@@ -287,6 +282,11 @@ export default function SettingsScreen() {
         {invitesEnabled && (
           <Row icon="mail-outline" label="Invite a friend" onPress={() => router.push('/invite-friend')} />
         )}
+        {/* AGORA-457: what shapes your timeline. Hidden posts (AGORA-309) and
+            muted keywords (AGORA-428); further timeline controls belong here. */}
+        <Text style={[s.section, { color: c.textMuted }]}>Content</Text>
+        <Row icon="eye-off-outline" label="Hidden posts" onPress={() => router.push('/hidden-posts')} />
+        <Row icon="volume-mute-outline" label="Muted keywords" onPress={() => router.push('/muted-keywords')} />
         {(user?.role === 'admin' || user?.role === 'moderator') && (
           <>
             <Text style={[s.section, { color: c.textMuted }]}>Administration</Text>
