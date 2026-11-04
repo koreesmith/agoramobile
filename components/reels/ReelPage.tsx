@@ -289,16 +289,19 @@ function ReelPage({ post, width, height, active, near, playAllowed, onViewed, on
               <Ionicons name="flag-outline" size={20} color="#dc2626" />
               <Text style={[s.sheetText, { color: '#dc2626' }]}>Report post</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.sheetItem} onPress={() => {
-              setMenuOpen(false)
-              Alert.alert('Block user?', `@${post.author_username} will be removed from your feed instantly and our team will be notified.`, [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Block', style: 'destructive', onPress: () => block.mutate() },
-              ])
-            }}>
-              <Ionicons name="ban-outline" size={20} color="#dc2626" />
-              <Text style={[s.sheetText, { color: '#dc2626' }]}>Block @{post.author_username}</Text>
-            </TouchableOpacity>
+            {/* Blocking is by local username: not offered for remote authors. */}
+            {!post.is_remote && (
+              <TouchableOpacity style={s.sheetItem} onPress={() => {
+                setMenuOpen(false)
+                Alert.alert('Block user?', `@${post.author_username} will be removed from your feed instantly and our team will be notified.`, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Block', style: 'destructive', onPress: () => block.mutate() },
+                ])
+              }}>
+                <Ionicons name="ban-outline" size={20} color="#dc2626" />
+                <Text style={[s.sheetText, { color: '#dc2626' }]}>Block @{post.author_username}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </Pressable>
       </Modal>
