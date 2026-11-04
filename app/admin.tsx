@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, StyleSheet,
 import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
+import { VideoView, useVideoPlayer } from 'expo-video'
 import * as ImagePicker from 'expo-image-picker'
 import { normalizeImageOrientation } from '../utils/image'
 import { Screen, Header, Spinner } from '../components/ui'
@@ -25,7 +26,17 @@ const TAB_LABELS: Partial<Record<Tab, string>> = { media: 'Storage' }
 // activitypub_enabled is deliberately excluded — it lives on the Fediverse
 // tab instead, alongside instance bans (parity with the web admin panel's
 // AGORA-178 consolidation).
-const BOOLEAN_SETTING_KEYS = new Set(['federation_enabled', 'smtp_enabled', 'user_invites_enabled'])
+const BOOLEAN_SETTING_KEYS = new Set(['federation_enabled', 'smtp_enabled', 'user_invites_enabled', 'reels_discover_enabled'])
+
+// AGORA-444: what the Reels and video settings do, shown under their names, and
+// which of them are plain numbers. The server refuses a value out of range with
+// a message, which the save error shows.
+const SETTING_HINTS: Record<string, string> = {
+  reels_discover_enabled: 'Show public videos from this instance and its peers in a Discover tab on Reels. Off leaves only the Following tab.',
+  video_max_seconds: 'The longest video, in seconds, from 5 to 120. Members can trim a longer video down to fit.',
+  video_quota_mb: 'Video storage each account may use, in MB. 0 means no limit. An account at its limit must delete a video before uploading another.',
+}
+const NUMERIC_SETTING_KEYS = new Set(['video_max_seconds', 'video_quota_mb'])
 
 // AMOBILE-176: settings that are neither a boolean nor free text. Without this
 // they fall through to the text input below, where an admin has to know and
@@ -43,6 +54,27 @@ const ENUM_SETTINGS: Record<string, { value: string; label: string; desc: string
     { value: 'auto',   label: 'Approve automatically', desc: 'A domain goes live as soon as it verifies' },
     { value: 'manual', label: 'Review manually',       desc: 'Every verified domain waits in the Domains tab for a decision' },
   ],
+}
+
+// A size for people, from a number of bytes (AGORA-444).
+function fmtBytes(n?: number): string {
+  if (!n) return '0 MB'
+  if (n >= 1 << 30) return `${(n / (1 << 30)).toFixed(1)} GB`
+  if (n >= 1 << 20) return `${Math.round(n / (1 << 20))} MB`
+  return `${Math.max(1, Math.round(n / 1024))} KB`
+}
+
+// A reported video the reviewer can play (AGORA-444). It starts paused: a
+// reviewer decides when to watch, and nothing plays under a long list of
+// reports.
+function ReportedVideo({ url }: { url: string }) {
+  const source = imgUrl(url) ?? null
+  const player = useVideoPlayer(source, (p) => { p.loop = false })
+  return (
+    <View style={{ height: 240, backgroundColor: '#000', borderRadius: 8, overflow: 'hidden' }}>
+      <VideoView player={player} style={{ flex: 1 }} contentFit="contain" nativeControls accessibilityLabel="Reported video" />
+    </View>
+  )
 }
 
 export default function AdminScreen() {
@@ -278,7 +310,7 @@ export default function AdminScreen() {
       qc.invalidateQueries({ queryKey: ['admin-custom-domains'] })
       Alert.alert('Saved')
     },
-    onError: () => Alert.alert('Error', 'Could not save settings'),
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not save settings'),
   })
 
   // AMOBILE-221, parity with web's Settings tab: the instance logo, uploaded
@@ -404,6 +436,13 @@ export default function AdminScreen() {
     mutationFn: () => adminApi.deleteOrphans(),
     onSuccess: (res) => { Alert.alert('Done', `Deleted ${res.data.count} file(s)`); setOrphanScan(null) },
     onError: () => Alert.alert('Error', 'Could not delete orphaned files'),
+  })
+
+  // AGORA-444: uploads on disk, video apart from images.
+  const { data: storage, isFetching: storageLoading, refetch: refetchStorage } = useQuery({
+    queryKey: ['admin-storage'],
+    queryFn: () => adminApi.mediaStorage().then(r => r.data),
+    enabled: tab === 'media',
   })
 
   const scanOrphans = async () => {
@@ -589,6 +628,15 @@ export default function AdminScreen() {
 
                 {isExpanded && (
                   <View style={{ marginTop: 12, gap: 8 }}>
+                    {/* AGORA-444: what was reported, including a video the reviewer
+                        can play */}
+                    {r.post_content ? (
+                      <View style={{ padding: 8, borderLeftWidth: 2, borderLeftColor: c.border, backgroundColor: c.bg }}>
+                        <Text style={{ color: c.textMuted, fontSize: 12, fontWeight: '600', marginBottom: 2 }}>{r.reported_comment_id ? 'Comment' : 'Post'} content</Text>
+                        <Text style={{ color: c.textMd, fontSize: 14 }}>{r.post_content}</Text>
+                      </View>
+                    ) : null}
+                    {r.post_video_url ? <ReportedVideo url={r.post_video_url} /> : null}
                     {/* Quick actions */}
                     {reportStatus === 'pending' && (
                       <>
@@ -1442,6 +1490,7 @@ export default function AdminScreen() {
               {Object.entries(settings).filter(([key]) => key !== 'activitypub_enabled' && key !== 'logo_url').map(([key, value]: [string, any]) => (
                 <View key={key} style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
                   <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>{key.replace(/_/g, ' ')}</Text>
+                  {SETTING_HINTS[key] ? <Text style={{ fontSize: 12, color: c.textMuted, marginBottom: 8 }}>{SETTING_HINTS[key]}</Text> : null}
                   {ENUM_SETTINGS[key] ? (
                     <View style={{ gap: 6 }}>
                       {ENUM_SETTINGS[key].map(opt => {
@@ -1478,6 +1527,7 @@ export default function AdminScreen() {
                         style={[s.miniInput, { borderColor: c.border, color: c.text, backgroundColor: c.bg, flex: 1 }]}
                         defaultValue={String(value ?? '')}
                         onEndEditing={e => updateSettings.mutate({ [key]: e.nativeEvent.text })}
+                        keyboardType={NUMERIC_SETTING_KEYS.has(key) ? 'number-pad' : 'default'}
                         returnKeyType="done"
                       />
                     </View>
@@ -1556,6 +1606,47 @@ export default function AdminScreen() {
       {tab === 'media' && (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}
           automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
+          <View style={[s.card, { backgroundColor: c.card, borderColor: c.border, marginBottom: 12 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <Text style={[s.actionSectionTitle, { color: c.textMuted }]}>Uploads</Text>
+              <TouchableOpacity onPress={() => refetchStorage()} disabled={storageLoading} accessibilityRole="button">
+                <Text style={{ color: c.primary, fontSize: 14 }}>{storageLoading ? 'Measuring…' : 'Refresh'}</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={{ color: c.textMd, fontSize: 13, marginBottom: 10 }}>
+              Disk used by files members have uploaded. Video is the part that grows fastest.
+            </Text>
+            {storage ? (
+              <View style={{ gap: 10 }}>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={[s.statBox, { backgroundColor: c.bg }]}>
+                    <Text style={{ color: c.textMuted, fontSize: 12 }}>Video</Text>
+                    <Text style={{ color: c.text, fontSize: 20, fontWeight: '700' }}>{fmtBytes(storage.video?.bytes)}</Text>
+                    <Text style={{ color: c.textMuted, fontSize: 12 }}>{storage.video?.count ?? 0} video{storage.video?.count === 1 ? '' : 's'}</Text>
+                  </View>
+                  <View style={[s.statBox, { backgroundColor: c.bg }]}>
+                    <Text style={{ color: c.textMuted, fontSize: 12 }}>Images and the rest</Text>
+                    <Text style={{ color: c.text, fontSize: 20, fontWeight: '700' }}>{fmtBytes(storage.images?.bytes)}</Text>
+                    <Text style={{ color: c.textMuted, fontSize: 12 }}>{storage.images?.count ?? 0} file{storage.images?.count === 1 ? '' : 's'}</Text>
+                  </View>
+                </View>
+                <Text style={{ color: c.textMuted, fontSize: 12 }}>
+                  Longest video: {storage.video_max_seconds} seconds. Per-account video limit: {storage.video_quota_mb > 0 ? `${storage.video_quota_mb} MB` : 'none'}.
+                </Text>
+                {storage.top_video_users?.length > 0 ? (
+                  <View>
+                    <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', marginBottom: 4 }}>Most video storage</Text>
+                    {storage.top_video_users.map((u: any) => (
+                      <View key={u.username} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 }}>
+                        <Text style={{ color: c.textMd, fontSize: 14 }}>@{u.username} · {u.videos} video{u.videos === 1 ? '' : 's'}</Text>
+                        <Text style={{ color: c.text, fontSize: 14 }}>{fmtBytes(u.bytes)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            ) : <Spinner />}
+          </View>
           <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[s.actionSectionTitle, { color: c.textMuted, marginBottom: 6 }]}>Orphaned Media</Text>
             <Text style={{ color: c.textMd, fontSize: 13, marginBottom: 10 }}>
@@ -1761,6 +1852,7 @@ function InstanceRow({ inst, c, onBlock, onUnblock, onDisconnect, onToggleTimeli
 }
 
 const s = StyleSheet.create({
+  statBox: { flex: 1, borderRadius: 10, padding: 10 },
   tabBar:           { height: 46, flexGrow: 0, flexShrink: 0, borderBottomWidth: 1 },
   tabItem:          { paddingHorizontal: 14, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabText:          { fontSize: 15, fontWeight: '600' },

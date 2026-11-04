@@ -11,6 +11,7 @@ const HANDLE = 24
 
 interface Props {
   duration: number
+  maxClip: number
   range: Range
   onChange: (r: Range) => void
   onRelease: (r: Range) => void
@@ -18,11 +19,11 @@ interface Props {
   trackColor: string
 }
 
-export default function TrimBar({ duration, range, onChange, onRelease, color, trackColor }: Props) {
+export default function TrimBar({ duration, maxClip, range, onChange, onRelease, color, trackColor }: Props) {
   const [width, setWidth] = useState(0)
   // The gesture handlers are created once; these keep them reading the latest.
-  const live = useRef({ duration, range, onChange, onRelease, width })
-  live.current = { duration, range, onChange, onRelease, width }
+  const live = useRef({ duration, maxClip, range, onChange, onRelease, width })
+  live.current = { duration, maxClip, range, onChange, onRelease, width }
   const grabbed = useRef<Range>(range)
 
   const make = (which: 'start' | 'end') => PanResponder.create({
@@ -31,12 +32,12 @@ export default function TrimBar({ duration, range, onChange, onRelease, color, t
     onPanResponderTerminationRequest: () => false,
     onPanResponderGrant: () => { grabbed.current = live.current.range },
     onPanResponderMove: (_e, g) => {
-      const { duration: d, width: w, onChange: change } = live.current
+      const { duration: d, maxClip: max, width: w, onChange: change } = live.current
       if (!w || !d) return
       const delta = (g.dx / w) * d
       change(which === 'start'
-        ? moveStart(grabbed.current, grabbed.current.start + delta, d)
-        : moveEnd(grabbed.current, grabbed.current.end + delta, d))
+        ? moveStart(grabbed.current, grabbed.current.start + delta, d, max)
+        : moveEnd(grabbed.current, grabbed.current.end + delta, d, max))
     },
     onPanResponderRelease: () => live.current.onRelease(live.current.range),
     onPanResponderTerminate: () => live.current.onRelease(live.current.range),

@@ -13,11 +13,11 @@ import NetworkChip from '../components/NetworkChip'
 import AudienceReach from '../components/AudienceReach'
 import TrimBar from '../components/reels/TrimBar'
 import CoverStrip from '../components/reels/CoverStrip'
-import { friendsApi } from '../api'
+import { friendsApi, instanceApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { useReelUploads } from '../store/reelUploads'
 import { useC } from '../constants/ColorContext'
-import { MAX_CLIP, Range, clampCover, initialRange, isTrimmed, moveEnd, moveStart, stripTimes } from '../utils/trimRange'
+import { MAX_CLIP, Range, clampCover, initialRange, isTrimmed, limitText, stripTimes } from '../utils/trimRange'
 
 // AGORA-443: make a reel. Record with the camera or choose a video, trim it and
 // pick its cover frame, then add a caption and post. The trim and cover go with
@@ -37,6 +37,11 @@ export default function NewReelScreen() {
   const c = useC()
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
+
+  // The longest reel is the instance's own limit (AGORA-444), 2 minutes unless
+  // an admin lowered it.
+  const { data: info } = useQuery({ queryKey: ['instance-info'], queryFn: () => instanceApi.getInfo().then((r) => r.data), staleTime: 5 * 60_000 })
+  const maxClip: number = info?.video_max_seconds ?? MAX_CLIP
 
   const [step, setStep] = useState<Step>('pick')
   const [asset, setAsset] = useState<ImagePicker.ImagePickerAsset | null>(null)
@@ -81,19 +86,19 @@ export default function NewReelScreen() {
   const settle = useCallback((d: number) => {
     if (durationSet.current || !(d > 0)) return
     durationSet.current = true
-    const r = initialRange(d)
+    const r = initialRange(d, maxClip)
     setDuration(d)
     setRange(r)
     setCoverAt(Math.min(1, (r.end - r.start) / 2))
     void refreshFrames(r)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [player])
+  }, [player, maxClip])
 
   useEventListener(player, 'sourceLoad', ({ duration: d }) => {
     settle(d)
     // Thumbnails can't be made until the video has loaded, so the first try,
     // made when the picker already knew the length, may have come up empty.
-    void refreshFrames(live.current.range.end > 0 ? live.current.range : initialRange(d))
+    void refreshFrames(live.current.range.end > 0 ? live.current.range : initialRange(d, maxClip))
   })
   useEventListener(player, 'timeUpdate', ({ currentTime }) => {
     const { step: st, range: r, duration: d } = live.current
@@ -144,7 +149,7 @@ export default function NewReelScreen() {
       }
       // A recording is held to the limit; a library video may be longer, since
       // it can be trimmed on the next step.
-      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['videos'], allowsEditing: false, ...(source === 'camera' ? { videoMaxDuration: MAX_CLIP } : {}) }
+      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['videos'], allowsEditing: false, ...(source === 'camera' ? { videoMaxDuration: maxClip } : {}) }
       const res = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options)
       if (!res.canceled && res.assets?.[0]) accept(res.assets[0])
     } catch (e: any) {
@@ -246,13 +251,13 @@ export default function NewReelScreen() {
       {step === 'pick' && (
         <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
           <Text style={{ color: c.textMuted, fontSize: 14 }}>
-            Reels are short videos, up to 2 minutes. A longer video from your library can be trimmed on the next step.
+            Reels are short videos, up to {limitText(maxClip)}. A longer video from your library can be trimmed on the next step.
           </Text>
           <TouchableOpacity onPress={() => choose('camera')} style={[s.bigBtn, { borderColor: c.border, backgroundColor: c.card }]} accessibilityRole="button">
             <Ionicons name="videocam-outline" size={26} color={c.primary} />
             <View style={{ flex: 1 }}>
               <Text style={[s.bigTitle, { color: c.text }]}>Record a video</Text>
-              <Text style={{ color: c.textMuted, fontSize: 13 }}>Use your camera, up to 2 minutes</Text>
+              <Text style={{ color: c.textMuted, fontSize: 13 }}>Use your camera, up to {limitText(maxClip)}</Text>
             </View>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => choose('library')} style={[s.bigBtn, { borderColor: c.border, backgroundColor: c.card }]} accessibilityRole="button">
@@ -287,14 +292,14 @@ export default function NewReelScreen() {
                   <Text style={[s.section, { color: c.text }]}>Trim</Text>
                   <Text style={{ color: c.textMuted, fontSize: 13 }}>Clip length {fmt(clipLen)}</Text>
                 </View>
-                <TrimBar duration={duration} range={range} onChange={onTrim} onRelease={onTrimRelease} color={c.primary} trackColor={c.border} />
+                <TrimBar duration={duration} maxClip={maxClip} range={range} onChange={onTrim} onRelease={onTrimRelease} color={c.primary} trackColor={c.border} />
                 <View style={s.rowBetween}>
                   <Text style={{ color: c.textMuted, fontSize: 12 }}>{fmt(range.start)}</Text>
                   <Text style={{ color: c.textMuted, fontSize: 12 }}>{fmt(range.end)}</Text>
                 </View>
-                {duration > MAX_CLIP ? (
+                {duration > maxClip ? (
                   <Text style={{ color: c.textMuted, fontSize: 12 }}>
-                    This video is {fmt(duration)} long. Reels are up to 2 minutes, so the first 2 minutes are selected. Drag the handles to choose another part.
+                    This video is {fmt(duration)} long. Reels are up to {limitText(maxClip)}, so the first {limitText(maxClip)} are selected. Drag the handles to choose another part.
                   </Text>
                 ) : null}
               </View>

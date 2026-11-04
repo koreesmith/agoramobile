@@ -439,6 +439,8 @@ export const adminApi = {
   setInstanceTimeline: (id: string, enabled: boolean) => api.put(`/admin/federation/instances/${id}/timeline`, { enabled }),
   // Storage / orphaned media
   scanOrphans:    ()                             => api.get('/admin/media/orphans'),
+  // AGORA-444: uploads on disk, video apart from images
+  mediaStorage:   ()                             => api.get('/admin/media/storage'),
   deleteOrphans:  ()                             => api.delete('/admin/media/orphans'),
   // Remote media cache (AMOBILE-213, from web's AGORA-380/381)
   getRemoteMediaCache:    ()          => api.get('/admin/media/remote-cache'),
