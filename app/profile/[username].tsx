@@ -39,7 +39,7 @@ export default function ProfileViewScreen() {
   const status = profile?.friend_status
   const canSeeTimeline = isSelf || (!profile?.hide_timeline && (!profile?.profile_private || status === 'accepted'))
 
-  const { posts, onScroll: onPostsScroll, loadMore: loadMorePosts, isFetchingNextPage: loadingMorePosts, loadMoreFailed: morePostsFailed } =
+  const { posts, pinnedPosts, onScroll: onPostsScroll, loadMore: loadMorePosts, isFetchingNextPage: loadingMorePosts, loadMoreFailed: morePostsFailed } =
     useProfilePosts(username, !!profile && canSeeTimeline)
 
   const { data: albumsData } = useQuery({
@@ -584,10 +584,13 @@ export default function ProfileViewScreen() {
           </View>
         ) : (
           <View style={{ marginTop: 8 }}>
+            {pinnedPosts.map((post: any) => (
+              <PostCard key={`pinned-${post.id}`} post={post} queryKey={['user-posts', username]} showPinned />
+            ))}
             {posts.map((post: any) => (
               <PostCard key={post.id} post={post} queryKey={['user-posts', username]} />
             ))}
-            {posts.length === 0 && (
+            {posts.length === 0 && pinnedPosts.length === 0 && (
               <Text style={[s.noPosts, { color: c.textLight }]}>No posts yet.</Text>
             )}
             <ProfilePostsFooter loading={loadingMorePosts} failed={morePostsFailed} onRetry={loadMorePosts} />

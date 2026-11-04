@@ -24,9 +24,14 @@ export function useProfilePosts(username: string | undefined, enabled: boolean) 
 
   // Offset paging can repeat a post when a new one is published mid-scroll,
   // so de-duplicate by id across pages.
+  // AGORA-447: the first page also carries the author's pinned posts. They show
+  // first, marked, and are left out of the list below so none shows twice. The
+  // page itself still holds every post, so paging is unchanged.
+  const pinnedPosts: any[] = q.data?.pages?.[0]?.pinned_posts ?? []
+  const pinnedIds = new Set(pinnedPosts.map((p: any) => p.id))
   const posts: any[] = Array.from(
     new Map((q.data?.pages.flatMap((pg: any) => pg.posts ?? []) ?? []).map((p: any) => [p.id, p])).values()
-  )
+  ).filter((p: any) => !pinnedIds.has(p.id))
 
   // A failed page stops auto-loading (otherwise every scroll event would retry
   // it); the footer's Retry button calls loadMore directly.
@@ -41,6 +46,7 @@ export function useProfilePosts(username: string | undefined, enabled: boolean) 
 
   return {
     posts,
+    pinnedPosts,
     isLoading: q.isLoading,
     refetch: q.refetch,
     isFetchingNextPage: q.isFetchingNextPage,

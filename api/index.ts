@@ -97,6 +97,9 @@ export const feedApi = {
   getPost:      (id: string)         => api.get(`/posts/${id}`),
   createPost:   (data: any)          => api.post('/posts', data),
   deletePost:   (id: string)         => api.delete(`/posts/${id}`),
+  // AGORA-447: pin one of your own posts to the top of your profile (at most 3)
+  pinPost:      (id: string)         => api.post(`/posts/${id}/pin`),
+  unpinPost:    (id: string)         => api.delete(`/posts/${id}/pin`),
   editPost:     (id: string, data: { content?: string; content_warning?: string; visibility?: string; group_id?: string }) => api.patch(`/posts/${id}`, data),
   likePost:     (id: string)         => api.post(`/posts/${id}/like`),
   unlikePost:   (id: string)         => api.delete(`/posts/${id}/like`),

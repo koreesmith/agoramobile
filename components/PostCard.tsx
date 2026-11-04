@@ -194,7 +194,7 @@ const pw = StyleSheet.create({
   voteCount:    { fontSize: 12 },
 })
 
-export default function PostCard({ post, queryKey }: { post: any; queryKey: any[] }) {
+export default function PostCard({ post, queryKey, showPinned = false }: { post: any; queryKey: any[]; showPinned?: boolean }) {
   const { user, instanceUrl } = useAuthStore()
   const { addBlock } = useBlockStore()
   const showToast = useToastStore(s => s.show)
@@ -397,6 +397,23 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
   })
 
   const isOwn    = user?.id === post.author_id
+
+  // AGORA-447: pin or unpin one of your own posts. The label follows the server's
+  // answer, and a refusal (the limit of 3, a kind of post that can't be pinned)
+  // is shown as the server wrote it. Your own top-level posts on your profile
+  // only: not a repost, a wall post, a group post or a page post.
+  const [pinned, setPinned] = useState(!!post.pinned)
+  useEffect(() => setPinned(!!post.pinned), [post.pinned])
+  const togglePin = useMutation({
+    mutationFn: (pin: boolean) => pin ? feedApi.pinPost(post.id) : feedApi.unpinPost(post.id),
+    onSuccess: (_r, pin) => {
+      setPinned(pin)
+      qc.invalidateQueries({ queryKey: ['user-posts'] })
+      showToast(pin ? 'Pinned to your profile' : 'Unpinned')
+    },
+    onError: (e: any) => showToast(e.response?.data?.error || 'Could not update the pin', 'error'),
+  })
+  const canPin = isOwn && !post.repost_of_id && !post.wall_user_id && !post.group_slug && !post.page_id
   // Page posts: use page identity for author display
   const isPagePost = !!post.page_id && !post.repost_of_id
   // Author row always identifies whoever made *this* post — for a repost, that's
@@ -474,6 +491,13 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
 
   return (
     <View style={[s.card, { backgroundColor: c.card }, post.group_slug && { borderLeftWidth: 3, borderLeftColor: c.primaryLt }]}>
+      {/* AGORA-447: on a profile, a pinned post says so */}
+      {showPinned && post.pinned ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingTop: 10 }}>
+          <Ionicons name="pin" size={13} color={c.textMuted} />
+          <Text style={{ color: c.textMuted, fontSize: 12, fontWeight: '600' }}>Pinned</Text>
+        </View>
+      ) : null}
       {/* Group badge */}
       {/* Page badge */}
       {isPagePost && (
@@ -884,6 +908,15 @@ export default function PostCard({ post, queryKey }: { post: any; queryKey: any[
             )}
             {isOwn ? (
               <>
+                {canPin ? (
+                  <>
+                    <TouchableOpacity style={s.menuItem} accessibilityRole="button" onPress={() => { setShowMenu(false); togglePin.mutate(!pinned) }}>
+                      <Ionicons name={pinned ? 'pin' : 'pin-outline'} size={18} color={c.text} />
+                      <Text style={[s.menuItemText, { color: c.text }]}>{pinned ? 'Unpin from profile' : 'Pin to profile'}</Text>
+                    </TouchableOpacity>
+                    <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+                  </>
+                ) : null}
                 <TouchableOpacity style={s.menuItem} onPress={() => { setShowMenu(false); setEditContent(post.content || ''); setEditCW(post.content_warning || ''); setShowEditCW(!!post.content_warning); setEditVisibility(post.visibility === 'locked' ? 'group' : (post.visibility || 'friends')); setEditFriendListId(post.group_id || ''); setShowEditVisibilitySheet(false); setShowEditListSheet(false); setShowEdit(true) }}>
                   <Ionicons name="pencil-outline" size={18} color={c.text} />
                   <Text style={[s.menuItemText, { color: c.text }]}>Edit post</Text>

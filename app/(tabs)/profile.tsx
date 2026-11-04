@@ -27,7 +27,7 @@ export default function ProfileScreen() {
     enabled: !!user,
   })
 
-  const { posts, isLoading: postL, refetch: rpost, onScroll: onPostsScroll, loadMore: loadMorePosts, isFetchingNextPage: loadingMorePosts, loadMoreFailed: morePostsFailed } =
+  const { posts, pinnedPosts, isLoading: postL, refetch: rpost, onScroll: onPostsScroll, loadMore: loadMorePosts, isFetchingNextPage: loadingMorePosts, loadMoreFailed: morePostsFailed } =
     useProfilePosts(user?.username, !!user)
 
   const { data: instanceData } = useQuery({
@@ -108,11 +108,18 @@ export default function ProfileScreen() {
           </View>
 
           <View style={{ marginTop: 8 }}>
-            {postL ? <Spinner /> : posts.length === 0 ? (
+            {postL ? <Spinner /> : posts.length === 0 && pinnedPosts.length === 0 ? (
               <Text style={[s.noPosts, { color: c.textLight }]}>No posts yet.</Text>
-            ) : posts.map((post: any) => (
-              <PostCard key={post.id} post={post} queryKey={['user-posts', user?.username]} />
-            ))}
+            ) : (
+              <>
+                {pinnedPosts.map((post: any) => (
+                  <PostCard key={`pinned-${post.id}`} post={post} queryKey={['user-posts', user?.username]} showPinned />
+                ))}
+                {posts.map((post: any) => (
+                  <PostCard key={post.id} post={post} queryKey={['user-posts', user?.username]} />
+                ))}
+              </>
+            )}
             <ProfilePostsFooter loading={loadingMorePosts} failed={morePostsFailed} onRetry={loadMorePosts} />
           </View>
 
