@@ -327,16 +327,22 @@ export default function ConnectionsScreen() {
 
   // AGORA-423: a Fediverse or Bluesky account to follow. The row has no local
   // profile to open, so it is not tappable.
-  const FollowRow = ({ kind, id, name, handleText, avatarUrl, reason }: { kind: 'fediverse' | 'bluesky'; id: string; name: string; handleText: string; avatarUrl?: string; reason?: string }) => {
+  const FollowRow = ({ kind, id, name, handleText, avatarUrl, reason, lookup }: { kind: 'fediverse' | 'bluesky'; id: string; name: string; handleText: string; avatarUrl?: string; reason?: string; lookup: string }) => {
     const done = followedSugg.has(`${kind}:${id}`)
     return (
       <View style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-        <Avatar url={avatarUrl} name={name} size={44} />
-        <View style={{ flex: 1 }}>
-          <Text style={[s.name, { color: c.text }]}>{name}</Text>
-          <Text style={[s.username, { color: c.textMuted }]}>{handleText}</Text>
-          {!!reason && <Text style={[s.username, { color: c.textMuted }]} numberOfLines={2}>{reason}</Text>}
-        </View>
+        {/* AGORA-454: a suggestion is not stored here yet, so opening it looks
+            the account up first (as the search previews do). */}
+        <TouchableOpacity onPress={() => openProfile.mutate(lookup)} disabled={openProfile.isPending}
+          accessibilityRole="link" accessibilityLabel={`Open ${name}'s profile`}
+          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Avatar url={avatarUrl} name={name} size={44} />
+          <View style={{ flex: 1 }}>
+            <Text style={[s.name, { color: c.text }]}>{name}</Text>
+            <Text style={[s.username, { color: c.textMuted }]}>{handleText}</Text>
+            {!!reason && <Text style={[s.username, { color: c.textMuted }]} numberOfLines={2}>{reason}</Text>}
+          </View>
+        </TouchableOpacity>
         {done ? (
           <Text style={{ fontSize: 13, color: c.textMuted, fontWeight: '500' }}>Following</Text>
         ) : (
@@ -441,11 +447,15 @@ export default function ConnectionsScreen() {
                         const sent = federatedSent.has(key)
                         return (
                           <View key={key} style={[s.row, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-                            <Avatar url={u.avatar_url} name={u.display_name || u.username} size={44} />
-                            <View style={{ flex: 1 }}>
-                              <Text style={[s.name, { color: c.text }]}>{u.display_name ? renderName(u.display_name, u.emojis) : u.username}</Text>
-                              <Text style={[s.username, { color: c.textMuted }]}>@{u.username}@{u.instance}</Text>
-                            </View>
+                            <TouchableOpacity onPress={() => openProfile.mutate(key)} disabled={openProfile.isPending}
+                              accessibilityRole="link" accessibilityLabel={`Open ${u.display_name || u.username}'s profile`}
+                              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                              <Avatar url={u.avatar_url} name={u.display_name || u.username} size={44} />
+                              <View style={{ flex: 1 }}>
+                                <Text style={[s.name, { color: c.text }]}>{u.display_name ? renderName(u.display_name, u.emojis) : u.username}</Text>
+                                <Text style={[s.username, { color: c.textMuted }]}>@{u.username}@{u.instance}</Text>
+                              </View>
+                            </TouchableOpacity>
                             {sent ? (
                               <Text style={{ fontSize: 13, color: c.textMuted, fontWeight: '500' }}>Sent</Text>
                             ) : (
@@ -468,7 +478,7 @@ export default function ConnectionsScreen() {
                       {fediverseSuggestions.map((u: any) => (
                         <FollowRow key={u.actor_url} kind="fediverse" id={u.actor_url}
                           name={u.display_name || u.username} handleText={`@${u.username}@${u.instance}`}
-                          avatarUrl={u.avatar_url} reason={u.reason} />
+                          avatarUrl={u.avatar_url} reason={u.reason} lookup={`${u.username}@${u.instance}`} />
                       ))}
                     </View>
                   )}
@@ -478,7 +488,7 @@ export default function ConnectionsScreen() {
                       {blueskySuggestions.map((u: any) => (
                         <FollowRow key={u.did} kind="bluesky" id={u.did}
                           name={u.display_name || u.handle} handleText={`@${u.handle}`}
-                          avatarUrl={u.avatar_url} reason={u.reason} />
+                          avatarUrl={u.avatar_url} reason={u.reason} lookup={u.handle} />
                       ))}
                     </View>
                   )}
