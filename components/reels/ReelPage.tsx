@@ -32,6 +32,10 @@ interface Props {
 }
 
 const VIEWED_AFTER_MS = 3000
+const CONTROLS_HIDE_MS = 3000
+// A fade from clear at the top to dark at the bottom, in even steps: no extra
+// native dependency, and the steps are too fine to see as an edge.
+const SHADE_STEPS = Array.from({ length: 16 }, (_, i) => +(0.5 * ((i + 1) / 16) ** 1.6).toFixed(3))
 const DOUBLE_TAP_MS = 280
 
 function networkLabel(post: any): string {
@@ -49,6 +53,11 @@ function ReelPage({ post, width, height, active, near, playAllowed, onViewed, on
   const [firstFrame, setFirstFrame] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [userPaused, setUserPaused] = useState(false)
+  // AGORA-451: a tap brings up the controls rather than pausing. While the
+  // video plays they hide again after a few seconds; `controlsTick` restarts
+  // that wait whenever one of them is used.
+  const [controlsShown, setControlsShown] = useState(false)
+  const [controlsTick, setControlsTick] = useState(0)
   const [failed, setFailed] = useState(false)
   const [progress, setProgress] = useState(0)
   // AGORA-450: dragging the bar. The picture pauses while a finger is on it and
@@ -71,7 +80,7 @@ function ReelPage({ post, width, height, active, near, playAllowed, onViewed, on
   useEffect(() => {
     if (!near) { setFirstFrame(false); setIsPlaying(false); setProgress(0); setUserPaused(false) }
   }, [near])
-  useEffect(() => { if (!active) setUserPaused(false) }, [active])
+  useEffect(() => { if (!active) { setUserPaused(false); setControlsShown(false) } }, [active])
 
   // Fill the screen when the video is close to its shape, otherwise show all of
   // it: a 9:16 clip on a tall phone fills the page, a landscape one letterboxes.
@@ -123,9 +132,19 @@ function ReelPage({ post, width, height, active, near, playAllowed, onViewed, on
       return
     }
     lastTap.current = now
-    tapTimer.current = setTimeout(() => { tapTimer.current = null; setUserPaused((p) => !p) }, DOUBLE_TAP_MS)
+    tapTimer.current = setTimeout(() => {
+      tapTimer.current = null
+      // A paused reel plays again on a tap; a playing one shows or hides its controls.
+      if (userPaused) { setUserPaused(false); setControlsShown(false) }
+      else setControlsShown((v) => !v)
+    }, DOUBLE_TAP_MS)
   }
   useEffect(() => () => { if (tapTimer.current) clearTimeout(tapTimer.current) }, [])
+  useEffect(() => {
+    if (!controlsShown || userPaused) return
+    const t = setTimeout(() => setControlsShown(false), CONTROLS_HIDE_MS)
+    return () => clearTimeout(t)
+  }, [controlsShown, userPaused, controlsTick])
 
   const [bookmarked, setBookmarked] = useState(!!post.bookmarked)
   const toggleBookmark = useMutation({
@@ -186,7 +205,7 @@ function ReelPage({ post, width, height, active, near, playAllowed, onViewed, on
   const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`
   const total = playerRef.current?.duration() ?? 0
   const shown = scrubbing ? scrubRatio : progress
-  const canSkip = active && userPaused && cwOk && !failed && !!source
+  const canSkip = active && (userPaused || controlsShown) && !scrubbing && cwOk && !failed && !!source
 
   const pill = { backgroundColor: 'rgba(0,0,0,0.4)' }
 
@@ -194,7 +213,7 @@ function ReelPage({ post, width, height, active, near, playAllowed, onViewed, on
     <View style={{ width, height, backgroundColor: '#000' }}>
       {/* Picture: the poster until frames are showing, then the player */}
       <Pressable style={StyleSheet.absoluteFill} onPress={onTap}
-        accessibilityRole="button" accessibilityLabel={userPaused ? 'Play' : 'Pause'}>
+        accessibilityRole="button" accessibilityLabel={userPaused ? 'Play' : 'Show controls'}>
         {thumb && !firstFrame ? (
           <Image source={{ uri: thumb }} style={StyleSheet.absoluteFill} contentFit="contain" />
         ) : null}
@@ -217,21 +236,22 @@ function ReelPage({ post, width, height, active, near, playAllowed, onViewed, on
         </Animated.View>
       </Pressable>
 
-      {/* Paused: play, with 10 seconds back and forward either side. The
+      {/* Controls (paused, or just tapped): play or pause, with 10 seconds back and forward either side. The
           buttons sit outside the tap-to-play surface so they never toggle it. */}
       {canSkip ? (
         <View style={s.centered} pointerEvents="box-none">
           <View style={s.skipRow} pointerEvents="box-none">
-            <TouchableOpacity style={s.skipBtn} onPress={() => playerRef.current?.skip(-10)}
+            <TouchableOpacity style={s.skipBtn} onPress={() => { playerRef.current?.skip(-10); setControlsTick((n) => n + 1) }}
               accessibilityRole="button" accessibilityLabel="Back 10 seconds" hitSlop={8}>
               <Ionicons name="play-back" size={22} color="#fff" />
               <Text style={s.skipText}>10</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.playBadge} onPress={() => setUserPaused(false)}
-              accessibilityRole="button" accessibilityLabel="Play">
-              <Ionicons name="play" size={34} color="#fff" />
+            <TouchableOpacity style={s.playBadge}
+              onPress={() => { setUserPaused(!userPaused); setControlsShown(userPaused); setControlsTick((n) => n + 1) }}
+              accessibilityRole="button" accessibilityLabel={userPaused ? 'Play' : 'Pause'}>
+              <Ionicons name={userPaused ? 'play' : 'pause'} size={34} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity style={s.skipBtn} onPress={() => playerRef.current?.skip(10)}
+            <TouchableOpacity style={s.skipBtn} onPress={() => { playerRef.current?.skip(10); setControlsTick((n) => n + 1) }}
               accessibilityRole="button" accessibilityLabel="Forward 10 seconds" hitSlop={8}>
               <Ionicons name="play-forward" size={22} color="#fff" />
               <Text style={s.skipText}>10</Text>
@@ -263,7 +283,9 @@ function ReelPage({ post, width, height, active, near, playAllowed, onViewed, on
       ) : null}
 
       {/* Shading so the text reads over any video */}
-      <View style={s.shade} pointerEvents="none" />
+      <View style={s.shade} pointerEvents="none">
+        {SHADE_STEPS.map((a, i) => <View key={i} style={{ flex: 1, backgroundColor: `rgba(0,0,0,${a})` }} />)}
+      </View>
 
       {/* Right rail */}
       <View style={s.rail} pointerEvents="box-none">
@@ -407,7 +429,7 @@ const s = StyleSheet.create({
   gateBody:     { color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center' },
   gateBtn:      { marginTop: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', borderRadius: 10, paddingHorizontal: 18, paddingVertical: 10 },
   gateBtnText:  { color: '#fff', fontSize: 14, fontWeight: '600' },
-  shade:        { position: 'absolute', left: 0, right: 0, bottom: 0, height: '40%', backgroundColor: 'rgba(0,0,0,0.35)' },
+  shade:        { position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%' },
   rail:         { position: 'absolute', right: 10, bottom: 28, alignItems: 'center', gap: 14 },
   railBtn:      { alignItems: 'center', minWidth: 48, minHeight: 48, justifyContent: 'center' },
   round:        { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
@@ -418,11 +440,11 @@ const s = StyleSheet.create({
   sub:          { color: 'rgba(255,255,255,0.75)', fontSize: 12 },
   badge:        { marginLeft: 8, color: '#fff', fontSize: 10, fontWeight: '600', backgroundColor: 'rgba(255,255,255,0.22)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' },
   caption:      { color: '#fff', fontSize: 14, lineHeight: 19 },
-  seekArea:     { position: 'absolute', left: 0, right: 0, bottom: 0, height: 32, justifyContent: 'flex-end' },
+  seekArea:     { position: 'absolute', left: 0, right: 0, bottom: 14, height: 32, justifyContent: 'flex-end' },
   skipRow:      { flexDirection: 'row', alignItems: 'center', gap: 28 },
   skipBtn:      { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   skipText:     { color: '#fff', fontSize: 11, fontWeight: '700', marginTop: -2 },
-  scrubTime:    { position: 'absolute', left: 0, right: 0, bottom: 44, alignItems: 'center' },
+  scrubTime:    { position: 'absolute', left: 0, right: 0, bottom: 58, alignItems: 'center' },
   scrubTimeText:{ color: '#fff', fontSize: 15, fontWeight: '700', backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, overflow: 'hidden' },
   thumb:        { position: 'absolute', bottom: -5, width: 16, height: 16, borderRadius: 8, marginLeft: -8, backgroundColor: '#fff' },
   progressTrack:{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, backgroundColor: 'rgba(255,255,255,0.2)' },
