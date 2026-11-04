@@ -18,8 +18,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "social.agora.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Used to take photos for posts and your profile.",
-        "NSPhotoLibraryUsageDescription": "Used to choose photos for posts and your profile.",
+        "NSCameraUsageDescription": "Used to take photos and record videos for posts, reels and your profile.",
+        "NSMicrophoneUsageDescription": "Used to record sound when you record a video for a reel or post.",
+        "NSPhotoLibraryUsageDescription": "Used to choose photos and videos for posts, reels and your profile.",
         "ITSAppUsesNonExemptEncryption": false,
         "UIFileSharingEnabled": true,
         "LSSupportsOpeningDocumentsInPlace": true
@@ -33,6 +34,7 @@
       "package": "social.agora.app",
       "permissions": [
         "CAMERA",
+        "RECORD_AUDIO",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
         "RECEIVE_BOOT_COMPLETED",

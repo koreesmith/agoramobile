@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, FlatList, TouchableOpacity, AppState, StyleSheet } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
-import { useFocusEffect } from 'expo-router'
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useFocusEffect, router } from 'expo-router'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { reelsApi } from '../../api'
 import { useReelsSupport } from '../../utils/useDestinations'
 import ReelPage from '../../components/reels/ReelPage'
+import { useReelUploads } from '../../store/reelUploads'
 
 // AGORA-442: Reels. One video per screen, paged vertically. Only the reel on
 // screen plays (ReelPage decides what mounts a player); this screen works out
@@ -22,6 +23,8 @@ type Row =
 export default function ReelsScreen() {
   const insets = useSafeAreaInsets()
   const { discoverOn } = useReelsSupport()
+  const qc = useQueryClient()
+  const upload = useReelUploads()
   const [tab, setTab] = useState<Tab>('following')
   const activeTab: Tab = tab === 'discover' && discoverOn ? 'discover' : 'following'
   const [includeViewed, setIncludeViewed] = useState(false)
@@ -128,6 +131,7 @@ export default function ReelsScreen() {
           {activeTab === 'following' && discoverOn ? (
             <TouchableOpacity onPress={() => setTab('discover')} style={s.statusBtn}><Text style={s.statusBtnText}>See what's on Discover</Text></TouchableOpacity>
           ) : null}
+          <TouchableOpacity onPress={() => router.push('/new-reel' as any)} style={s.statusBtn}><Text style={s.statusBtnText}>Make a reel</Text></TouchableOpacity>
           {!includeViewed ? (
             <TouchableOpacity onPress={() => setIncludeViewed(true)}><Text style={s.statusLink}>Show videos I've already watched</Text></TouchableOpacity>
           ) : null}
@@ -190,20 +194,48 @@ export default function ReelsScreen() {
         />
       ) : null}
 
-      {/* Tabs float over the video, below the status bar */}
+      {/* Tabs and the Create button float over the video, below the status bar */}
       <View style={[s.tabs, { top: insets.top + 8 }]} pointerEvents="box-none">
         <View style={s.tabPill}>
           {tabBtn('following', 'Following')}
           {discoverOn ? tabBtn('discover', 'Discover') : null}
         </View>
+        <TouchableOpacity onPress={() => router.push('/new-reel' as any)} style={s.create} accessibilityRole="button" accessibilityLabel="Make a reel">
+          <Ionicons name="add" size={26} color="#fff" />
+        </TouchableOpacity>
       </View>
+
+      {/* A reel on its way (AGORA-443): it carries on if the person leaves, and
+          a failure can be retried from here. */}
+      {upload.status !== 'idle' ? (
+        <View style={[s.uploadPill, { top: insets.top + 8 + 52 }]} accessibilityRole="alert">
+          <Text style={s.uploadText} numberOfLines={1}>
+            {upload.status === 'uploading' ? `Uploading your reel… ${Math.round(upload.progress * 100)}%`
+              : upload.status === 'processing' ? 'Processing your reel…'
+              : upload.status === 'posting' ? 'Posting your reel…'
+              : "Couldn't post your reel"}
+          </Text>
+          {upload.status === 'failed' ? (
+            <>
+              <TouchableOpacity onPress={() => upload.retry(qc)} accessibilityRole="button"><Text style={s.uploadAction}>Retry</Text></TouchableOpacity>
+              <TouchableOpacity onPress={upload.dismiss} accessibilityRole="button"><Text style={s.uploadAction}>Dismiss</Text></TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity onPress={upload.cancel} accessibilityRole="button" accessibilityLabel="Cancel posting"><Text style={s.uploadAction}>Cancel</Text></TouchableOpacity>
+          )}
+        </View>
+      ) : null}
     </View>
   )
 }
 
 const s = StyleSheet.create({
   root:          { flex: 1, backgroundColor: '#000' },
-  tabs:          { position: 'absolute', left: 12, right: 12, flexDirection: 'row' },
+  tabs:          { position: 'absolute', left: 12, right: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  create:        { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
+  uploadPill:    { position: 'absolute', left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10 },
+  uploadText:    { flex: 1, color: '#fff', fontSize: 13 },
+  uploadAction:  { color: '#fff', fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
   tabPill:       { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 18, padding: 3, gap: 2 },
   tab:           { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15 },
   tabOn:         { backgroundColor: '#fff' },

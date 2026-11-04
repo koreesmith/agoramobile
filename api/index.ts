@@ -132,6 +132,22 @@ export const feedApi = {
   // returns { job_id, status: 'processing' } immediately. Poll this until
   // status is 'done' (url/thumb_url) or 'failed' (error).
   getVideoJob:  (jobId: string)      => api.get(`/media/jobs/${jobId}`),
+  // AGORA-443 (server side AGORA-439): upload a video with an optional trim and
+  // cover frame. Times are milliseconds, the cover within the trimmed clip.
+  uploadVideo:  (file: any, opts: { trimStartMs?: number; trimEndMs?: number; coverMs?: number },
+                 onProgress?: (ratio: number) => void, signal?: AbortSignal) => {
+    const form = new FormData()
+    form.append('file', file)
+    if (opts.trimStartMs != null) form.append('trim_start_ms', String(Math.max(0, Math.round(opts.trimStartMs))))
+    if (opts.trimEndMs != null)   form.append('trim_end_ms',   String(Math.max(0, Math.round(opts.trimEndMs))))
+    if (opts.coverMs != null)     form.append('cover_ms',      String(Math.max(0, Math.round(opts.coverMs))))
+    return api.post('/media/upload?category=videos', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0, // a big video on a slow connection takes as long as it takes
+      signal,
+      onUploadProgress: (e: any) => { if (onProgress && e.total) onProgress(e.loaded / e.total) },
+    })
+  },
   previewUrl:   (url: string)        => api.get('/preview', { params: { url } }),
   // Guest-reachable — unauthenticated, so it bypasses the `api` instance
   // (which always attaches whatever token/instanceUrl auth store currently
