@@ -357,7 +357,8 @@ export default function PostCard({ post, queryKey, showPinned = false }: { post:
 
   const blockUser = useMutation({
     mutationFn: async () => {
-      await blockApi.blockUser(post.author_id)
+      // The server blocks by username, not id.
+      await blockApi.blockUser(post.author_username)
       await moderationApi.createReport({
         reported_user_id: post.author_id,
         violation_type: 'harassment',
@@ -956,21 +957,28 @@ export default function PostCard({ post, queryKey, showPinned = false }: { post:
                   <Ionicons name="flag-outline" size={18} color={c.red} />
                   <Text style={[s.menuItemText, { color: c.red }]}>Report post</Text>
                 </TouchableOpacity>
-                <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-                <TouchableOpacity style={s.menuItem} onPress={() => {
-                  setShowMenu(false)
-                  Alert.alert(
-                    'Block user?',
-                    `@${username} will be removed from your feed instantly and our team will be notified.`,
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Block', style: 'destructive', onPress: () => blockUser.mutate() },
-                    ]
-                  )
-                }}>
-                  <Ionicons name="ban-outline" size={18} color={c.red} />
-                  <Text style={[s.menuItemText, { color: c.red }]}>Block @{username}</Text>
-                </TouchableOpacity>
+                {/* Blocking is by local username, so a Fediverse or Bluesky
+                    author (whose username could match a local member) is
+                    not offered it. */}
+                {!post.is_remote && (
+                  <>
+                    <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+                    <TouchableOpacity style={s.menuItem} onPress={() => {
+                      setShowMenu(false)
+                      Alert.alert(
+                        'Block user?',
+                        `@${username} will be removed from your feed instantly and our team will be notified.`,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Block', style: 'destructive', onPress: () => blockUser.mutate() },
+                        ]
+                      )
+                    }}>
+                      <Ionicons name="ban-outline" size={18} color={c.red} />
+                      <Text style={[s.menuItemText, { color: c.red }]}>Block @{username}</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </>
             )}
           </View>
