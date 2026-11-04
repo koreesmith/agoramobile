@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { forwardRef, useEffect, useImperativeHandle } from 'react'
 import { StyleSheet } from 'react-native'
 import { VideoView, useVideoPlayer } from 'expo-video'
 import { useEvent, useEventListener } from 'expo'
@@ -22,7 +22,17 @@ interface Props {
   onError: () => void
 }
 
-export default function ReelPlayer({ source, shouldPlay, rewind, muted, fit, onFirstFrame, onPlayingChange, onProgress, onError }: Props) {
+// AGORA-450: what the page can ask of the player, for the skip buttons and the
+// seek bar.
+export interface ReelPlayerHandle {
+  duration: () => number
+  seekToRatio: (ratio: number) => void
+  skip: (seconds: number) => void
+}
+
+const ReelPlayer = forwardRef<ReelPlayerHandle, Props>(function ReelPlayer(
+  { source, shouldPlay, rewind, muted, fit, onFirstFrame, onPlayingChange, onProgress, onError }, ref,
+) {
   const player = useVideoPlayer(source, (p) => {
     p.loop = true
     p.timeUpdateEventInterval = 0.25
@@ -30,6 +40,20 @@ export default function ReelPlayer({ source, shouldPlay, rewind, muted, fit, onF
   })
 
   useEffect(() => { player.muted = muted }, [player, muted])
+
+  useImperativeHandle(ref, () => ({
+    duration: () => (player.duration > 0 ? player.duration : 0),
+    seekToRatio: (ratio) => {
+      const d = player.duration
+      if (!(d > 0)) return
+      try { player.currentTime = Math.max(0, Math.min(1, ratio)) * d } catch { /* not seekable yet */ }
+    },
+    skip: (seconds) => {
+      const d = player.duration
+      if (!(d > 0)) return
+      try { player.currentTime = Math.max(0, Math.min(d, player.currentTime + seconds)) } catch { /* not seekable yet */ }
+    },
+  }), [player])
 
   useEffect(() => {
     if (shouldPlay) player.play()
@@ -60,4 +84,6 @@ export default function ReelPlayer({ source, shouldPlay, rewind, muted, fit, onF
       onFirstFrameRender={onFirstFrame}
     />
   )
-}
+})
+
+export default ReelPlayer
