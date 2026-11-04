@@ -262,9 +262,9 @@ export default function ManageGroupScreen() {
           keyExtractor={m => m.user_id}
           renderItem={({ item: m }) => (
             <View style={[s.memberRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-              <Avatar url={m.avatar_url} name={m.display_name || m.username} size={38} />
+              <TouchableOpacity onPress={() => router.push(`/profile/${m.username}` as any)} accessibilityRole="link"><Avatar url={m.avatar_url} name={m.display_name || m.username} size={38} /></TouchableOpacity>
               <View style={{ flex: 1 }}>
-                <Text style={[s.memberName, { color: c.text }]}>{m.display_name || m.username}</Text>
+                <Text onPress={() => router.push(`/profile/${m.username}` as any)} style={[s.memberName, { color: c.text }]}>{m.display_name || m.username}</Text>
                 <Text style={[s.memberMeta, { color: c.textMuted }]}>@{m.username}</Text>
               </View>
               <View style={[s.roleBadge, { backgroundColor: m.role === 'admin' ? c.primaryBg : c.gray100 }]}>
@@ -377,9 +377,9 @@ export default function ManageGroupScreen() {
           keyExtractor={r => r.id}
           renderItem={({ item: req }) => (
             <View style={[s.memberRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-              <Avatar url={req.avatar_url} name={req.display_name || req.username} size={38} />
+              <TouchableOpacity onPress={() => router.push(`/profile/${req.username}` as any)} accessibilityRole="link"><Avatar url={req.avatar_url} name={req.display_name || req.username} size={38} /></TouchableOpacity>
               <View style={{ flex: 1 }}>
-                <Text style={[s.memberName, { color: c.text }]}>{req.display_name || req.username}</Text>
+                <Text onPress={() => router.push(`/profile/${req.username}` as any)} style={[s.memberName, { color: c.text }]}>{req.display_name || req.username}</Text>
                 <Text style={[s.memberMeta, { color: c.textMuted }]}>@{req.username}</Text>
               </View>
               <TouchableOpacity

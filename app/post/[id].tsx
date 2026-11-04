@@ -75,10 +75,16 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
   return (
     <View>
       <View style={[s.comment, { marginLeft: indent, borderBottomColor: c.border }]}>
-        <Avatar url={comment.avatar_url} name={comment.display_name || comment.username} size={avatarSize} />
+        {/* AGORA-452: the avatar and name open the commenter's profile, for
+            local, Fediverse and Bluesky people alike, as on a post. */}
+        <TouchableOpacity onPress={() => router.push(`/profile/${comment.username}` as any)}
+          accessibilityRole="link" accessibilityLabel={`Open ${comment.display_name || comment.username}'s profile`}>
+          <Avatar url={comment.avatar_url} name={comment.display_name || comment.username} size={avatarSize} />
+        </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 }}>
-            <Text style={[s.commentAuthor, { color: c.text }]}>{comment.display_name ? renderName(comment.display_name, comment.author_emojis) : comment.username}</Text>
+            <Text onPress={() => router.push(`/profile/${comment.username}` as any)} accessibilityRole="link"
+              style={[s.commentAuthor, { color: c.text }]}>{comment.display_name ? renderName(comment.display_name, comment.author_emojis) : comment.username}</Text>
             {comment.pronouns ? <Text style={{ fontSize: 12, color: c.textLight }}>({comment.pronouns})</Text> : null}
             <Text style={[s.commentTime, { color: c.textLight }]}>{timeAgo(comment.published_at || comment.created_at)}</Text>
           </View>

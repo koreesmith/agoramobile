@@ -622,8 +622,8 @@ export default function PostCard({ post, queryKey, showPinned = false }: { post:
             style={[s.quotedPost, { borderColor: c.border }]}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
-              <Avatar url={post.repost_author_avatar_url} name={post.repost_author_display_name} size={22} />
-              <Text style={[s.quotedAuthorName, { color: c.text }]}>
+              <TouchableOpacity onPress={() => router.push(`/profile/${post.repost_author_username}` as any)} accessibilityRole="link"><Avatar url={post.repost_author_avatar_url} name={post.repost_author_display_name} size={22} /></TouchableOpacity>
+              <Text onPress={() => router.push(`/profile/${post.repost_author_username}` as any)} accessibilityRole="link" style={[s.quotedAuthorName, { color: c.text }]}>
                 {post.repost_author_display_name ? renderName(post.repost_author_display_name, post.repost_author_emojis) : post.repost_author_username}
               </Text>
               {post.repost_author_pronouns ? (
@@ -665,7 +665,7 @@ export default function PostCard({ post, queryKey, showPinned = false }: { post:
                 style={[s.nestedQuote, { borderColor: c.border }]}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-                  <Text style={[s.nestedQuoteName, { color: c.text }]}>
+                  <Text onPress={() => router.push(`/profile/${post.repost_quote.author_username}` as any)} accessibilityRole="link" style={[s.nestedQuoteName, { color: c.text }]}>
                     {post.repost_quote.author_display_name ? renderName(post.repost_quote.author_display_name, post.repost_quote.author_emojis) : post.repost_quote.author_username}
                   </Text>
                   <Text style={[s.nestedQuoteMeta, { color: c.textMuted }]}>{handle(post.repost_quote.author_username)}</Text>

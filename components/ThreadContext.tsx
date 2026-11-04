@@ -48,10 +48,16 @@ export default function ThreadContext({ post }: { post: any }) {
           <TouchableOpacity key={a.id} activeOpacity={0.7}
             onPress={() => router.push(`/post/${a.id}` as any)}
             style={[s.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
-            <Avatar url={a.avatar_url} name={a.display_name || a.username} size={30} />
+            {/* AGORA-452: the avatar and name open the author's profile; the
+                rest of the row still opens the post. */}
+            <TouchableOpacity onPress={() => router.push(`/profile/${a.username}` as any)}
+              accessibilityRole="link" accessibilityLabel={`Open ${a.display_name || a.username}'s profile`}>
+              <Avatar url={a.avatar_url} name={a.display_name || a.username} size={30} />
+            </TouchableOpacity>
             <View style={{ flex: 1, marginLeft: 10 }}>
               <Text numberOfLines={1} style={[s.meta, { color: c.textMuted }]}>
-                <Text style={[s.name, { color: c.text }]}>
+                <Text onPress={() => router.push(`/profile/${a.username}` as any)} accessibilityRole="link"
+                  style={[s.name, { color: c.text }]}>
                   {a.display_name ? renderName(a.display_name, a.author_emojis) : a.username}
                 </Text>
                 {'  '}{handle(a.username, a.is_remote, a.remote_instance)}

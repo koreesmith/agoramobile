@@ -145,7 +145,7 @@ export default function ConversationScreen() {
             )
             return (
               <View style={[s.bubbleRow, isOwn && { justifyContent: 'flex-end' }]}>
-                {!isOwn && <Avatar url={msg.author_avatar_url} name={msg.author_display_name} size={28} />}
+                {!isOwn && <TouchableOpacity onPress={() => router.push(`/profile/${msg.author_username || other?.username}` as any)} accessibilityRole="link"><Avatar url={msg.author_avatar_url} name={msg.author_display_name} size={28} /></TouchableOpacity>}
                 <View style={{ alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
                   <TouchableOpacity
                     onLongPress={() => {

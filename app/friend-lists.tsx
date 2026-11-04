@@ -150,9 +150,9 @@ function MemberDetailModal({
               if (item._type === 'member') {
                 return (
                   <View style={[s.friendRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-                    <Avatar url={item.avatar_url} name={item.display_name || item.username} size={40} />
+                    <TouchableOpacity onPress={() => router.push(`/profile/${item.username}` as any)} accessibilityRole="link"><Avatar url={item.avatar_url} name={item.display_name || item.username} size={40} /></TouchableOpacity>
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.friendName, { color: c.text }]}>{item.display_name ? renderName(item.display_name, item.emojis) : item.username}</Text>
+                      <Text onPress={() => router.push(`/profile/${item.username}` as any)} style={[s.friendName, { color: c.text }]}>{item.display_name ? renderName(item.display_name, item.emojis) : item.username}</Text>
                       <Text style={[s.friendUsername, { color: c.textMuted }]}>{handle(item.username, item.is_remote, item.remote_instance)}</Text>
                     </View>
                     <TouchableOpacity
@@ -180,9 +180,9 @@ function MemberDetailModal({
                   <Text style={[s.sectionLabel, { color: c.textMuted }]}>Add people</Text>
                   {addableFriends.map(f => (
                     <View key={f.id} style={[s.friendRow, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-                      <Avatar url={f.avatar_url} name={f.display_name || f.username} size={40} />
+                      <TouchableOpacity onPress={() => router.push(`/profile/${f.username}` as any)} accessibilityRole="link"><Avatar url={f.avatar_url} name={f.display_name || f.username} size={40} /></TouchableOpacity>
                       <View style={{ flex: 1 }}>
-                        <Text style={[s.friendName, { color: c.text }]}>{f.display_name ? renderName(f.display_name, f.emojis) : f.username}</Text>
+                        <Text onPress={() => router.push(`/profile/${f.username}` as any)} style={[s.friendName, { color: c.text }]}>{f.display_name ? renderName(f.display_name, f.emojis) : f.username}</Text>
                         <Text style={[s.friendUsername, { color: c.textMuted }]}>{handle(f.username, f.is_remote, f.remote_instance)}</Text>
                       </View>
                       <TouchableOpacity
