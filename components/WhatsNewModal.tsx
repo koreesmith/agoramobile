@@ -5,52 +5,40 @@ import * as SecureStore from 'expo-secure-store'
 import { Ionicons } from '@expo/vector-icons'
 import { useC } from '../constants/ColorContext'
 
-// AGORA-435: moved on for 4.1.0 so anyone who dismissed the 4.0.0 list sees the
+// AGORA-448: moved on for 5.0.0 so anyone who dismissed the 4.1.0 list sees the
 // new one once.
-const WHATS_NEW_VERSION = '4.1.0'
+const WHATS_NEW_VERSION = '5.0.0'
 const STORAGE_KEY = 'last_seen_whats_new'
 
 const FEATURES: { icon: string; title: string; desc: string; link?: string; linkText?: string }[] = [
   {
-    icon: 'bookmark-outline',
-    title: 'Bookmarks',
-    desc: 'Save any post to come back to later. Tap the bookmark under a post, then find everything you saved in Bookmarks. Only you can see them.',
-    link: '/bookmarks',
-    linkText: 'Open Bookmarks →',
+    icon: 'play-circle-outline',
+    title: 'Reels',
+    desc: 'Watch short videos one after another. Following shows reels from the people you follow, and Discover shows reels from around the network. Videos you have already watched are skipped.',
+    link: '/reels',
+    linkText: 'Watch Reels →',
   },
   {
-    icon: 'volume-mute-outline',
-    title: 'Muted keywords',
-    desc: 'Hide posts that contain words or phrases you choose, for a set number of days or for good. It applies to your timelines, including posts from the Fediverse and Bluesky.',
-    link: '/muted-keywords',
-    linkText: 'Mute a word →',
+    icon: 'videocam-outline',
+    title: 'Make a reel',
+    desc: 'Record a video or choose one, trim it, pick the cover frame and post it. It uploads in the background while you keep using the app. Reels also reach the Fediverse.',
+    link: '/new-reel',
+    linkText: 'Make a reel →',
   },
   {
-    icon: 'compass-outline',
-    title: 'Better Find Friends',
-    desc: 'Suggestions now say why someone is suggested, you can dismiss the ones you do not want, and they include people from the Fediverse and Bluesky.',
-    link: '/connections?tab=discover',
-    linkText: 'Find friends →',
+    icon: 'apps-outline',
+    title: 'Customize the bottom bar',
+    desc: 'Press and hold a tab to choose which places stay in the bar. The rest move to More. Home and Profile always stay.',
   },
   {
-    icon: 'search-outline',
-    title: 'Search shows who you follow',
-    desc: 'Search results now show when you already follow someone or are friends with them.',
+    icon: 'pin-outline',
+    title: 'Pinned posts',
+    desc: 'Pin up to three of your own posts to the top of your profile. Use the menu on a post to pin or unpin it.',
   },
   {
-    icon: 'stats-chart-outline',
-    title: 'Accurate follower counts',
-    desc: 'Follower and following counts are now correct across Agora, the Fediverse and Bluesky.',
-  },
-  {
-    icon: 'infinite-outline',
-    title: 'Keep scrolling on profiles',
-    desc: 'Posts on a profile page now keep loading as you scroll, instead of stopping after the first batch.',
-  },
-  {
-    icon: 'repeat-outline',
-    title: 'Reposts reach Bluesky',
-    desc: "When you repost a public post that isn't on Bluesky, it now appears there as a post from you with the original text and a link back.",
+    icon: 'document-text-outline',
+    title: 'Drafts',
+    desc: 'Save a post to finish later. Tap the draft icon in the composer, then pick it from Drafts when you are ready. Drafts are kept for 90 days.',
   },
 ]
 
@@ -94,7 +82,7 @@ export default function WhatsNewModal({ visible, onDismiss }: { visible: boolean
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleDismiss}>
       <View style={[s.container, { backgroundColor: c.card }]}>
         <View style={[s.header, { borderBottomColor: c.border }]}>
-          <Text style={[s.title, { color: c.text }]}>What's New in 4.1</Text>
+          <Text style={[s.title, { color: c.text }]}>What's New in 5.0</Text>
           <TouchableOpacity onPress={handleDismiss} style={s.closeBtn}>
             <Ionicons name="close" size={22} color={c.textMuted} />
           </TouchableOpacity>
