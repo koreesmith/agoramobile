@@ -135,11 +135,15 @@ export default function PageProfileScreen() {
         ? <EmptyState icon="people-outline" title="No members" subtitle="Invite someone to help manage this page." />
         : members.map((m: any) => (
           <View key={m.user_id} style={[s.memberRow, { borderColor: c.border, backgroundColor: c.card }]}>
-            <Avatar url={imgUrl(m.avatar_url)} name={m.display_name} size={36} />
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={[s.memberName, { color: c.text }]}>{m.display_name}</Text>
-              <Text style={[s.memberRole, { color: c.textMuted }]}>{m.role}</Text>
-            </View>
+            {/* AGORA-455: the avatar and name open the member's profile. */}
+            <TouchableOpacity onPress={() => m.username && router.push(`/profile/${m.username}` as any)} disabled={!m.username}
+              accessibilityRole="link" style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+              <Avatar url={imgUrl(m.avatar_url)} name={m.display_name} size={36} />
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={[s.memberName, { color: c.text }]}>{m.display_name}</Text>
+                <Text style={[s.memberRole, { color: c.textMuted }]}>{m.role}</Text>
+              </View>
+            </TouchableOpacity>
             {m.pending && (
               <View style={[s.pendingBadge, { backgroundColor: c.primaryBg }]}>
                 <Text style={[s.pendingText, { color: c.primary }]}>Pending</Text>

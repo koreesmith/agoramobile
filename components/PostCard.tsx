@@ -533,7 +533,12 @@ export default function PostCard({ post, queryKey, showPinned = false }: { post:
       {post.wall_user_id && (
         <View style={s.banner}>
           <Ionicons name="arrow-forward" size={13} color={c.primary} />
-          <Text style={[s.bannerText, { color: c.primary }]}>{post.author_display_name} to {post.wall_display_name}'s wall</Text>
+          <Text style={[s.bannerText, { color: c.primary }]}>
+            <Text onPress={() => router.push(`/profile/${post.author_username}` as any)} accessibilityRole="link" style={{ fontWeight: '700' }}>{post.author_display_name}</Text>
+            {' to '}
+            <Text onPress={() => post.wall_username && router.push(`/profile/${post.wall_username}` as any)} accessibilityRole="link" style={{ fontWeight: '700' }}>{post.wall_display_name}</Text>
+            {"'s wall"}
+          </Text>
         </View>
       )}
 
