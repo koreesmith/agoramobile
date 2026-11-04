@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, Modal, TextInput, Alert, Animated, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, Text, Pressable, Modal, TextInput, Alert, Animated, PanResponder, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -14,7 +14,7 @@ import { Avatar, LinkedText, renderName } from '../ui'
 import { isShareable, sharePost } from '../../utils/share'
 import { handle } from '../../utils/handle'
 import { reactionDisplay } from '../../utils/reactions'
-import ReelPlayer from './ReelPlayer'
+import ReelPlayer, { ReelPlayerHandle } from './ReelPlayer'
 
 // AGORA-442: one full-screen reel. The picture (a poster, plus a real player
 // while this is the reel on screen or the one either side), the author and
@@ -51,6 +51,12 @@ function ReelPage({ post, width, height, active, near, playAllowed, onViewed, on
   const [userPaused, setUserPaused] = useState(false)
   const [failed, setFailed] = useState(false)
   const [progress, setProgress] = useState(0)
+  // AGORA-450: dragging the bar. The picture pauses while a finger is on it and
+  // plays on again from the new place when it lifts.
+  const playerRef = useRef<ReelPlayerHandle>(null)
+  const [scrubbing, setScrubbing] = useState(false)
+  const [scrubRatio, setScrubRatio] = useState(0)
+  const barWidth = useRef(1)
   const [cwShown, setCwShown] = useState(false)
   const [captionOpen, setCaptionOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -72,7 +78,7 @@ function ReelPage({ post, width, height, active, near, playAllowed, onViewed, on
   const ratio = post.video_width > 0 && post.video_height > 0 ? post.video_width / post.video_height : 0
   const fit: 'cover' | 'contain' = ratio > 0 && Math.abs(Math.log(ratio / (width / height))) < 0.2 ? 'cover' : 'contain'
 
-  const shouldPlay = active && playAllowed && cwOk && !userPaused && !failed
+  const shouldPlay = active && playAllowed && cwOk && !userPaused && !scrubbing && !failed
 
   // Count it as watched after a few seconds of actual playback.
   useEffect(() => {
@@ -155,6 +161,33 @@ function ReelPage({ post, width, height, active, near, playAllowed, onViewed, on
   const network = networkLabel(post)
   const who = handle(post.author_username, post.is_remote, post.remote_instance)
 
+  const ratioAt = (x: number) => Math.max(0, Math.min(1, x / Math.max(1, barWidth.current)))
+  const scrub = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      // The reel pager scrolls vertically: once the bar has the touch it keeps it.
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: (e) => {
+        const r = ratioAt(e.nativeEvent.locationX)
+        setScrubbing(true); setScrubRatio(r); playerRef.current?.seekToRatio(r)
+      },
+      onPanResponderMove: (e, g) => {
+        // locationX is relative to whatever is under the finger; x0 + dx is not.
+        const r = ratioAt(g.x0 + g.dx - barLeft.current)
+        setScrubRatio(r); playerRef.current?.seekToRatio(r)
+      },
+      onPanResponderRelease: () => setScrubbing(false),
+      onPanResponderTerminate: () => setScrubbing(false),
+    }),
+  ).current
+  const barLeft = useRef(0)
+  const barRef = useRef<View>(null)
+  const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`
+  const total = playerRef.current?.duration() ?? 0
+  const shown = scrubbing ? scrubRatio : progress
+  const canSkip = active && userPaused && cwOk && !failed && !!source
+
   const pill = { backgroundColor: 'rgba(0,0,0,0.4)' }
 
   return (
@@ -167,6 +200,7 @@ function ReelPage({ post, width, height, active, near, playAllowed, onViewed, on
         ) : null}
         {near && cwOk && source && !failed ? (
           <ReelPlayer
+            ref={playerRef}
             source={source}
             shouldPlay={shouldPlay}
             rewind={!active}
@@ -178,15 +212,33 @@ function ReelPage({ post, width, height, active, near, playAllowed, onViewed, on
             onError={() => setFailed(true)}
           />
         ) : null}
-        {active && userPaused && cwOk && !failed ? (
-          <View style={s.centered} pointerEvents="none">
-            <View style={s.playBadge}><Ionicons name="play" size={34} color="#fff" /></View>
-          </View>
-        ) : null}
         <Animated.View style={[s.centered, { opacity: burst, transform: [{ scale: burst.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.1] }) }] }]} pointerEvents="none">
           <Ionicons name="thumbs-up" size={96} color="#fff" />
         </Animated.View>
       </Pressable>
+
+      {/* Paused: play, with 10 seconds back and forward either side. The
+          buttons sit outside the tap-to-play surface so they never toggle it. */}
+      {canSkip ? (
+        <View style={s.centered} pointerEvents="box-none">
+          <View style={s.skipRow} pointerEvents="box-none">
+            <TouchableOpacity style={s.skipBtn} onPress={() => playerRef.current?.skip(-10)}
+              accessibilityRole="button" accessibilityLabel="Back 10 seconds" hitSlop={8}>
+              <Ionicons name="play-back" size={22} color="#fff" />
+              <Text style={s.skipText}>10</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.playBadge} onPress={() => setUserPaused(false)}
+              accessibilityRole="button" accessibilityLabel="Play">
+              <Ionicons name="play" size={34} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={s.skipBtn} onPress={() => playerRef.current?.skip(10)}
+              accessibilityRole="button" accessibilityLabel="Forward 10 seconds" hitSlop={8}>
+              <Ionicons name="play-forward" size={22} color="#fff" />
+              <Text style={s.skipText}>10</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
 
       {/* Content warning gate */}
       {post.content_warning && !cwShown ? (
@@ -273,9 +325,21 @@ function ReelPage({ post, width, height, active, near, playAllowed, onViewed, on
       </View>
 
       {/* Progress */}
-      <View style={s.progressTrack} pointerEvents="none">
-        <View style={[s.progressFill, { width: `${Math.min(100, progress * 100)}%` }]} />
-      </View>
+      {scrubbing && total > 0 ? (
+        <View style={s.scrubTime} pointerEvents="none">
+          <Text style={s.scrubTimeText}>{clock(scrubRatio * total)} / {clock(total)}</Text>
+        </View>
+      ) : null}
+      {near && cwOk && source && !failed ? (
+        <View ref={barRef} style={s.seekArea} {...scrub.panHandlers}
+          onLayout={() => barRef.current?.measureInWindow((x, _y, w) => { barLeft.current = x; barWidth.current = w })}
+          accessibilityRole="adjustable" accessibilityLabel="Seek">
+          <View style={[s.progressTrack, scrubbing && { height: 6 }]} pointerEvents="none">
+            <View style={[s.progressFill, scrubbing && { height: 6 }, { width: `${Math.min(100, shown * 100)}%` }]} />
+          </View>
+          {scrubbing ? <View style={[s.thumb, { left: `${Math.min(100, shown * 100)}%` }]} pointerEvents="none" /> : null}
+        </View>
+      ) : null}
 
       {/* Hide / report / block */}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
@@ -354,6 +418,13 @@ const s = StyleSheet.create({
   sub:          { color: 'rgba(255,255,255,0.75)', fontSize: 12 },
   badge:        { marginLeft: 8, color: '#fff', fontSize: 10, fontWeight: '600', backgroundColor: 'rgba(255,255,255,0.22)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' },
   caption:      { color: '#fff', fontSize: 14, lineHeight: 19 },
+  seekArea:     { position: 'absolute', left: 0, right: 0, bottom: 0, height: 32, justifyContent: 'flex-end' },
+  skipRow:      { flexDirection: 'row', alignItems: 'center', gap: 28 },
+  skipBtn:      { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  skipText:     { color: '#fff', fontSize: 11, fontWeight: '700', marginTop: -2 },
+  scrubTime:    { position: 'absolute', left: 0, right: 0, bottom: 44, alignItems: 'center' },
+  scrubTimeText:{ color: '#fff', fontSize: 15, fontWeight: '700', backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, overflow: 'hidden' },
+  thumb:        { position: 'absolute', bottom: -5, width: 16, height: 16, borderRadius: 8, marginLeft: -8, backgroundColor: '#fff' },
   progressTrack:{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, backgroundColor: 'rgba(255,255,255,0.2)' },
   progressFill: { height: 2, backgroundColor: 'rgba(255,255,255,0.85)' },
   sheetBackdrop:{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
