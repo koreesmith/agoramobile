@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, Linking, Alert } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
@@ -375,10 +375,24 @@ function BlueskyActorRow({ actor: a, c, onFollow, followPending }: {
   const [followed, setFollowed] = useState(!!a.following)
   const handleFollow = () => { setFollowed(true); onFollow() }
 
+  // AGORA-455: not stored here yet, so look the handle up first (as Find
+  // Friends does, AGORA-454) and open its Agora profile, not bsky.app.
+  const openProfile = useMutation({
+    mutationFn: async () => {
+      const res = await federationApi.lookupUser(a.handle)
+      const username = res.data?.user?.username
+      if (!username) throw new Error('could not resolve this account')
+      return username as string
+    },
+    onSuccess: (username) => router.push(`/profile/${username}` as any),
+    onError: (e: any) => Alert.alert('Error', e.response?.data?.error || 'Could not open that profile'),
+  })
+
   return (
     <TouchableOpacity
       style={[s.userRow, { borderBottomColor: c.border, backgroundColor: c.card }]}
-      onPress={() => Linking.openURL(`https://bsky.app/profile/${a.handle}`)}
+      onPress={() => openProfile.mutate()}
+      disabled={openProfile.isPending}
       activeOpacity={0.7}
     >
       <Avatar url={a.avatar_url} name={a.display_name || a.handle} size={44} />

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, RefreshControl, Alert, StyleSheet } from 'react-native'
-import { useLocalSearchParams, Stack } from 'expo-router'
+import { useLocalSearchParams, Stack, router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen, Spinner, Avatar, LinkedText, renderName } from '../../components/ui'
@@ -130,7 +130,8 @@ export default function WallScreen() {
               </Text>
               {pending.map((p: any) => (
                 <View key={p.id} style={[s.pendingRow, { borderColor: c.border }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <TouchableOpacity onPress={() => router.push(`/profile/${p.author_username}` as any)} accessibilityRole="link"
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Avatar url={p.author_avatar_url} name={p.author_display_name || p.author_username} size={28} />
                     <View>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>
@@ -138,7 +139,7 @@ export default function WallScreen() {
                       </Text>
                       <Text style={{ fontSize: 12, color: c.textMuted }}>@{p.author_username}</Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                   <LinkedText text={p.content} style={{ fontSize: 14, color: c.textMd, marginTop: 6 }} emojis={p.emojis} />
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                     <TouchableOpacity
