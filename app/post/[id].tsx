@@ -15,6 +15,8 @@ import ThreadContext from '../../components/ThreadContext'
 import MentionSuggestions from '../../components/MentionSuggestions'
 import { feedApi, imgUrl } from '../../api'
 import { useAuthStore } from '../../store/auth'
+import { useToastStore } from '../../store/toast'
+import { setReactionInCache } from '../../utils/reactionCache'
 import { C } from '../../constants/colors'
 import { useC } from '../../constants/ColorContext'
 import { REACTIONS, reactionDisplay, pickerMetrics } from '../../utils/reactions'
@@ -60,14 +62,29 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply, ro
     onSuccess: () => { setIsEditing(false); onRefresh() },
     onError: (e: any) => Alert.alert('Error', e?.response?.data?.error || 'Could not edit comment'),
   })
+  // AGORA-461: as for posts (AGORA-456), the reaction shows at once and the
+  // thread is not fetched again; if the server does not take it, it goes back.
+  const qc = useQueryClient()
+  const showToast = useToastStore((st) => st.show)
   const react = useMutation({
-    mutationFn: ({ type }: { type: string }) =>
-      comment.my_reaction === type
+    mutationFn: ({ type, remove }: { type: string; remove: boolean; prev: string }) =>
+      remove
         ? feedApi.unreactComment(postId, comment.id)
         : feedApi.reactComment(postId, comment.id, type),
-    onSuccess: () => { setShowPicker(false); setPickerPosition(null); onRefresh() },
-    onError: (e: any) => Alert.alert('Error', e?.response?.data?.error || 'Could not react to comment'),
+    onError: (_e, vars) => {
+      setReactionInCache(qc, comment.id, vars.prev)
+      showToast("Couldn't save your reaction. Check your connection.", 'error')
+    },
+    // Out of date, not refetched: it refreshes the next time it would anyway.
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['comments', postId], refetchType: 'none' }),
   })
+  const pickReaction = ({ type }: { type: string }) => {
+    const prev: string = comment.my_reaction || ''
+    const remove = prev === type
+    setReactionInCache(qc, comment.id, remove ? '' : type)
+    setShowPicker(false); setPickerPosition(null)
+    react.mutate({ type, remove, prev })
+  }
 
   const reactionCounts: Record<string, number> = comment.reaction_counts || {}
   const totalReactions = Object.values(reactionCounts).reduce((a: any, b: any) => a + b, 0) as number
@@ -159,7 +176,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply, ro
                 style={[s.actionBtn, { paddingVertical: 4, paddingHorizontal: 2 }]}
                 onPress={() => {
                   if (showPicker) { setShowPicker(false); setPickerPosition(null); return }
-                  react.mutate({ type: 'like' })
+                  pickReaction({ type: 'like' })
                 }}
                 onLongPress={() => {
                   wrapperRef.current?.measure((_x, _y, _w, h, pageX, pageY) => {
@@ -191,7 +208,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply, ro
                     {REACTIONS.map(r => (
                       <TouchableOpacity
                         key={r.type}
-                        onPress={() => { react.mutate({ type: r.type }); setShowPicker(false); setPickerPosition(null) }}
+                        onPress={() => pickReaction({ type: r.type })}
                         style={[
                           s.pickerItem,
                           comment.my_reaction === r.type && { backgroundColor: c.primaryBg },
