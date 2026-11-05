@@ -202,7 +202,13 @@ export default function NotificationsScreen() {
       router.push(n.data ? `/groups/${n.data}` : '/groups')
     } else if (n.type === 'page_member_invite') {
       router.push(n.data ? `/pages/${n.data}` : '/pages')
-    } else if (n.post_id) router.push(`/post/${n.post_id}`)
+    } else if (n.post_id) {
+      // AGORA-460: about a comment: open the post at that comment.
+      const aboutComment = ['comment_like', 'comment_reaction', 'post_comment', 'comment_reply'].includes(n.type)
+      router.push((aboutComment && n.comment_id
+        ? `/post/${n.post_id}?commentId=${n.comment_id}`
+        : `/post/${n.post_id}`) as any)
+    }
   }
 
   return (
