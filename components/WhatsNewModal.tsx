@@ -36,6 +36,32 @@ const FEATURES: { icon: string; title: string; desc: string; link?: string; link
     desc: 'Pin up to three of your own posts to the top of your profile. Use the menu on a post to pin or unpin it.',
   },
   {
+    icon: 'chatbubble-ellipses-outline',
+    title: 'Notifications jump to the comment',
+    desc: 'Tap a notification about a comment and the post opens at that comment, highlighted, even in a long thread.',
+    link: '/(tabs)/notifications',
+    linkText: 'Open Notifications →',
+  },
+  {
+    icon: 'flash-outline',
+    title: 'Reactions show instantly',
+    desc: 'Reactions on posts and comments appear the moment you pick them, and the timeline stays where it is. If one cannot be saved, it goes back and says so.',
+  },
+  {
+    icon: 'play-forward-outline',
+    title: 'Skip and seek in reels',
+    desc: 'Tap a reel for back and forward 10 seconds, and drag the bar at the bottom to jump around the video.',
+    link: '/reels',
+    linkText: 'Watch Reels →',
+  },
+  {
+    icon: 'filter-outline',
+    title: 'Content settings',
+    desc: 'Muted keywords and hidden posts now live together under Settings, Content.',
+    link: '/muted-keywords',
+    linkText: 'Open muted keywords →',
+  },
+  {
     icon: 'document-text-outline',
     title: 'Drafts',
     desc: 'Save a post to finish later. Tap the draft icon in the composer, then pick it from Drafts when you are ready. Drafts are kept for 90 days.',
