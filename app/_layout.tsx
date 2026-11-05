@@ -25,20 +25,22 @@ installJSErrorHandler()
 function getRouteForNotification(data: Record<string, string>): string | null {
   const { type, post_id, actor_username } = data
   switch (type) {
-    case 'post_like':
-    case 'post_reaction':
+    // AGORA-460: the server names the comment these are about; open the post at it.
     case 'post_comment':
     case 'comment_reply':
+    case 'comment_like':
+    case 'comment_reaction':
+      if (!post_id) return null
+      return data.comment_id ? `/post/${post_id}?commentId=${data.comment_id}` : `/post/${post_id}`
+    case 'post_like':
+    case 'post_reaction':
     case 'post_mention':
     case 'post_repost':
     case 'wall_post':
     case 'wall_post_pending':
     case 'fediverse_post':
     case 'atproto_post':
-    // AGORA-420: types the server now pushes that are about a post. The
-    // server sends the post a comment is on, so these open the thread.
-    case 'comment_like':
-    case 'comment_reaction':
+    // AGORA-420: types the server now pushes that are about a post.
     case 'user_post':
     case 'page_post':
     case 'group_tag':

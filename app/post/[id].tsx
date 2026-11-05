@@ -27,13 +27,16 @@ const PICKER = pickerMetrics(Dimensions.get('window').width)
 const DEPTH_INDENT = 20
 const DEPTH_AVATAR = [36, 28, 22]
 
-function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: {
+function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply, rowRef, highlightId }: {
   comment: any
   postId: string
   userId?: string
   depth?: number
   onRefresh: () => void
   onReply: (username: string, commentId: string) => void
+  // AGORA-460: lets the screen find this row to scroll to it, and which one to mark.
+  rowRef?: (id: string, v: View | null) => void
+  highlightId?: string
 }) {
   const c = useC()
   const [showPicker, setShowPicker] = useState(false)
@@ -74,7 +77,9 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
 
   return (
     <View>
-      <View style={[s.comment, { marginLeft: indent, borderBottomColor: c.border }]}>
+      <View ref={(v) => rowRef?.(comment.id, v)} collapsable={false}
+        style={[s.comment, { marginLeft: indent, borderBottomColor: c.border },
+          highlightId === comment.id && { backgroundColor: c.primaryBg, borderRadius: 10 }]}>
         {/* AGORA-452: the avatar and name open the commenter's profile, for
             local, Fediverse and Bluesky people alike, as on a post. */}
         <TouchableOpacity onPress={() => router.push(`/profile/${comment.username}` as any)}
@@ -218,10 +223,10 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
       {/* Nested replies */}
       {comment.replies?.map((reply: any) => (
         <View key={reply.id}>
-          <CommentRow comment={reply} postId={postId} userId={userId} depth={depth + 1} onRefresh={onRefresh} onReply={onReply} />
+          <CommentRow comment={reply} postId={postId} userId={userId} depth={depth + 1} onRefresh={onRefresh} onReply={onReply} rowRef={rowRef} highlightId={highlightId} />
           {/* Depth-2 replies */}
           {reply.replies?.map((r2: any) => (
-            <CommentRow key={r2.id} comment={r2} postId={postId} userId={userId} depth={depth + 2} onRefresh={onRefresh} onReply={onReply} />
+            <CommentRow key={r2.id} comment={r2} postId={postId} userId={userId} depth={depth + 2} onRefresh={onRefresh} onReply={onReply} rowRef={rowRef} highlightId={highlightId} />
           ))}
         </View>
       ))}
@@ -278,7 +283,7 @@ function CommentRow({ comment, postId, userId, depth = 0, onRefresh, onReply }: 
 export default function PostScreen() {
   const c = useC()
   const insets = useSafeAreaInsets()
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, commentId } = useLocalSearchParams<{ id: string; commentId?: string }>()
   const { user } = useAuthStore()
   const [comment, setComment] = useState('')
   const [commentImage, setCommentImage] = useState('')
@@ -349,6 +354,35 @@ export default function PostScreen() {
     setComment('')
   }
 
+  // AGORA-460: a notification about a comment opens the post at that comment.
+  // The comments sit in `commentsBox`, a direct child of the scroll view, so a
+  // row's position in it plus the box's own gives where to scroll to. Retried
+  // a few times, since the post and its images above are still laying out.
+  const scrollRef = useRef<ScrollView>(null)
+  const commentsBox = useRef<View>(null)
+  const boxY = useRef(0)
+  const rows = useRef<Record<string, View | null>>({})
+  const jumped = useRef('')
+  const [highlightId, setHighlightId] = useState<string | undefined>()
+  const registerRow = (rowId: string, v: View | null) => { rows.current[rowId] = v }
+  useEffect(() => {
+    if (!commentId || !commentsData || jumped.current === `${id}:${commentId}`) return
+    let tries = 0
+    const attempt = () => {
+      const row = rows.current[commentId], box = commentsBox.current
+      if (!row || !box) return // deleted, or not on this post: shown as usual
+      row.measureLayout(box as any, (_x, y) => {
+        jumped.current = `${id}:${commentId}`
+        scrollRef.current?.scrollTo({ y: Math.max(0, boxY.current + y - 90), animated: tries > 0 })
+        setHighlightId(commentId)
+        setTimeout(() => setHighlightId(undefined), 3200)
+        if (++tries < 3) setTimeout(attempt, 500) // again once images above have loaded
+      }, () => {})
+    }
+    const t = setTimeout(attempt, 250)
+    return () => clearTimeout(t)
+  }, [commentId, commentsData, id])
+
   const post = postData?.post
   const comments = commentsData?.comments || []
   const nestedReplyIds = new Set(comments.flatMap((c: any) => c.replies?.map((r: any) => r.id) ?? []))
@@ -362,7 +396,7 @@ export default function PostScreen() {
         headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary,
       }} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={insets.top + 44}>
-        <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => {
+        <ScrollView ref={scrollRef} style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => {
           setPulling(true)
           Promise.all([refetch(), rc()]).finally(() => setPulling(false))
         }} tintColor={c.primary} />}>
@@ -371,7 +405,8 @@ export default function PostScreen() {
             <PostUnavailable error={postError} onRetry={() => { refetch(); rc() }} />
           )}
           {post ? (
-          <View style={{ paddingHorizontal: 16, paddingBottom: 24 }}>
+          <View ref={commentsBox} collapsable={false} onLayout={(e) => { boxY.current = e.nativeEvent.layout.y }}
+            style={{ paddingHorizontal: 16, paddingBottom: 24 }}>
             <Text style={[s.commentsHeader, { color: c.textMuted }]}>
               {rootComments.length} {rootComments.length === 1 ? 'comment' : 'comments'}
             </Text>
@@ -384,6 +419,8 @@ export default function PostScreen() {
                 depth={0}
                 onRefresh={rc}
                 onReply={handleReply}
+                rowRef={registerRow}
+                highlightId={highlightId}
               />
             ))}
           </View>
